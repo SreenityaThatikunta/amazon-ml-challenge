@@ -125,8 +125,13 @@ def run_decide(cfg: Config) -> None:
 
         if cfg.run_test:
             with timed(st.log, "decide test"):
-                sc = pd.read_parquet(st.input_path(dc.scores_stage, "scores_test"))
-                a_t = one_owner(sc.astype({"q_id": str, "s1_id": str}))
+                # stream: every scores part holds complete queries, so the best row
+                # per query can be taken part by part (~10M rows kept, not ~250M)
+                src = st.input_path(dc.scores_stage, "scores_test")
+                a_t = pd.concat([one_owner(pd.read_parquet(f).astype({"q_id": str, "s1_id": str}))
+                                 for f in sorted(src.glob("*.parquet"))], ignore_index=True)
+                if a_t.q_id.duplicated().any():  # a query split across parts: resolve globally
+                    a_t = one_owner(a_t)
                 if dc.tie_duplicates:
                     rt = pd.read_parquet(st.input_path("normalize", "records_test"),
                                          columns=["entity_id", "source", "country", "name_raw",

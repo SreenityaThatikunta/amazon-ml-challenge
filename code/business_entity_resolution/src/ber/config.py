@@ -98,6 +98,8 @@ class ScorerConfig:
     n_threads: int = 0
     oof_folds: int = 3            # >1: also write out-of-fold scores for train-side pairs
     model_from_run: str | None = None  # apply that run's model instead of training
+    train_query_frac: float = 0.3   # share of featurised train-side queries used for training
+    es_query_frac: float = 0.2      # share of val-side queries used for early stopping
 
 
 @dataclass
@@ -132,6 +134,11 @@ class FranceConfig:
 
 
 @dataclass
+class SubmitConfig:
+    write_candidates: bool = False  # also write output/candidate_pairs.tsv (~3 GB; not needed)
+
+
+@dataclass
 class Config:
     run_id: str = "main"
     seed: int = 42
@@ -146,6 +153,7 @@ class Config:
     decide: DecideConfig = field(default_factory=DecideConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
     france: FranceConfig = field(default_factory=FranceConfig)
+    submit: SubmitConfig = field(default_factory=SubmitConfig)
 
     # ------------------------------------------------------ derived paths
     @property

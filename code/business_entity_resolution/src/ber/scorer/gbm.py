@@ -50,28 +50,70 @@ def train_model(tr: pd.DataFrame, va: pd.DataFrame, cfg: Config, log) -> lgb.Boo
                                 lgb.log_evaluation(100)])
 
 
+def _prep(df: pd.DataFrame) -> pd.DataFrame:
+    """float32 features (halves memory), int32 categoricals, string ids."""
+    num = [c for c in df.columns if c not in KEY_COLS and c not in CATEGORICAL]
+    df[num] = df[num].astype(np.float32)
+    for c in CATEGORICAL:
+        df[c] = df[c].astype("int32")
+    return df
+
+
+def load_sampled(path, cfg: Config, log) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Stream feature parts; keep a query-level sample of train-side rows and of
+    val-side rows (the latter for early stopping). Memory stays bounded."""
+    sc = cfg.scorer
+    tr_parts, es_parts = [], []
+    for f in sorted(path.glob("*.parquet")):
+        d = pd.read_parquet(f)
+        d["q_id"] = d.q_id.astype(str)
+        u = stable_unit(d.q_id, cfg.seed + 4)
+        t = d[(d.side == "train").to_numpy() & (u < sc.train_query_frac)]
+        e = d[(d.side == "val").to_numpy() & (u < sc.es_query_frac)]
+        if len(t):
+            tr_parts.append(_prep(t.copy()))
+        if len(e):
+            es_parts.append(_prep(e.copy()))
+    tr = pd.concat(tr_parts, ignore_index=True) if tr_parts else pd.DataFrame()
+    es = pd.concat(es_parts, ignore_index=True) if es_parts else pd.DataFrame()
+    log.info("sampled %d train rows, %d early-stopping rows", len(tr), len(es))
+    return tr, es
+
+
+def predict_side(model: lgb.Booster, path, side: str, feats: list[str]) -> pd.DataFrame:
+    """Scores for every row of one side, streaming the parts."""
+    out = []
+    for f in sorted(path.glob("*.parquet")):
+        d = pd.read_parquet(f)
+        d = d[d.side == side]
+        if d.empty:
+            continue
+        d = _prep(d)
+        out.append(d[["q_id", "s1_id", "y"]].assign(
+            p=model.predict(d[feats], num_iteration=model.best_iteration).astype(np.float32)))
+    return pd.concat(out, ignore_index=True)
+
+
 def run_scorer(cfg: Config) -> None:
     with StageRun(cfg, "scorer") as st:
-        with timed(st.log, "load train features"):
-            df = pd.read_parquet(st.input_path("features", "features_train"))
-            for c in CATEGORICAL:
-                df[c] = df[c].astype("int32")
-        tr, va = df[df.side == "train"], df[df.side == "val"]
-        del df
+        feat_dir = st.input_path("features", "features_train")
+        with timed(st.log, "load sampled train features"):
+            tr, va = load_sampled(feat_dir, cfg, st.log)
         st.metric("rows", {"train": len(tr), "val": len(va),
-                           "train_pos": int(tr.y.sum()), "val_pos": int(va.y.sum())})
-        feats = feature_columns(va)
+                           "train_pos": int(tr.y.sum()) if len(tr) else 0,
+                           "val_pos": int(va.y.sum()) if len(va) else 0})
+        feats = feature_columns(tr if len(tr) else va)
         if cfg.scorer.model_from_run:  # apply an existing model (e.g. France proxy)
             path = st.input_path("scorer", "model", run=cfg.scorer.model_from_run)
             model = lgb.Booster(model_file=str(path))
+            feats = feature_columns(pd.read_parquet(next(feat_dir.glob("*.parquet"))).head(1))
             missing = set(model.feature_name()) - set(feats)
             if missing:
                 raise ValueError(f"features missing for model: {sorted(missing)}")
             feats = model.feature_name()
-            p = model.predict(va[feats])
-            st.metric("val_auc", round(float(roc_auc_score(va.y, p)), 6))
-            st.write_parquet(va[["q_id", "s1_id", "y"]].assign(p=p.astype(np.float32)),
-                             "scores_val")
+            sv = predict_side(model, feat_dir, "val", feats)
+            st.metric("val_auc", round(float(roc_auc_score(sv.y, sv.p)), 6))
+            st.write_parquet(sv, "scores_val")
             return
         with timed(st.log, "train LightGBM"):
             model = train_model(tr, va, cfg, st.log)
@@ -96,11 +138,13 @@ def run_scorer(cfg: Config) -> None:
                 st.write_parquet(tr[["q_id", "s1_id", "y"]].assign(p=oof), "scores_train_oof")
                 st.metric("train_oof_auc", round(float(roc_auc_score(tr.y, oof)), 6))
 
-        p = model.predict(va[feats], num_iteration=model.best_iteration)
+        del va
+        with timed(st.log, "score all val pairs"):
+            sv = predict_side(model, feat_dir, "val", feats)
         st.metric("best_iteration", model.best_iteration)
-        st.metric("val_auc", round(float(roc_auc_score(va.y, p)), 6))
-        st.metric("val_logloss", round(float(log_loss(va.y, p)), 6))
-        st.write_parquet(va[["q_id", "s1_id", "y"]].assign(p=p.astype(np.float32)), "scores_val")
+        st.metric("val_auc", round(float(roc_auc_score(sv.y, sv.p)), 6))
+        st.metric("val_logloss", round(float(log_loss(sv.y, sv.p)), 6))
+        st.write_parquet(sv, "scores_val")
 
         if cfg.run_test:
             out_dir = st.path("scores_test")
@@ -111,9 +155,7 @@ def run_scorer(cfg: Config) -> None:
             with timed(st.log, "score test"):
                 src = st.input_path("features", "features_test")
                 for i, f in enumerate(sorted(src.glob("*.parquet"))):
-                    t = pd.read_parquet(f)
-                    for c in CATEGORICAL:
-                        t[c] = t[c].astype("int32")
+                    t = _prep(pd.read_parquet(f))
                     pt = model.predict(t[feats], num_iteration=model.best_iteration)
                     t[["q_id", "s1_id"]].assign(p=pt.astype(np.float32)).to_parquet(
                         out_dir / f"part-{i:05d}.parquet", index=False)

@@ -58,6 +58,8 @@ scorer:               # stage 2 (T3.4): LightGBM pair scorer
   n_threads: 0          # 0 = cpu_count - 2
   oof_folds: 3          # >1: out-of-fold scores for train-side pairs (LLM training prompts)
   model_from_run: null  # apply the model trained in that run instead of training (e.g. France proxy)
+  train_query_frac: 0.3   # share of featurised train-side queries used to train (~14M rows on 16 GB)
+  es_query_frac: 0.2      # share of val-side queries used for early stopping (all val pairs are scored)
 
 decide:               # stage 4 (T3.5/T4.1)
   method: expected_f  # threshold | expected_f
@@ -81,3 +83,6 @@ llm:                  # stage 3 (T3.6, T5.x): routed select-prompts for the LLM 
 france:               # T5.1: synthetic French validation proxy (from unlabelled test S1 France)
   n_entities: 20000   # S1 France records to generate S2/S3 copies and lookalikes for
   distractor_rate: 0.35  # per S1 and source: chance of one lookalike distractor
+
+submit:
+  write_candidates: false  # output/candidate_pairs.tsv (~3 GB, 244M ids) is not needed for our submission

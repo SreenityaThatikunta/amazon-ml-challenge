@@ -9,3 +9,7 @@ data:
 
 features:
   train_query_frac: 1.0
+
+scorer:
+  train_query_frac: 1.0
+  es_query_frac: 1.0

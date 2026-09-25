@@ -1,9 +1,9 @@
-"""``ber submit`` (task T3.5): write output/matching_results.tsv and
-output/candidate_pairs.tsv for the test set, then run the official validator.
+"""``ber submit`` (task T3.5): write output/matching_results.tsv for the test
+set and run the official validator on it.
 
-candidate_pairs.tsv is the full stage-1 candidate set, which is exactly what the
-scorer runs inference on. With ~10^8 pairs, grouping uses integer codes,
-not Python strings.
+Optionally (``submit.write_candidates``) also output/candidate_pairs.tsv, the
+full stage-1 candidate set (~2.4e8 pairs, ~3 GB; grouped with integer codes).
+Not needed for our submission.
 """
 
 from __future__ import annotations
@@ -58,26 +58,40 @@ def run_submit(cfg: Config) -> None:
         st.register("matching_results", out / "matching_results.tsv", rows=n)
         st.metric("matched_pairs", len(dec))
 
-        with timed(st.log, "candidate_pairs.tsv"):
-            sc, qc = [], []
-            for f in sorted(st.input_path("candidates", "candidates_test").glob("*.parquet")):
-                p = pd.read_parquet(f, columns=["q_id", "s1_id"])
-                sc.append(pd.Categorical(p.s1_id.astype(str), dtype=s1_cat).codes)
-                qc.append(pd.Categorical(p.q_id.astype(str), dtype=q_cat).codes)
-            sc_all, qc_all = np.concatenate(sc), np.concatenate(qc)
-            n = _write_grouped(out / "candidate_pairs.tsv", s1_ids, sc_all, q_ids, qc_all,
-                               CANDIDATE_HEADER)
-            st.register("candidate_pairs", out / "candidate_pairs.tsv", rows=n)
-            st.metric("candidate_pairs", len(sc_all))
+        if cfg.submit.write_candidates:
+            _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat)
+        else:
+            st.log.info("candidate_pairs.tsv skipped (submit.write_candidates=false)")
 
         with timed(st.log, "official validator"):
-            res = subprocess.run(
-                [sys.executable, str(cfg.root / "utils" / "validate_submission.py"),
-                 "--matching", str(out / "matching_results.tsv"),
-                 "--candidate", str(out / "candidate_pairs.tsv"),
-                 "--test-dir", str(cfg.data_dir / "test")],
-                capture_output=True, text=True)
-            st.log.info("validator output:\n%s%s", res.stdout, res.stderr)
-            st.metric("validator", "PASS" if res.returncode == 0 else "FAIL")
-            if res.returncode != 0:
-                raise RuntimeError("submission failed validation; see log.txt")
+            _validate(st, cfg, out)
+
+
+def _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat) -> None:
+    with timed(st.log, "candidate_pairs.tsv"):
+        sc, qc = [], []
+        for f in sorted(st.input_path("candidates", "candidates_test").glob("*.parquet")):
+            p = pd.read_parquet(f, columns=["q_id", "s1_id"])
+            sc.append(pd.Categorical(p.s1_id.astype(str), dtype=s1_cat).codes)
+            qc.append(pd.Categorical(p.q_id.astype(str), dtype=q_cat).codes)
+        sc_all, qc_all = np.concatenate(sc), np.concatenate(qc)
+        n = _write_grouped(out / "candidate_pairs.tsv", s1_ids, sc_all, q_ids, qc_all,
+                           CANDIDATE_HEADER)
+        st.register("candidate_pairs", out / "candidate_pairs.tsv", rows=n)
+        st.metric("candidate_pairs", len(sc_all))
+
+
+def _validate(st, cfg: Config, out) -> None:
+    """Official validator on matching_results.tsv only. It runs from utils/ on
+    purpose: when --candidate is omitted the validator loads
+    ./output/candidate_pairs.tsv if it exists, and at ~2.4e8 ids that needs
+    ~30 GB of RAM."""
+    res = subprocess.run(
+        [sys.executable, "validate_submission.py",
+         "--matching", str(out / "matching_results.tsv"),
+         "--test-dir", str(cfg.data_dir / "test")],
+        capture_output=True, text=True, cwd=cfg.root / "utils")
+    st.log.info("validator output:\n%s%s", res.stdout, res.stderr)
+    st.metric("validator", "PASS" if res.returncode == 0 else "FAIL")
+    if res.returncode != 0:
+        raise RuntimeError("submission failed validation; see log.txt")

@@ -23,14 +23,14 @@ Plan and task definitions: [plan.md](plan.md).
 | T1.3 | Learned Indic→Latin dictionary + fallback | ✅ | val exact-token match 95.8% (dict 84%, rules-only 23%) |
 | T1.4 | `normalize` stage (train + test) | ✅ | 24.2M records in 214 s |
 | T2.1 | Chunked TF-IDF top-k per country | ✅ | sparse_dot_topn; region-blocked, streamed per block |
-| T2.2 | Combine candidates + recall report | ✅ | dev pair recall 99.74%; full run in progress |
-| T2.3 | Tune k / index mix to recall targets | 🔄 | dev: US ✅ ≥99.8; India Latin 99.4–99.7, Indic val 98.4–98.7 ❌ |
+| T2.2 | Combine candidates + recall report | ✅ | full: pair recall 99.04%, cluster 96.78%, 24.5 cands/query, 83 min |
+| T2.3 | Tune k / index mix to recall targets | 🔄 | full: US 99.3%, India 98.2–99.2% ❌ (targets 99.8/99) — recall is a ceiling; revisit |
 | T2.4 | (conditional) Dense ANN fallback | ⬜ | |
 | T3.1 | Number-relation feature | ✅ | |
 | T3.2 | Edit-type / initials / gibberish features | ✅ | |
 | T3.3 | String + context features | ✅ | ~72k pairs/s |
 | T3.4 | LightGBM train + calibration | ✅ | dev val AUC 0.99992, logloss 0.0040 |
-| T3.5 | Minimal decision + submission (**first LB**) | 🔄 | `ber submit` built (writes both TSVs + runs validator); waiting on full-scale run |
+| T3.5 | Minimal decision + submission (**first LB**) | ✅ | output/matching_results.tsv: official validator PASS; ready for LB upload |
 | T3.6 | Router (uncertain band) | ✅ | dev: band [0.05,0.95] = 10.3% of queries, scorer top-1 precision there 0.59 |
 | T4.1 | Expected-F0.5 subset selection | ✅ | dev val F0.5 0.97655 (best threshold 0.97615) |
 | T4.2 | Duplicate tying / capacity assignment | ✅ | tying: 0 changes on dev (duplicates already agree) → kept as safety; capacity not needed yet |
@@ -55,6 +55,7 @@ Plan and task definitions: [plan.md](plan.md).
 | Date | Run id | Stage / change | Cand. recall | Val F0.5 | US | India | Indic | Singletons | Notes |
 |---|---|---|---|---|---|---|---|---|---|
 | 2026-09-25 | dev | first end-to-end: TF-IDF (region-blocked) → LightGBM → one-owner → expected-F0.5 | 99.74% | **0.97655** | 0.98929 | 0.96373 | 0.92228 | 0.97261 | dev index is small (70k S1) → optimistic; Indic val = Punjab (Gurmukhi unseen in train) |
+| 2026-09-25 | main | **full scale**: same pipeline; scorer on 13.6M sampled train pairs (AUC 0.99993) | 99.04% | **0.98211** | 0.98539 | 0.97696 | 0.97244 | 0.97707 | pair P 0.9964 / R 0.9555; expected-F robust (0.9820–0.9821 for min_p 0.02–0.5) |
 
 ### Leaderboard submissions
 | Date | Run id | Val F0.5 | Public LB | Δ vs prev | Notes |
@@ -72,6 +73,7 @@ Plan and task definitions: [plan.md](plan.md).
 | 2026-09-25 | Compute: Kaggle GPUs for LLM training/inference; local Mac for everything else | User's available compute |
 | 2026-09-25 | Unlabelled test data may be used for France (synthetic pairs + pseudo-labels) | User approval; document in methodology |
 | 2026-09-25 | Query direction S2/S3 → S1; one owner per record | EDA: all matched ids unique |
+| 2026-09-25 | Don't produce candidate_pairs.tsv (`submit.write_candidates=false`) | User: not needed for our submission; it is ~3 GB / 2.4e8 ids and the official validator needs ~30 GB RAM to check it |
 
 ---
 
@@ -186,7 +188,22 @@ Plan and task definitions: [plan.md](plan.md).
 - Performance lesson: two heavy jobs at once on 16 GB swap badly (the candidate run dropped to 77 MB resident) →
   run heavy stages one at a time. Candidate generation profile (Gujarat, 260k queries × 57k S1): 37 s; sparse
   top-k dominates. Empty-address queries now search only the name index.
-- Next: full-scale candidates (running) → features → scorer → decide → submit; France proxy F0.5; LLM export.
+- **Full-scale run (main)**:
+  - candidates: 83 min (train 48 min, test 34 min), peak 9.5 GB; pair recall **99.04%** (US 99.3%, India 98.2–99.2%),
+    cluster recall 96.8%, 253M train / ~240M test pairs. Region neighbourhoods got bloated by tiny misdetected regions
+    (min_share 0.001 too low for small regions) — cost, not correctness.
+  - features: 101 min (71M train pairs incl. 20% of train-side queries + all val; 244M test pairs), peak 9 GB.
+  - scorer: streams parts, float32, query-level sample (30% of featurised train queries = 13.6M rows; 20% of val for
+    early stopping); AUC 0.99993, logloss 0.0031, best iteration 548; 3-fold OOF AUC 0.99994; 34 min incl. test.
+    Top features: cos_combo_margin, cos_combo_gap, num_q_only, cos_combo_rank, num_s_only, n_jw_margin, hn_logdiff, hn_rel.
+  - decide: **val F0.5 0.98211** over 222,624 val S1 (US 0.9854, India 0.9770, Indic-matched 0.9724, singletons 0.9771).
+- **submit**: `output/matching_results.tsv` (1,732,544 rows; 5,835,284 matched pairs; 94,844 empty = 5.5%, singleton
+  rate in train 5.6%) — **official validator PASS**; own checks: 0 unknown ids, 0 one-owner violations.
+  - Gotchas: `decide` test loaded all 244M test scores with string ids → 15 GB swap; now streams one-owner per part
+    (peak 9.5 GB, 2.7 min). The official validator, when `--candidate` is omitted, silently loads
+    `./output/candidate_pairs.tsv` if it exists → ~30 GB → every CLI run hung. `ber submit` now runs it from `utils/`
+    on the matching file only; candidate_pairs.tsv is off by default (user decision). `submit` now takes 18 s.
+- Next: user uploads to LB; France proxy F0.5; LLM export; candidate recall (T2.3).
 
 ---
 
