@@ -16,6 +16,14 @@ Groups (see eda/FINDINGS.md):
   * context: each score relative to the query's other candidates (margin over
     the best other candidate, rank, gap to best), candidate counts per query
     and per S1
+  * lookalike (T7.2/T7.3, eda/reports/07_france_errors.txt): S1-level twins
+    (same name at another number / street / legal form) dominate France. Name
+    similarity without the S1's own city word ("Lille Club" vs "Lille Ecole");
+    address words each side has that the other lacks (Rue du Magasin vs Rue du
+    Chateau, Impasse vs Rue); house-number digit length and leading-digit
+    truncation (13 -> 3 is a different house in France); and **relative** margins
+    of number / legal-form / address / initials agreement over the query's other
+    candidates ("another candidate matches the number exactly")
 No country feature: every feature means the same thing in any country.
 """
 
@@ -26,9 +34,13 @@ import pandas as pd
 from rapidfuzz import fuzz, process
 from rapidfuzz.distance import Indel, JaroWinkler, Levenshtein, OSA
 
-from .numbers import number_features
+from .numbers import EQUAL, MISSING, PADDED, TRUNCATED, number_features
 
 CONTEXT_COLS = ["cos_combo", "cos_name", "cos_addr", "n_tsr", "n_jw", "a_tsr"]
+# agreement scores whose margin over the query's best other candidate is a feature
+RELATIVE_COLS = ["hn_quality", "l_quality", "a_word_quality", "n_q_is_initials", "n_core_eq",
+                 "n_nocity_ratio"]
+WORD_SIM = 0.8  # normalised Levenshtein similarity at which two address words "match"
 
 
 def _cp(a: pd.Series, b: pd.Series, scorer) -> np.ndarray:
@@ -76,6 +88,71 @@ def name_features(d: pd.DataFrame) -> pd.DataFrame:
     f["q_vocab_oov"] = d.q_vocab_oov
     f["s_name_freq"] = d.s_name_freq
     return f
+
+
+def addr_words(addr_norm: str) -> str:
+    """Non-numeric words of a normalised address (numbers are compared separately)."""
+    return " ".join(t for t in addr_norm.split() if not t.isdigit())
+
+
+def house_number(nums: str) -> str:
+    n = nums.split()
+    return n[0].lstrip("0") if n else ""
+
+
+def name_city(name_core: str, addr_norm: str) -> str:
+    """Name words that also occur in the record's own address (the city in
+    "Lille Club", "La Baule-Escoublac Sportive")."""
+    a = set(addr_norm.split())
+    return " ".join(t for t in name_core.split() if len(t) >= 3 and t in a and not t.isdigit())
+
+
+def _unmatched(a: list[str], b: list[str]) -> int:
+    """Words of ``a`` with no exact or near (OCR / typo) partner in ``b``."""
+    rest = set(a).difference(b)
+    if not rest or not b:
+        return len(rest)
+    return sum(process.extractOne(x, b, scorer=Levenshtein.normalized_similarity,
+                                  score_cutoff=WORD_SIM) is None for x in rest)
+
+
+def lookalike_features(d: pd.DataFrame, f: pd.DataFrame) -> pd.DataFrame:
+    """Features for telling S1-level lookalike twins apart (see module doc).
+    ``f`` holds the name/address features computed so far. Needs the per-record
+    extras ``addr_words``, ``house``, ``name_city`` (features.stage.record_extras)."""
+    out = pd.DataFrame(index=d.index)
+    # name without the S1's city words (S1 name words that also occur in its address)
+    q_core, s_core = d.q_name_core.tolist(), d.s_name_core.tolist()
+    city = [set(c.split()) for c in d.s_name_city]
+    qn = [" ".join(t for t in n.split() if t not in c) for n, c in zip(q_core, city)]
+    sn = [" ".join(t for t in n.split() if t not in c) for n, c in zip(s_core, city)]
+    out["n_nocity_ratio"] = process.cpdist(qn, sn, scorer=fuzz.ratio, workers=-1)
+    shared = [set(a.split()) & set(b.split()) for a, b in zip(q_core, s_core)]
+    out["n_shared_only_city"] = np.array([bool(x) and x <= c for x, c in zip(shared, city)],
+                                         dtype=np.int8)
+    out["n_s_city_frac"] = [len(c) / max(len(n.split()), 1) for c, n in zip(city, s_core)]
+    out["n_q_short"] = np.array([len(n) <= 5 and " " not in n and len(n) >= 2 for n in q_core],
+                                dtype=np.int8)
+    # address words each side lacks (fuzzy, so OCR noise and typos still match)
+    qw = [a.split() for a in d.q_addr_words]
+    sw = [a.split() for a in d.s_addr_words]
+    out["a_q_unmatched"] = np.array([_unmatched(a, b) for a, b in zip(qw, sw)], dtype=np.int16)
+    out["a_s_unmatched"] = np.array([_unmatched(b, a) for a, b in zip(qw, sw)], dtype=np.int16)
+    out["a_word_conflict"] = ((out.a_q_unmatched > 0) & (out.a_s_unmatched > 0)).astype(np.int8)
+    # house numbers: digit length of the shorter one; truncation by the leading digit
+    qh, sh = d.q_house.tolist(), d.s_house.tolist()
+    out["hn_len_min"] = np.array([min(len(a), len(b)) for a, b in zip(qh, sh)], dtype=np.int8)
+    out["hn_trunc_lead"] = np.array([len(a) != len(b) and bool(a) and bool(b) and
+                                     (a.endswith(b) or b.endswith(a)) and
+                                     not (a.startswith(b) or b.startswith(a))
+                                     for a, b in zip(qh, sh)], dtype=np.int8)
+    # agreement scores for the relative (margin) features
+    hq = np.select([f.hn_rel.isin([EQUAL, PADDED]), f.hn_rel.isin([TRUNCATED, MISSING])],
+                   [3, 1], 0)
+    out["hn_quality"] = hq.astype(np.int8)
+    out["l_quality"] = (f.l_eq - f.l_conflict).astype(np.int8)
+    out["a_word_quality"] = -(out.a_q_unmatched + out.a_s_unmatched).astype(np.int16)
+    return out
 
 
 def address_features(d: pd.DataFrame) -> pd.DataFrame:
@@ -130,6 +207,10 @@ def context_features(d: pd.DataFrame, f: pd.DataFrame) -> pd.DataFrame:
         out[f"{col}_margin"] = v - np.nan_to_num(other, nan=0.0)   # >0: beats all others
         out[f"{col}_gap"] = best - v
         out[f"{col}_rank"] = rank
+    for col in RELATIVE_COLS:  # margin only: > 0 beats every other candidate
+        v = f[col].to_numpy(dtype=np.float64)
+        _, other, _ = _best_other(q, v)
+        out[f"{col}_margin"] = np.where(np.isnan(other), 0.0, v - other)
     out["q_n_cands"] = np.bincount(q)[q]
     return out
 
@@ -143,4 +224,5 @@ def build_features(d: pd.DataFrame) -> pd.DataFrame:
     nf = name_features(d)
     af = address_features(d)
     f = pd.concat([retr, nf, af], axis=1)
+    f = pd.concat([f, lookalike_features(d, f)], axis=1)
     return pd.concat([f, context_features(d, f)], axis=1)

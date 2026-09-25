@@ -70,3 +70,39 @@ def test_build_features_smoke_and_signals():
     assert f.loc[2, "hn_rel"] == TRUNCATED and f.loc[2, "n_core_eq"] == 1
     assert f.loc[0, "cos_combo_margin"] == pytest.approx(0.8)
     assert f.loc[0, "l_eq"] == 1 and f.loc[2, "l_q_empty"] == 1
+
+
+def _fr(eid, src, name_core, addr, nums, legal=""):
+    r = _rec(eid, src, name_core, addr, nums, region="HDF", legal=legal)
+    r["country"] = "France"
+    return r
+
+
+def test_lookalike_features_french_twins():
+    """eda/reports/07: the query matches S1-a; S1-b is a twin at another number,
+    S1-c a twin on another street, S1-d another legal form."""
+    from ber.features.stage import join_records
+    recs = pd.DataFrame([
+        _fr("S1-a", 1, "lille amicale", "13 rue du vaisseau le vengeur lille", "13", legal="sarl"),
+        _fr("S1-b", 1, "lille amicale", "3 rue du vaisseau le vengeur lille", "3", legal="sarl"),
+        _fr("S1-c", 1, "lille amicale", "13 rue du chateau lille", "13", legal="sarl"),
+        _fr("S1-d", 1, "lille amicale", "13 rue du vaisseau le vengeur lille", "13", legal="sas"),
+        _fr("S1-e", 1, "lille ecole", "13 rue du vaisseau le vengeur lille", "13", legal="sarl"),
+        _fr("S2-1", 2, "lille amicale", "13 rue du vaiseau le vengeur lille", "13", legal="sarl"),
+    ])
+    rec = record_extras(recs).set_index("entity_id")
+    s1 = ["S1-a", "S1-b", "S1-c", "S1-d", "S1-e"]
+    cands = pd.DataFrame({"q_id": ["S2-1"] * 5, "s1_id": s1, "cos_name": [1.] * 5,
+                          "cos_addr": [1., .9, .6, 1., 1.], "cos_combo": [1., .9, .7, 1., .8],
+                          "rank_name": range(5), "rank_addr": range(5), "rank_combo": range(5)})
+    ctx = pd.DataFrame({"s_n_cands": [1] * 5, "s_n_top1": [1] * 5}, index=s1)
+    f = build_features(join_records(cands, rec, ctx)).set_index(pd.Index(s1))
+    assert f.loc["S1-a", "a_q_unmatched"] == 0             # "vaiseau" typo still matches
+    assert f.loc["S1-c", "a_word_conflict"] == 1           # vaisseau vengeur vs chateau
+    assert f.loc["S1-b", "hn_len_min"] == 1 and f.loc["S1-b", "hn_trunc_lead"] == 1
+    assert f.loc["S1-b", "hn_quality_margin"] < 0          # another candidate has the exact number
+    assert f.loc["S1-d", "l_quality_margin"] < 0           # another candidate has the same legal form
+    assert f.loc["S1-a", "l_quality_margin"] == 0 and f.loc["S1-a", "hn_quality_margin"] == 0
+    assert f.loc["S1-e", "n_nocity_ratio"] < f.loc["S1-e", "n_ratio"] - 10  # city word removed
+    assert f.loc["S1-e", "n_shared_only_city"] == 1
+    assert f.loc["S1-a", "n_s_city_frac"] == 0.5

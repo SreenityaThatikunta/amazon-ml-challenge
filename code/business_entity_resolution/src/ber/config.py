@@ -100,6 +100,20 @@ class ScorerConfig:
     model_from_run: str | None = None  # apply that run's model instead of training
     train_query_frac: float = 0.3   # share of featurised train-side queries used for training
     es_query_frac: float = 0.2      # share of val-side queries used for early stopping
+    extra_train: list[str] = field(default_factory=list)  # runs whose labelled features_train
+                                                          # pairs are added to training only
+    extra_train_frac: float = 1.0   # query-level share of extra_train pairs used
+    unseen_extra_train: list[str] = field(default_factory=list)  # runs added to a 2nd model for
+                                                                 # countries absent from train
+    unseen_base_frac: float = 0.5   # share of the main model's real pairs in the unseen model
+
+
+@dataclass
+class RescoreConfig:
+    k: int = 3                 # top-k stage-1 candidates per query that get rescored
+    conf: float = 0.5          # stage-1 p for a query to count as a confident cluster member
+    folds: int = 2             # cross-fitting folds on val (by the query's best S1)
+    model_from_run: str | None = None  # apply that run's rescore model to val (France proxy)
 
 
 @dataclass
@@ -109,7 +123,8 @@ class DecideConfig:
     min_p: float | None = None      # expected_f: drop p below this; None = best on val sweep
     empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
     tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
-    scores_stage: str = "scorer"    # "scorer" or "llm-import" (blended LLM scores)
+    scores_stage: str = "scorer"    # "scorer", "rescore" (M8) or "llm-import" (blended LLM scores)
+    eval_s1: str | None = None      # TSV (entity_id) restricting val scoring to these S1
     sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
                                                         0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])
 
@@ -131,11 +146,15 @@ class LlmConfig:
 class FranceConfig:
     n_entities: int = 20_000        # test S1 France records to synthesise S2/S3 for
     distractor_rate: float = 0.35   # per S1 and source: chance of one lookalike distractor
+    background_run: str | None = "main"  # run whose test scores pick unmatched background records
+    background_max_p: float = 0.01  # background: best candidate p below this
+    background_frac: float = 0.45   # background records per synthetic query
+    exclude: str | None = None      # TSV (entity_id) of S1 never to synthesise (e.g. proxy eval S1)
 
 
 @dataclass
 class SubmitConfig:
-    write_candidates: bool = False  # also write output/candidate_pairs.tsv (~3 GB; not needed)
+    write_candidates: bool = True  # also write output/candidate_pairs.tsv (~3 GB; required in the zip)
 
 
 @dataclass
@@ -150,6 +169,7 @@ class Config:
     candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
     scorer: ScorerConfig = field(default_factory=ScorerConfig)
+    rescore: RescoreConfig = field(default_factory=RescoreConfig)
     decide: DecideConfig = field(default_factory=DecideConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
     france: FranceConfig = field(default_factory=FranceConfig)

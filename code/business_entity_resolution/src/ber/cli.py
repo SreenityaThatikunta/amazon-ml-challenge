@@ -66,6 +66,11 @@ def cmd_scorer(cfg: Config, args: argparse.Namespace) -> None:
     run_scorer(cfg)
 
 
+def cmd_rescore(cfg: Config, args: argparse.Namespace) -> None:
+    from .cluster.stage import run_rescore
+    run_rescore(cfg)
+
+
 def cmd_decide(cfg: Config, args: argparse.Namespace) -> None:
     from .decide.stage import run_decide
     run_decide(cfg)
@@ -112,6 +117,7 @@ COMMANDS: dict[str, Command] = {
     "scorer": Command(cmd_scorer, "stage 2: train/apply LightGBM scorer"),
     "llm-export": Command(cmd_llm_export, "stage 3: route uncertain queries, export prompts"),
     "llm-import": Command(cmd_llm_import, "stage 3: import Kaggle LLM scores, blend on val"),
+    "rescore": Command(cmd_rescore, "M8: second-stage scorer with cluster context (val cross-fit)"),
     "decide": Command(cmd_decide, "stage 4: one-owner assignment + expected-F0.5, val F0.5"),
     "synth-france": Command(cmd_synth_france, "synthetic labelled French data (validation proxy)"),
     "submit": Command(cmd_submit, "write output/*.tsv for test and run the validator"),

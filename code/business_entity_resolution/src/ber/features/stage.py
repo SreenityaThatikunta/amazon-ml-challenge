@@ -19,7 +19,7 @@ from ..artifacts import StageRun
 from ..config import Config
 from ..eval.split import stable_unit
 from ..log import timed
-from .build import build_features, initials
+from .build import addr_words, build_features, house_number, initials, name_city
 
 REC_COLS = ["entity_id", "source", "country", "name_core", "name_compact", "name_legal",
             "name_pre_core", "name_alt_core", "name_is_domain", "name_has_alias", "name_indic",
@@ -28,11 +28,15 @@ REC_COLS = ["entity_id", "source", "country", "name_core", "name_compact", "name
 
 
 def record_extras(recs: pd.DataFrame) -> pd.DataFrame:
-    """Per-record extras: initials, share of name tokens unknown to the S1 name
+    """Per-record extras: initials, address words / house number / city words in
+    the name (lookalike features), share of name tokens unknown to the S1 name
     vocabulary of the country (gibberish brand names score high), and for S1 how
     many S1 of the country share the exact core name (ambiguity)."""
     recs = recs.copy()
     recs["initials"] = initials(recs.name_core)
+    recs["addr_words"] = [addr_words(a) for a in recs.addr_norm]
+    recs["house"] = [house_number(x) for x in recs.addr_numbers]
+    recs["name_city"] = [name_city(n, a) for n, a in zip(recs.name_core, recs.addr_norm)]
     s1 = recs[recs.source == 1]
     vocab = {c: Counter(t for n in g.name_core for t in set(n.split()))
              for c, g in s1.groupby("country")}
