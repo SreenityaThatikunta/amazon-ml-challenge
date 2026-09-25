@@ -1,0 +1,13 @@
+# Pinned runtime + dev dependencies (Python 3.12, macOS arm64 / Linux x86_64).
+# Licenses verified with tools/check_licenses.py (see progress.md, T0.1).
+# LLM-stage dependencies (torch, transformers, peft, vllm) are pinned separately
+# in kaggle/requirements.txt at T5.4.
+numpy==2.5.3
+pandas==3.0.6
+pyarrow==25.0.1
+scipy==1.18.1
+scikit-learn==1.9.1
+rapidfuzz==3.14.6
+lightgbm==4.7.0
+PyYAML==6.0.3
+pytest==9.1.1

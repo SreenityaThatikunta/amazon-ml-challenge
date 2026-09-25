@@ -62,7 +62,9 @@ configs/
 src/ber/
   config.py                typed config (dataclasses) + yaml loading
   log.py                   structured logging, stage timers
-  io.py                    TSV readers, parquet artifacts, manifests, submission writers
+  io.py                    TSV readers, parquet read/write, submission (id-list) writers
+  artifacts.py             StageRun: per-stage dir, log.txt, manifest.json (status/timing/memory/
+                           config hash/git/inputs/outputs/metrics), upstream input resolution
   normalize/
     text.py                case/accents/punct, junk tokens, suffix split, typo map
     address.py             number extraction, street types, state/region/département maps

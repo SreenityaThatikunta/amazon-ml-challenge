@@ -1,0 +1,8 @@
+# Fast iteration: the full pipeline on a small slice of states.
+extends: default.yaml
+
+run_id: dev
+log_level: DEBUG
+
+data:
+  slice: dev

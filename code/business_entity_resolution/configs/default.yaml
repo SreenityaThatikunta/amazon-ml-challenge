@@ -1,0 +1,24 @@
+# Default pipeline configuration. Every key is documented here; the schema
+# (types, defaults) is in src/ber/config.py and unknown keys are rejected.
+# Override per run with another file (`extends: default.yaml`) or
+# `--set section.key=value` on the command line.
+
+run_id: main          # artifacts go to <artifacts_dir>/<run_id>/
+seed: 42
+log_level: INFO
+
+paths:                # relative to the project root (dir containing dataset/)
+  root: ""            # "" = auto-detect; or set BER_ROOT
+  data_dir: dataset
+  artifacts_dir: artifacts
+  output_dir: output
+
+data:
+  slice: null         # null = full data; "dev" = small dev slice (defined in T0.3)
+
+candidates:           # stage 1 (T2.x)
+  ngram: 3            # character n-gram size for TF-IDF
+  k_name: 10          # top-k S1 per query from the name index
+  k_addr: 10          # top-k S1 per query from the address index
+  k_translit: 10      # top-k S1 per query from the transliterated-name index
+  chunk_size: 20000   # queries per sparse matmul chunk (memory vs speed)
