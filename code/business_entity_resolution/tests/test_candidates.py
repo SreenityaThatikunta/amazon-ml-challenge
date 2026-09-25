@@ -56,3 +56,24 @@ def test_region_neighbors_symmetric_and_thresholded():
                       "owner": ["S1-1"] * 4 + ["S1-3"] + ["S1-1"] * 5 + ["S1-2", "S1-2"]})
     nb = region_neighbors(pd.concat([s1, q]), 0.1)["India"]
     assert nb["AP"] == ["AP", "TG"] and nb["TG"] == ["AP", "TG"] and nb["MH"] == ["MH"]
+
+
+def test_gpu_topk_matches_cpu():
+    import numpy as np
+    import pytest
+    import scipy.sparse as sp
+    from sklearn.preprocessing import normalize
+
+    from ber.candidates.tfidf import gpu_available, topk
+    if not gpu_available():
+        pytest.skip("no CUDA device / CuPy")
+    rng = np.random.default_rng(0)
+    S = normalize(sp.random(3000, 400, density=0.03, format="csr", random_state=1,
+                            dtype=np.float32))
+    Q = normalize(sp.random(500, 400, density=0.03, format="csr", random_state=2,
+                            dtype=np.float32))
+    a = topk(Q, S, 5, 1000, 2)
+    b = topk(Q, S, 5, 1000, 2, device="gpu")
+    assert (a[0] == b[0]).all()                       # same number of hits per query
+    np.testing.assert_allclose(a[2], b[2], atol=1e-5)  # same similarities in rank order
+    del rng

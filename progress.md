@@ -7,6 +7,56 @@ Plan and task definitions: [plan.md](plan.md).
 
 ---
 
+## v2 (branch `improve/v2`, 2026-09-25 → 27)
+
+Starting point: `main` at 6120d59 (val macro F0.5 0.98211 on the geographic split;
+leaderboard ≈ 0.975, top 50). Goal: raise the leaderboard score without breaking the
+rules, and ship the `candidate_pairs.tsv` that the organisers now say **counts toward the
+final ranking** (smaller candidate set per S1 = ranked higher).
+
+### v2 at a glance
+
+| # | Change | Where | Why (the logic) |
+|---|---|---|---|
+| 1 | Windows support | `log.py` | `import resource` is Unix-only; peak memory now via `psutil` on Windows. The pipeline didn't start on the Windows laptop without this. |
+| 2 | `data.phase = all / train / test` | `config.py`, every stage, `artifacts.py` | Experiments only need the train/val side (~2.5 h); the test side (~3 h) runs once per candidate model. A `test` pass reuses the model, region neighbourhoods and decision parameters of the train pass (manifests are merged). `data.phase` is excluded from the config hash. |
+| 3 | Bounded memory | candidates, features, scorer, rerank | The laptop has 16 GB shared with the user's apps; main peaked at ~9.5 GB and hit 96 % RAM. Candidates and features now read records **one country at a time** (parquet filter) and build query TF-IDF matrices **per region block**; the scorer keeps its sample as one float32 matrix (LightGBM reads it in place: a mixed-dtype frame was silently converted to float64, doubling memory) and frees it once binned; rerank streams the val features part by part. Scorer sample: 10 % of featurised train queries (was 30 %), 5 % of val for early stopping (was 20 %); feature chunks of 1 M pairs (was 2 M). |
+| 4 | Name normalisation fixes | `normalize/text.py`, `tables/name_stopwords.tsv` | Found in the raw data (see "Evidence" below): ~1 % of S2/S3 names carry injected record ids / phone numbers (`(ID: 63317)`, `#32038`, `- 9334025793`) that S1 never has → dropped (5-digit and ≥7-digit numbers, `#nnn`). Doubled words (`Dynamic Dynamic`) collapsed. Legal-word typos with swapped letters (`Priavte`, `Privtae`) now caught (OSA distance ≤ 1 instead of Levenshtein). New stopwords `of`, `et` (French "&"), `dr` (honorific the noise prepends to Indian names), `id`. On 300k Latin true pairs: exact core-name equality 58.9 % → 60.1 %. |
+| 5 | Filler-free name key + IDF overlap (`k_*`) | `features/stage.py`, `features/build.py` | The generator appends filler words to S2/S3 names (US: Riverside, Westgate, Services, Holdings…; India: Smt, Shri, Sweets, Infratech…; France: Participations, Holding, Distribution, Développement…). They are learned **without labels**: tokens whose share of S2/S3 names is ≥ 2× their share of S1 names (a copy of an S1 keeps S1's token rates, so only injected tokens stand out); union over splits × countries so train and test agree. Key = sorted unique core tokens minus fillers (also removes word-order transpositions). Features: key equality / Levenshtein / ratio / token-set ratio, IDF-weighted recall & precision, largest IDF of an unmatched token on each side ("Meridian Dental" vs "Meridian Plumbing"), unmatched counts; context margins. Vectorised with sparse matrices (~4 µs/pair). |
+| 6 | House-number features v2 (`hn_*`) | `features/numbers.py` | In true pairs the *first* number is often not the house number: Indian S2/S3 addresses get a fake number prepended (`H.NO 937 33, …`, `PLOT 57 1808/B4`) and components are reordered (`Unit 177, AZ, 9310 Main St` → `AZ, 9310 MAIN ST`). Main compared only first numbers (India: 12.6 % of true pairs "different"). New: S1's first number anywhere in the query numbers (and vice versa), best relation to any query number, digit edit distance, position of the leftmost differing digit (true typos hit leading digits 394→894; distractors shift the last digit 5835→5838). |
+| 7 | Made-up brand names (`q_brand`, `s_brand`) | `features/stage.py` | ~1.6 % of true pairs replace the whole name with a made-up brand (`Grand Physical Therapy` → `Jaxdrexquo`). They are concatenations of ~45 syllables (tavo, jax, kelo, zeph, flux, onyx, …) learned from train pairs (maximal frequent prefixes). The flag covers 96 % of them and fires on 0.03 % of S1 names, so the model knows the name carries no evidence and must decide on the address. |
+| 8 | Address-word IDF overlap (`a_idf_*`) | `features/build.py` | Street and locality words are rare, cities and street types common; exact IDF-weighted overlap of the address words (numbers excluded) helps exactly the pairs whose names can't (brands, initials) and lookalikes at another street. |
+| 9 | **Stage-2 re-ranker** (`ber rerank`) | `rerank/stage.py` | Stage 1 judges each pair alone (plus the *query's* other candidates). It never sees the *S1 side*: how many other records already claim that S1, how strongly, from which source. That is what separates a true match from the lookalike distractor next to it, and a singleton from an S1 that attracts one stray record. Stage 2 = LightGBM on p1 + query context + S1 context (rank of the record among all records listing the S1, best/sum/count of competing p1, same restricted to the record's source, "claims" = records whose best S1 it is) + 19 stage-1 features. It needs complete S1 groups, so it trains on the **val side, cross-fitted in 4 folds** (grouped by the record's top S1): every val pair gets an out-of-fold p2, the val F0.5 stays honest, and test uses the mean of the 4 fold models. Pairs with p1 < 0.001 are dropped first. |
+| 10 | `candidate_pairs.tsv` from the final model's input | `submit.py` | Main didn't write it (3 GB at 2.4 e8 TF-IDF pairs). The rules: "the exact set of records you feed into your matching model … if your pipeline has several blocking/filtering stages, the last one". With stage 2 that is the stage-1-filtered set (~1.3 pairs per record), a few candidates per S1 instead of ~140. Validator now also checks the candidate file. |
+| 11 | Exact expected F0.5 (`decide.method = expected_f_exact`) | `decide/expected_f.py` | The ratio-of-expectations approximation is biased on the tiny groups here (1–6 candidates per S1). Exact expectation via Poisson-binomial distributions (brute-force checked in tests). Both variants are reported by `ber decide`. |
+| 12 | Ablation switch `scorer.drop_features` | `scorer/gbm.py` | Train the scorer without a feature group (`k_*`, names) to measure what each change buys. |
+
+### Evidence behind the changes (raw-data checks, 2026-09-25)
+- **Name noise per country (test S2/S3 vs S1, % of names):** US/India carry `(ID: …)` 0.26–0.32 %, phone numbers 0.26–0.32 %, `#nnnnn` 0.26–0.32 %; France none of those but quotes (0.05 %), `et` for `&` (0.27 %) and far more accents (17 %). Injected honorifics in India only (8 %).
+- **Token add/drop rates (S1 vs S2/S3 names):** added — US `riverside/westgate/lakeside/midtown/…` (~0.5 % each, never in S1), `services`, `holdings`; India `smt/shri/sri/dr/mr` (~1.3 % each), `sweets/bakery/hardware/…`; France `participations` (2.4 %), `holding`, `distribution`, `international`, `développement`, `groupe`. Dropped — legal forms, `group`, `associates`, `center`, `india` (~21 % of the time).
+- **True-pair name residuals after normalisation (300k Latin pairs):** 60 % equal, 9.5 % typo ≤ 3, 5.4 % query adds a token, 5.3 % drops one, 2.5 % reordered, 17 % other (domains, heavy typos, brand replacement, initials). True-pair typos are *not* just OCR-style: arbitrary letter substitutions/insertions are common (`Mitllls`, `Amvhation`, `Hfabor`).
+- **House numbers in true pairs:** equal 63 % (India) / 73 % (US); "different" 12.6 % / 4.7 % — mostly the prepended fake number and reordering; "shifted" 3.4 % / 1.7 % (digit typos).
+- **Test is not train-shaped:** 5.5–5.8 S2/S3 records per S1 in test vs 4.7 in train, i.e. ~40 % of test records are unmatched vs 26 % in train (estimated from main's predicted links). If the extra records are lookalikes, precision on test is at more risk than val suggests: see open questions.
+
+### Results
+| Date | Run | Change | Pair recall (TF-IDF) | Val F0.5 | US | India | Singletons | Notes |
+|---|---|---|---|---|---|---|---|---|
+| 2026-09-25 | main (reported) | baseline | 99.04 % | 0.98211 | 0.98539 | 0.97696 | 0.97707 | Mac, from progress below |
+| 2026-09-25 | dev2 (dev slice) | v2 features, stage 1 only | 99.73 % | 0.98079 | | | | main's dev slice: 0.97655 |
+| 2026-09-25 | dev2 (dev slice) | + stage-2 re-ranker + exact expected F | | **0.98771** | | | | p2 AUC 0.9985 vs p1 0.9951 on kept pairs |
+| | v2 (full) | all of the above | TBD | TBD | | | | |
+
+### Open questions / what the user can help with
+- ~~Which file produced the ≈ 0.975 leaderboard score?~~ **Answered 2026-09-25: main's
+  `output/matching_results.tsv`** (val 0.98211). So val over-estimates the public
+  leaderboard by ≈ 0.007. Candidate causes, to check on the v2 test predictions:
+  (a) France (15 % of test S1, no labels anywhere) scoring well below US/India;
+  (b) the larger share of unmatched records in test (~40 % vs 26 %) costing precision
+  and singletons. Val gains should therefore be read as relative, not absolute.
+- Leaderboard feedback on the v2 file, to compare with its val score.
+
+---
+
 ## Task board
 
 | ID | Task | Status | Notes |

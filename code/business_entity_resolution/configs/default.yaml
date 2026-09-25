@@ -43,6 +43,9 @@ candidates:           # stage 1 (T2.x): char n-gram TF-IDF top-k per country
   block_by_region: true   # search only S1 in the query region's neighbourhood (no region: whole country)
   region_min_share: 0.001 # neighbourhood = owner regions with >= this share of a region's true matches
   k_name_noaddr: 30       # name candidates for queries with an empty address
+  device: auto            # top-k search: cpu | gpu (optional CuPy, MIT; ~10-30x faster) | auto
+  gpu_mem_gb: 1.5         # GPU memory for one chunk's dense similarity block
+  gpu_min_s1: 50000       # smaller blocks search on the CPU (GPU wins only on large blocks)
 
 features:             # stage 2 (T3.3)
   train_query_frac: 0.2   # share of train-side queries featurised (val side: all)
@@ -77,7 +80,8 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   early_stopping: 50
   raw_features: [q_source, hn_rel, n_core_eq, n_compact_eq, a_bag_eq, a_q_empty, a_s_empty,
                  cos_combo, cos_name, cos_addr, n_lev, n_sub, a_tsr, n_tsr, s_name_freq,
-                 s_n_cands, r_eq, num_q_only, num_s_only]   # stage-1 features passed through
+                 s_n_cands, r_eq, num_q_only, num_s_only, k_idf_rec, k_idf_unmatched_s,
+                 a_idf_rec, hn_s_in_q, hn_best_rel, q_brand]   # stage-1 features passed through
 
 decide:               # stage 4 (T3.5/T4.1)
   method: expected_f  # threshold | expected_f (ratio approximation) | expected_f_exact (v2)

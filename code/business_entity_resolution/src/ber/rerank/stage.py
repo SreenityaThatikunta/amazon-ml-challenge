@@ -138,6 +138,13 @@ def _read_val(st: StageRun, cfg: Config, raw_cols: list[str]):
     in order (val side only), so the two line up row by row (checked part by
     part); only the kept rows of each part are held in memory."""
     sv = st.read_input("scorer", "scores_val")
+    # candidate-set size vs recall for other filter levels (the organisers rank smaller
+    # candidate sets higher): pairs per val query and share of true pairs kept
+    n_q = max(sv.q_id.nunique(), 1)
+    st.metric("filter_tradeoff", {t: {"pairs_per_query": round(float((sv.p >= t).sum()) / n_q, 3),
+                                      "true_pairs_kept": round(float(sv.y[sv.p >= t].sum())
+                                                               / max(float(sv.y.sum()), 1), 5)}
+                                  for t in (0.0, 0.0003, 0.001, 0.003, 0.01, 0.03)})
     keep_all = (sv.p >= cfg.rerank.min_p1).to_numpy()
     sv_q = sv.q_id.astype(str).to_numpy()
     parts, off = [], 0

@@ -28,7 +28,7 @@ import pandas as pd
 from ..artifacts import StageRun
 from ..config import Config
 from ..log import timed
-from .tfidf import fit_index, pair_cosine, ranks_within_query, topk
+from .tfidf import fit_index, gpu_available, pair_cosine, ranks_within_query, topk
 
 INDEXES = ("name", "addr", "combo")
 RECORD_COLS = ["entity_id", "source", "country", "name_core", "addr_bag", "region",
@@ -83,11 +83,27 @@ def _groups(s1: pd.DataFrame, q: pd.DataFrame, by_region: bool,
         yield np.arange(len(s1)), orphans
 
 
-def _search_group(mats, s_pos, q_pos, no_addr, n_s1, cfg: Config, threads: int):
+def resolve_device(cfg: Config) -> str:
+    """candidates.device: "cpu", "gpu", or "auto" (GPU when CuPy and a CUDA device
+    are available)."""
+    d = cfg.candidates.device
+    if d == "auto":
+        return "gpu" if gpu_available() else "cpu"
+    if d == "gpu" and not gpu_available():
+        raise RuntimeError("candidates.device=gpu but CuPy / a CUDA device is not available")
+    return d
+
+
+def _search_group(mats, s_pos, q_pos, no_addr, n_s1, cfg: Config, threads: int,
+                  device: str = "cpu"):
     """Top-k union for one block: returns (keys, {index: (keys, ranks)})."""
     cc = cfg.candidates
     k = {"name": cc.k_name, "addr": cc.k_addr, "combo": cc.k_combo}
     rank_of = {}
+    # the GPU wins on large blocks only (dense per-query work grows with the block's
+    # S1 count; the CPU kernel's with overlapping postings); small blocks stay on CPU
+    if device == "gpu" and len(s_pos) < cc.gpu_min_s1:
+        device = "cpu"
     for ix in INDEXES:
         Xs, Xq = mats[ix]
         parts_k, parts_r = [], []
@@ -100,7 +116,8 @@ def _search_group(mats, s_pos, q_pos, no_addr, n_s1, cfg: Config, threads: int):
         for qp, kk in runs:
             if len(qp) == 0:
                 continue
-            qi, sj, _ = topk(Xq[qp], Xs[s_pos], kk, cc.chunk_size, threads, cc.min_sim)
+            qi, sj, _ = topk(Xq[qp], Xs[s_pos], kk, cc.chunk_size, threads, cc.min_sim,
+                             device, cc.gpu_mem_gb)
             parts_k.append(qp[qi].astype(np.int64) * n_s1 + s_pos[sj])
             parts_r.append(ranks_within_query(qi))
         rank_of[ix] = (np.concatenate(parts_k) if parts_k else np.array([], dtype=np.int64),
@@ -118,6 +135,8 @@ def generate_country(s1: pd.DataFrame, q: pd.DataFrame, cfg: Config, log,
     k = {"name": cc.k_name, "addr": cc.k_addr, "combo": cc.k_combo}
     no_addr = (q.addr_bag == "").to_numpy()
     threads = cc.n_threads or max(1, (os.cpu_count() or 4) - 2)
+    device = resolve_device(cfg)
+    log.info("  top-k search on %s", device)
     n_s1 = len(s1)
     fitted = {}
     for ix in INDEXES:
@@ -135,7 +154,8 @@ def generate_country(s1: pd.DataFrame, q: pd.DataFrame, cfg: Config, log,
         mats = {ix: (Xs, vec.transform(_texts(qb, ix)).tocsr())
                 for ix, (vec, Xs) in fitted.items()}
         local = np.arange(len(q_pos))
-        keys, rank_of = _search_group(mats, s_pos, local, no_addr[q_pos], n_s1, cfg, threads)
+        keys, rank_of = _search_group(mats, s_pos, local, no_addr[q_pos], n_s1, cfg, threads,
+                                      device)
         qi, sj = keys // n_s1, keys % n_s1
         out = pd.DataFrame({"q_id": q_ids[q_pos[qi]], "s1_id": s_ids[sj]})
         for ix in INDEXES:

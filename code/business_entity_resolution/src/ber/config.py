@@ -82,6 +82,9 @@ class CandidatesConfig:
     block_by_region: bool = True
     region_min_share: float = 0.001  # neighbourhood: owner regions with >= this share
     k_name_noaddr: int = 30       # name candidates for queries with an empty address
+    device: str = "auto"          # top-k search: "cpu" | "gpu" (CuPy) | "auto"
+    gpu_mem_gb: float = 1.5       # GPU memory for one chunk's dense similarity block
+    gpu_min_s1: int = 50_000      # blocks with fewer S1 records search on the CPU
 
 
 @dataclass
@@ -123,7 +126,8 @@ class RerankConfig:
     raw_features: list[str] = field(default_factory=lambda: [
         "q_source", "hn_rel", "n_core_eq", "n_compact_eq", "a_bag_eq", "a_q_empty",
         "a_s_empty", "cos_combo", "cos_name", "cos_addr", "n_lev", "n_sub", "a_tsr", "n_tsr",
-        "s_name_freq", "s_n_cands", "r_eq", "num_q_only", "num_s_only"])
+        "s_name_freq", "s_n_cands", "r_eq", "num_q_only", "num_s_only", "k_idf_rec",
+        "k_idf_unmatched_s", "a_idf_rec", "hn_s_in_q", "hn_best_rel", "q_brand"])
 
 
 @dataclass
