@@ -45,3 +45,11 @@ def test_hash_ignores_run_id_but_not_params():
     assert a.hash() == load_config(run_id="b").hash()
     assert a.hash() != load_config(overrides=["seed=1"]).hash()
     assert DEFAULT_CONFIG.exists()
+
+
+def test_list_and_optional_fields():
+    cfg = load_config(overrides=["decide.sweep=[0.1, 0.5]", "decide.threshold=0.3"])
+    assert cfg.decide.sweep == [0.1, 0.5] and cfg.decide.threshold == 0.3
+    assert load_config().decide.threshold is None
+    with pytest.raises(ConfigError, match="expected"):
+        load_config(overrides=["decide.sweep=0.5"])

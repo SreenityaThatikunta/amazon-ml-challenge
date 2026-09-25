@@ -1,0 +1,11 @@
+# Tokens dropped from name_core (kept in name_norm): articles, honorifics and connectors
+# that the noise adds or drops freely (EDA 03: the, mr, smt, shri, sri, and, m/s).
+token	reason
+the	article
+and	connector
+mr	honorific
+mrs	honorific
+ms	honorific
+smt	honorific
+shri	honorific
+sri	honorific

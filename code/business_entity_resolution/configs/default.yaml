@@ -15,10 +15,69 @@ paths:                # relative to the project root (dir containing dataset/)
 
 data:
   slice: null         # null = full data; "dev" = small dev slice (defined in T0.3)
+  split_run: main     # run whose `split` stage defines train/val sides and the dev slice
+  with_test: true     # also process the test split (only when slice is null)
 
-candidates:           # stage 1 (T2.x)
-  ngram: 3            # character n-gram size for TF-IDF
+split:                # geographic train/val split + dev slice (T0.3); whole regions per country
+  val_frac: 0.10      # share of each country's S1 entities held out for validation
+  dev_train_frac: 0.02  # dev slice: share of the country drawn from train regions
+  dev_val_frac: 0.01    # dev slice: share of the country drawn from val regions
+
+normalize:            # stage 0 (T1.x)
+  workers: 0          # processes; 0 = cpu_count - 2
+  chunk_size: 100000  # records per worker task
+  dict_min_count: 2   # Indic->Latin dictionary: min aligned occurrences of a token pair
+  dict_min_share: 0.6 # ... and min share of the dominant Latin spelling
+
+candidates:           # stage 1 (T2.x): char n-gram TF-IDF top-k per country
+  ngram: 3            # character n-gram size (char_wb)
   k_name: 10          # top-k S1 per query from the name index
   k_addr: 10          # top-k S1 per query from the address index
-  k_translit: 10      # top-k S1 per query from the transliterated-name index
+  k_combo: 10         # top-k S1 per query from the name+address index
+  max_df: 0.05        # ignore n-grams present in more than this share of S1 (speed)
+  min_sim: 0.0        # drop top-k hits below this cosine
   chunk_size: 20000   # queries per sparse matmul chunk (memory vs speed)
+  n_threads: 0        # 0 = cpu_count - 2
+  block_by_region: true   # search only S1 in the query region's neighbourhood (no region: whole country)
+  region_min_share: 0.001 # neighbourhood = owner regions with >= this share of a region's true matches
+  k_name_noaddr: 30       # name candidates for queries with an empty address
+
+features:             # stage 2 (T3.3)
+  train_query_frac: 0.2   # share of train-side queries featurised (val side: all)
+  chunk_rows: 2000000     # candidate pairs per feature chunk (memory vs speed)
+
+scorer:               # stage 2 (T3.4): LightGBM pair scorer
+  learning_rate: 0.05
+  num_leaves: 127
+  min_data_in_leaf: 200
+  feature_fraction: 0.8
+  bagging_fraction: 0.8
+  lambda_l2: 1.0
+  num_boost_round: 3000
+  early_stopping: 100   # rounds without val logloss improvement
+  n_threads: 0          # 0 = cpu_count - 2
+  oof_folds: 3          # >1: out-of-fold scores for train-side pairs (LLM training prompts)
+  model_from_run: null  # apply the model trained in that run instead of training (e.g. France proxy)
+
+decide:               # stage 4 (T3.5/T4.1)
+  method: expected_f  # threshold | expected_f
+  threshold: null     # threshold method: null = best value from the val sweep
+  min_p: null         # expected_f: drop assigned pairs below this p; null = best from sweep
+  empty_prior: 1.0    # expected_f: multiplier on P(no true match) for the "no match" option
+  tie_duplicates: true  # exact duplicate S2/S3 records (same source/name/address) share one owner
+  scores_stage: scorer  # scorer | llm-import (after the LLM round trip)
+  sweep: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8]
+
+llm:                  # stage 3 (T3.6, T5.x): routed select-prompts for the LLM matcher
+  route_low: 0.05     # a query goes to the LLM if its best scorer p is in [route_low, route_high]
+  route_high: 0.95
+  n_candidates: 5     # candidates per prompt (top by scorer p, shown in seeded shuffled order)
+  easy_frac: 0.1      # train prompts: share of non-routed queries also included
+  model_name: Qwen/Qwen3-1.7B   # Apache-2.0, <= 8B parameters
+  scores_dir: artifacts/llm_scores  # put Kaggle outputs llm_scores_{val,test}.parquet here
+  blend_weight: null  # weight of the LLM in the blend; null = best on val
+  blend_sweep: [0.0, 0.25, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+
+france:               # T5.1: synthetic French validation proxy (from unlabelled test S1 France)
+  n_entities: 20000   # S1 France records to generate S2/S3 copies and lookalikes for
+  distractor_rate: 0.35  # per S1 and source: chance of one lookalike distractor

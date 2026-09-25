@@ -14,9 +14,14 @@ from importlib.metadata import distributions
 
 PERMISSIVE = re.compile(
     r"\b(MIT|BSD|Apache|PSF|Python Software Foundation|ISC|Unlicense|"
-    r"Zlib|0BSD|Historical Permission)\b", re.I)
+    r"Zlib|0BSD|Historical Permission|ZPL|Zope Public License)\b", re.I)
 COPYLEFT = re.compile(r"\b(A?GPL|LGPL|MPL|Mozilla|CC-BY-NC|Commons Clause)\b", re.I)
 IGNORE = {"pip", "setuptools", "wheel", "ber"}
+# Reviewed by hand: name -> reason it is acceptable (shown in the report).
+REVIEWED = {
+    "tqdm": "MPL-2.0 AND MIT; used unmodified as a transitive dependency of "
+            "indic-transliteration (MPL copyleft is file-level only)",
+}
 
 
 def license_of(dist):
@@ -41,6 +46,8 @@ def main():
             continue
         lic = license_of(dist)
         ok = bool(PERMISSIVE.search(lic)) and not COPYLEFT.search(lic)
+        if not ok and name in REVIEWED:
+            ok, lic = True, f"{lic}  [reviewed: {REVIEWED[name]}]"
         rows.append((name, dist.version, lic, ok))
         if not ok:
             flagged.append(name)

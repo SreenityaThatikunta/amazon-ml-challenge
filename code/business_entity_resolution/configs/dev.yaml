@@ -6,3 +6,6 @@ log_level: DEBUG
 
 data:
   slice: dev
+
+features:
+  train_query_frac: 1.0

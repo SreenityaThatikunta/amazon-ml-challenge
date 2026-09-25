@@ -16,30 +16,30 @@ Plan and task definitions: [plan.md](plan.md).
 | — | Research notes (docs/RESEARCH_NOTES.md) | ✅ | 2026-09-25 |
 | T0.1 | Project scaffold, venv, requirements, license check | ✅ | 2026-09-25; `.venv` (Py 3.12), all deps permissive, pytest green |
 | T0.2 | Config, logging, artifact IO, CLI skeleton | ✅ | 2026-09-25; `ber --help` lists all stages; noop writes manifest; 23 tests |
-| T0.3 | Geographic train/val split + dev slice | ⬜ | |
-| T0.4 | eval/metrics.py matching utils/score.py | ⬜ | |
-| T1.1 | Text normaliser | ⬜ | |
-| T1.2 | Address parser + tables | ⬜ | |
-| T1.3 | Learned Indic→Latin dictionary + fallback | ⬜ | |
-| T1.4 | `normalize` stage (train + test) | ⬜ | |
-| T2.1 | Chunked TF-IDF top-k per country | ⬜ | |
-| T2.2 | Combine candidates + recall report | ⬜ | |
-| T2.3 | Tune k / index mix to recall targets | ⬜ | |
+| T0.3 | Geographic train/val split + dev slice | ✅ | 2026-09-25; val US 10.3% / IN 9.8%; dev ≈40k/30k S1 incl. val; leakage (candidate-based) measured in T2.2 |
+| T0.4 | eval/metrics.py matching utils/score.py | ✅ | identical to utils/score.py on 3000 random cases |
+| T1.1 | Text normaliser | ✅ | exact core-name equality on true pairs +4–8 pts vs EDA baseline |
+| T1.2 | Address parser + tables | ✅ | address token Jaccard on true pairs +11–35 pts (US S3 0.48→0.83) |
+| T1.3 | Learned Indic→Latin dictionary + fallback | ✅ | val exact-token match 95.8% (dict 84%, rules-only 23%) |
+| T1.4 | `normalize` stage (train + test) | ✅ | 24.2M records in 214 s |
+| T2.1 | Chunked TF-IDF top-k per country | ✅ | sparse_dot_topn; region-blocked, streamed per block |
+| T2.2 | Combine candidates + recall report | ✅ | dev pair recall 99.74%; full run in progress |
+| T2.3 | Tune k / index mix to recall targets | 🔄 | dev: US ✅ ≥99.8; India Latin 99.4–99.7, Indic val 98.4–98.7 ❌ |
 | T2.4 | (conditional) Dense ANN fallback | ⬜ | |
-| T3.1 | Number-relation feature | ⬜ | |
-| T3.2 | Edit-type / initials / gibberish features | ⬜ | |
-| T3.3 | String + context features | ⬜ | |
-| T3.4 | LightGBM train + calibration | ⬜ | |
-| T3.5 | Minimal decision + submission (**first LB**) | ⬜ | |
-| T3.6 | Router (uncertain band) | ⬜ | |
-| T4.1 | Expected-F0.5 subset selection | ⬜ | |
-| T4.2 | Duplicate tying / capacity assignment | ⬜ | |
-| T4.3 | `ber explain` + error dumps | ⬜ | |
-| T5.1 | Synthetic French pairs + French val proxy | ⬜ | |
-| T5.2 | Prompt v1 + token budget | ⬜ | |
-| T5.3 | LLM training data | ⬜ | |
-| T5.4 | Kaggle LoRA fine-tune Qwen3-1.7B | ⬜ | |
-| T5.5 | Kaggle batched inference + throughput | ⬜ | |
+| T3.1 | Number-relation feature | ✅ | |
+| T3.2 | Edit-type / initials / gibberish features | ✅ | |
+| T3.3 | String + context features | ✅ | ~72k pairs/s |
+| T3.4 | LightGBM train + calibration | ✅ | dev val AUC 0.99992, logloss 0.0040 |
+| T3.5 | Minimal decision + submission (**first LB**) | 🔄 | `ber submit` built (writes both TSVs + runs validator); waiting on full-scale run |
+| T3.6 | Router (uncertain band) | ✅ | dev: band [0.05,0.95] = 10.3% of queries, scorer top-1 precision there 0.59 |
+| T4.1 | Expected-F0.5 subset selection | ✅ | dev val F0.5 0.97655 (best threshold 0.97615) |
+| T4.2 | Duplicate tying / capacity assignment | ✅ | tying: 0 changes on dev (duplicates already agree) → kept as safety; capacity not needed yet |
+| T4.3 | `ber explain` + error dumps | ✅ | `ber explain <id>`; dev loss decomposition done |
+| T5.1 | Synthetic French pairs + French val proxy | 🔄 | `ber synth-france` + configs/france_proxy.yaml; proxy candidate recall 99.75%; F0.5 needs main model |
+| T5.2 | Prompt v1 + token budget | ✅ | select-v1 with hint tags; token count to be measured on Kaggle |
+| T5.3 | LLM training data | 🔄 | `ber llm-export` (OOF scores for train prompts); needs full-scale scorer |
+| T5.4 | Kaggle LoRA fine-tune Qwen3-1.7B | ⏸ | scripts ready (kaggle/); **needs user: Kaggle account + upload** |
+| T5.5 | Kaggle batched inference + throughput | ⏸ | kaggle/infer.py + `ber llm-import` ready; needs T5.4 |
 | T5.6 | Blend LLM + GBM (**LB**) | ⬜ | |
 | T5.7 | (optional) Qwen3-4B / wider band | ⬜ | |
 | T6.1 | France pseudo-labelling | ⬜ | |
@@ -54,6 +54,7 @@ Plan and task definitions: [plan.md](plan.md).
 ### Validation runs
 | Date | Run id | Stage / change | Cand. recall | Val F0.5 | US | India | Indic | Singletons | Notes |
 |---|---|---|---|---|---|---|---|---|---|
+| 2026-09-25 | dev | first end-to-end: TF-IDF (region-blocked) → LightGBM → one-owner → expected-F0.5 | 99.74% | **0.97655** | 0.98929 | 0.96373 | 0.92228 | 0.97261 | dev index is small (70k S1) → optimistic; Indic val = Punjab (Gurmukhi unseen in train) |
 
 ### Leaderboard submissions
 | Date | Run id | Val F0.5 | Public LB | Δ vs prev | Notes |
@@ -114,7 +115,78 @@ Plan and task definitions: [plan.md](plan.md).
 - `.gitignore` reorganised into sections: data, pipeline outputs (`artifacts/`, `output/`, submission zip),
   EDA caches/reports, `docs/`, model files (`*.safetensors`, `*.bin`, `*.pt`, `*.gguf`, `checkpoints/`,
   `models/`), secrets (`.env`, `kaggle.json`), Python/tool caches, editors/OS. Removed a duplicate `.venv/`.
-  Next: T0.3.
+- **T0.3 done.** `ber split` (`src/ber/eval/split.py`) + `normalize/geo.py` + `normalize/tables/regions.tsv`
+  (every state/region spelling seen in the data → code, incl. Indic-script state names; France region↔département).
+  - Whole regions are held out per country; the dev slice = small whole regions (dev-val chosen first, part of val).
+    S2/S3 follow their owner (matched) or their own detected region (unmatched); undetectable → stable hash.
+  - Full-train run: 112 s, peak 4.5 GB. Val: US 10.27% (FL KY MA MN ND NE RI SC SD), India 9.81% (PB UP + 3 tiny).
+    Dev: US 27.0k train + 13.1k val S1; India 17.4k train (AP) + 13.0k val (PB).
+  - A record's own detected region = its owner's region: US 99.99–100%, India 98.6–98.8% → unmatched
+    records are placed reliably. Only ~0.1–0.2% of unmatched records needed the hash fallback.
+  - The true leakage rate (val queries with train-side candidates) needs candidates → measured in T2.2.
+  - Bugs caught on the real run (both now covered by tests): (1) dev slice had no val (US 0, India 4 S1) because
+    all val regions were bigger than the dev-val target → pick dev-val first; (2) India has no state between
+    4 and 13k S1, so dev-val was still ~empty → fall back to the region closest to the shortfall. Also
+    `make_split` crashed on an empty query frame. 50 tests pass.
+- **T0.4 done.** `eval/metrics.py` (per-entity F0.5 + `summarize` by segment), identical to `utils/score.py`.
+- **M1 done (T1.1–T1.4).** `normalize/{text,address,translit,geo,lexicon,stage}.py`, tables as TSV
+  (`legal_forms`, `name_stopwords`, `credentials`, `street_types`, `addr_junk`, `ocr_digits`, `regions`,
+  `translit_overrides`).
+  - Name: fold/accents, alias split (aka/fka/dba/formerly/nee), domains, OCR digit fixes, single-letter runs →
+    known units or initials, legal forms canonical (with one-typo tolerance for long words: "PRlVATE").
+  - Address: placeholders dropped, region components removed → `region`, street types per country,
+    unit/house prefixes dropped, zero padding stripped; raw digit strings kept for number features.
+  - On 100k real true pairs: exact core-name equality 0.52–0.57 → 0.56–0.65; address token Jaccard
+    0.48–0.75 → 0.76–0.86. Speed ~100k fields/s/core.
+  - Transliteration: dictionary learned from train-side pairs (1,164 words) + rules + **consonant-skeleton snap
+    to the S1 vocabulary** (S1 is fully known at inference, test included). Val exact token match 95.8%.
+    Gurmukhi words were entirely unseen in training because Punjab is a val region; the skeleton fallback covers them.
+  - Full run: 12.5M train + 11.7M test records in 214 s (8 workers), peak 4.4 GB.
+  - New deps: indic-transliteration (MIT; pulls tqdm MPL-2.0 + roman ZPL-2.1, reviewed in check_licenses),
+    sparse_dot_topn (Apache-2.0), psutil (BSD).
+- **M2 (T2.1–T2.2) done; T2.3 in progress.** `candidates/{tfidf,generate}.py`: three char-3gram TF-IDF indexes
+  (name, address, name+address) → union of top-10 each; all 3 cosines + ranks per pair.
+  - Full-scale reality check (India, country-wide): combo recall@10 only 95.7% and ~65 min/index →
+    **region blocking** with learned neighbourhoods (AP↔TG: Telangana addresses written as "Andhra Pradesh";
+    KS↔OK); no-region queries search the whole country; empty-address queries get k_name=30.
+  - Streams one block at a time (parts on disk, incremental recall report) → dev peak 2.3 GB.
+  - Dev: pair recall 99.74%, cluster recall 99.11%, 23.7 candidates/query. Misses: 45% have an empty
+    query address + generic name; the rest are Gurmukhi names with odd transliterations.
+  - Cross-split candidates (val query → train S1) 3.5%: descriptive only, no label leakage.
+- **M3 (T3.1–T3.4) done.** `features/{numbers,build,stage}.py`: 70+ features (name edit ops incl. substitutions vs
+  indels, fuzzy ratios, alias, initials, legal agreement/conflict, vocabulary OOV, name ambiguity; address ratios,
+  region agreement, **house-number relation equal/padded/truncated/shifted**, number sets, PO box; TF-IDF
+  cosines/ranks; per-query margins/gaps/ranks; per-S1 candidate counts). `scorer/gbm.py`: LightGBM, early stopping
+  on val. Dev: AUC 0.99992; top features: rank_combo, num_q_only, cos_combo_gap, hn_logdiff, hn_rel.
+- **T4.1 done.** `decide/{expected_f,stage}.py`: one owner per query → per-S1 expected-F0.5 prefix.
+  **Dev val F0.5 = 0.97655** (US 0.989, India 0.964; S1 with Indic matches 0.922; singletons 0.973).
+- Bug fixes along the way: `list[float]` config fields were rejected (container hint unpacked as a union).
+- **Dev loss decomposition** (sum of 1−F over val S1): 78% missed matches only, 11% wrong matches only, 7% singletons
+  given a match, 4% both. Missed true pairs: 3,666 were the query's top candidate but dropped (median p 0.32), 626
+  assigned to another S1, 318 not in candidates. Wrong kept matches have p 0.54–0.98 → the LLM band.
+  `ber explain` example: an S1 with 3 true matches had 6 candidates at p>0.98 (exact-name lookalike + PMB, one-letter
+  edit at the same address, exact name with empty address) → group-level reasoning needed.
+- **T4.2**: duplicate tying changes nothing on dev (identical records already get identical scores); kept as a safety net.
+- **T4.3**: `ber explain <entity_id>` traces a record through normalize → candidates → features → scorer → decide.
+- **T3.5**: `ber submit` writes `output/matching_results.tsv` + `output/candidate_pairs.tsv` for all test S1 (integer
+  codes for ~10^8 candidate pairs) and runs `utils/validate_submission.py`.
+- **LLM stage (T3.6, T5.2, T5.3; Kaggle T5.4/T5.5 prepared)**:
+  - scorer writes 3-fold **out-of-fold** scores for train pairs (honest probabilities for training prompts);
+  - `ber llm-export`: routes queries with best p in [0.05, 0.95] (dev 10.3%), top-5 candidates in seeded shuffled
+    order, prompt `select-v1` with hint tags (name edit kind, legal form, house-number relation, extra numbers/PO box,
+    region, address similarity, scorer p); labels 1..5 / 0 = none;
+  - `kaggle/train_lora.py` (Qwen3-1.7B, LoRA r=16, fp16, loss = CE over the 10 answer digits), `kaggle/infer.py`
+    (single forward pass, digit probabilities), `kaggle/README.md` (workflow);
+  - `ber llm-import`: blends p = w·p_llm + (1−w)·p_scorer for routed queries, w chosen on val;
+    `decide.scores_stage=llm-import` uses it.
+- **T5.1**: `ber synth-france` builds labelled French data from 20k test S1 France records (noise catalogue + lookalike
+  distractors; 83k S2/S3 records, 69k true pairs). `configs/france_proxy.yaml` runs the pipeline on it with the main
+  model (`scorer.model_from_run`). Proxy candidate recall 99.75%.
+- Infrastructure: `data.with_test` / `cfg.run_test`; stages can read inputs from another run (`data.split_run`).
+- Performance lesson: two heavy jobs at once on 16 GB swap badly (the candidate run dropped to 77 MB resident) →
+  run heavy stages one at a time. Candidate generation profile (Gujarat, 260k queries × 57k S1): 37 s; sparse
+  top-k dominates. Empty-address queries now search only the name index.
+- Next: full-scale candidates (running) → features → scorer → decide → submit; France proxy F0.5; LLM export.
 
 ---
 

@@ -41,6 +41,61 @@ def cmd_noop(cfg: Config, args: argparse.Namespace) -> None:
         st.metric("answer", 42)
 
 
+def cmd_split(cfg: Config, args: argparse.Namespace) -> None:
+    from .eval.split import run_split
+    run_split(cfg)
+
+
+def cmd_normalize(cfg: Config, args: argparse.Namespace) -> None:
+    from .normalize.stage import run_normalize
+    run_normalize(cfg)
+
+
+def cmd_candidates(cfg: Config, args: argparse.Namespace) -> None:
+    from .candidates.generate import run_candidates
+    run_candidates(cfg)
+
+
+def cmd_features(cfg: Config, args: argparse.Namespace) -> None:
+    from .features.stage import run_features
+    run_features(cfg)
+
+
+def cmd_scorer(cfg: Config, args: argparse.Namespace) -> None:
+    from .scorer.gbm import run_scorer
+    run_scorer(cfg)
+
+
+def cmd_decide(cfg: Config, args: argparse.Namespace) -> None:
+    from .decide.stage import run_decide
+    run_decide(cfg)
+
+
+def cmd_submit(cfg: Config, args: argparse.Namespace) -> None:
+    from .submit import run_submit
+    run_submit(cfg)
+
+
+def cmd_explain(cfg: Config, args: argparse.Namespace) -> None:
+    from .explain import explain
+    explain(cfg, args.entity_id)
+
+
+def cmd_llm_export(cfg: Config, args: argparse.Namespace) -> None:
+    from .llm.export import run_llm_export
+    run_llm_export(cfg)
+
+
+def cmd_llm_import(cfg: Config, args: argparse.Namespace) -> None:
+    from .llm.import_scores import run_llm_import
+    run_llm_import(cfg)
+
+
+def cmd_synth_france(cfg: Config, args: argparse.Namespace) -> None:
+    from .france.synth import run_synth_france
+    run_synth_france(cfg)
+
+
 def _planned(task: str) -> Callable[[Config, argparse.Namespace], None]:
     def run(cfg: Config, args: argparse.Namespace) -> None:
         raise SystemExit(f"not implemented yet (planned in {task}; see plan.md)")
@@ -50,18 +105,17 @@ def _planned(task: str) -> Callable[[Config, argparse.Namespace], None]:
 COMMANDS: dict[str, Command] = {
     "config": Command(cmd_config, "print the resolved config"),
     "noop": Command(cmd_noop, "no-op stage (tests the artifact/manifest machinery)"),
-    "split": Command(_planned("T0.3"), "geographic train/val split + dev slice", "T0.3"),
-    "normalize": Command(_planned("T1.4"), "stage 0: normalise train + test records", "T1.4"),
-    "candidates": Command(_planned("T2.2"), "stage 1: TF-IDF top-k candidates + recall", "T2.2"),
-    "features": Command(_planned("T3.3"), "stage 2: pair + context features", "T3.3"),
-    "scorer": Command(_planned("T3.4"), "stage 2: train/apply LightGBM scorer", "T3.4"),
-    "route": Command(_planned("T3.6"), "stage 2: send the uncertain band to the LLM queue", "T3.6"),
-    "llm-export": Command(_planned("T5.3"), "stage 3: export prompts for Kaggle", "T5.3"),
-    "llm-import": Command(_planned("T5.5"), "stage 3: import Kaggle LLM scores", "T5.5"),
-    "decide": Command(_planned("T4.1"), "stage 4: one-owner assignment + expected-F0.5", "T4.1"),
-    "submit": Command(_planned("T3.5"), "write output/*.tsv and validate", "T3.5"),
-    "evaluate": Command(_planned("T3.5"), "score a run on validation", "T3.5"),
-    "explain": Command(_planned("T4.3"), "trace one entity through every stage", "T4.3"),
+    "split": Command(cmd_split, "geographic train/val split + dev slice"),
+    "normalize": Command(cmd_normalize, "stage 0: normalise train + test records"),
+    "candidates": Command(cmd_candidates, "stage 1: TF-IDF top-k candidates + recall"),
+    "features": Command(cmd_features, "stage 2: pair + context features"),
+    "scorer": Command(cmd_scorer, "stage 2: train/apply LightGBM scorer"),
+    "llm-export": Command(cmd_llm_export, "stage 3: route uncertain queries, export prompts"),
+    "llm-import": Command(cmd_llm_import, "stage 3: import Kaggle LLM scores, blend on val"),
+    "decide": Command(cmd_decide, "stage 4: one-owner assignment + expected-F0.5, val F0.5"),
+    "synth-france": Command(cmd_synth_france, "synthetic labelled French data (validation proxy)"),
+    "submit": Command(cmd_submit, "write output/*.tsv for test and run the validator"),
+    "explain": Command(cmd_explain, "trace one entity through every stage"),
 }
 
 
@@ -80,6 +134,8 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--set", "-s", action="append", default=[], metavar="KEY=VALUE",
                         help="override a config value, e.g. --set candidates.k_name=20")
         sp.add_argument("--run", "-r", default=None, help="run id (artifacts/<run>/)")
+        if name == "explain":
+            sp.add_argument("entity_id", help="S1-/S2-/S3- id to trace")
     return p
 
 

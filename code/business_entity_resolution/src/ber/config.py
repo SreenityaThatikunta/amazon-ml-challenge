@@ -45,6 +45,23 @@ class PathsConfig:
 @dataclass
 class DataConfig:
     slice: str | None = None  # None = full data; "dev" = dev slice (T0.3)
+    split_run: str = "main"   # run whose `split` stage defines sides and the dev slice
+    with_test: bool = True    # also process the test split (needs full data, no slice)
+
+
+@dataclass
+class NormalizeConfig:
+    workers: int = 0              # processes; 0 = cpu_count - 2
+    chunk_size: int = 100_000     # records per worker task
+    dict_min_count: int = 2       # translit dictionary: min aligned occurrences
+    dict_min_share: float = 0.6   # translit dictionary: min share of the dominant spelling
+
+
+@dataclass
+class SplitConfig:
+    val_frac: float = 0.10        # share of each country's S1 held out (whole regions)
+    dev_train_frac: float = 0.02  # dev slice: share of the country taken from train regions
+    dev_val_frac: float = 0.01    # dev slice: share of the country taken from val regions
 
 
 @dataclass
@@ -52,8 +69,66 @@ class CandidatesConfig:
     ngram: int = 3
     k_name: int = 10
     k_addr: int = 10
-    k_translit: int = 10
+    k_combo: int = 10
+    max_df: float = 0.05          # drop n-grams in more than this share of S1 (speed)
+    min_sim: float = 0.0          # drop top-k hits below this cosine
     chunk_size: int = 20_000
+    n_threads: int = 0            # 0 = cpu_count - 2
+    block_by_region: bool = True
+    region_min_share: float = 0.001  # neighbourhood: owner regions with >= this share
+    k_name_noaddr: int = 30       # name candidates for queries with an empty address
+
+
+@dataclass
+class FeaturesConfig:
+    train_query_frac: float = 0.2  # share of train-side queries used (val side: all)
+    chunk_rows: int = 2_000_000    # candidate pairs per feature chunk
+
+
+@dataclass
+class ScorerConfig:
+    learning_rate: float = 0.05
+    num_leaves: int = 127
+    min_data_in_leaf: int = 200
+    feature_fraction: float = 0.8
+    bagging_fraction: float = 0.8
+    lambda_l2: float = 1.0
+    num_boost_round: int = 3000
+    early_stopping: int = 100
+    n_threads: int = 0
+    oof_folds: int = 3            # >1: also write out-of-fold scores for train-side pairs
+    model_from_run: str | None = None  # apply that run's model instead of training
+
+
+@dataclass
+class DecideConfig:
+    method: str = "expected_f"      # "threshold" | "expected_f"
+    threshold: float | None = None  # threshold method: None = best on val sweep
+    min_p: float | None = None      # expected_f: drop p below this; None = best on val sweep
+    empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
+    tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
+    scores_stage: str = "scorer"    # "scorer" or "llm-import" (blended LLM scores)
+    sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
+                                                        0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])
+
+
+@dataclass
+class LlmConfig:
+    route_low: float = 0.05       # queries whose best scorer p is in [low, high] go to the LLM
+    route_high: float = 0.95
+    n_candidates: int = 5         # candidates shown per prompt (top by scorer p)
+    easy_frac: float = 0.1        # train prompts: share of non-routed queries also included
+    model_name: str = "Qwen/Qwen3-1.7B"   # Apache-2.0, <= 8B
+    scores_dir: str = "artifacts/llm_scores"  # where Kaggle's llm_scores_<split>.parquet go
+    blend_weight: float | None = None     # None = best on val
+    blend_sweep: list[float] = field(default_factory=lambda: [0.0, 0.25, 0.5, 0.6, 0.7, 0.8,
+                                                              0.9, 1.0])
+
+
+@dataclass
+class FranceConfig:
+    n_entities: int = 20_000        # test S1 France records to synthesise S2/S3 for
+    distractor_rate: float = 0.35   # per S1 and source: chance of one lookalike distractor
 
 
 @dataclass
@@ -63,7 +138,14 @@ class Config:
     log_level: str = "INFO"
     paths: PathsConfig = field(default_factory=PathsConfig)
     data: DataConfig = field(default_factory=DataConfig)
+    split: SplitConfig = field(default_factory=SplitConfig)
+    normalize: NormalizeConfig = field(default_factory=NormalizeConfig)
     candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
+    features: FeaturesConfig = field(default_factory=FeaturesConfig)
+    scorer: ScorerConfig = field(default_factory=ScorerConfig)
+    decide: DecideConfig = field(default_factory=DecideConfig)
+    llm: LlmConfig = field(default_factory=LlmConfig)
+    france: FranceConfig = field(default_factory=FranceConfig)
 
     # ------------------------------------------------------ derived paths
     @property
@@ -73,6 +155,11 @@ class Config:
     def resolve(self, p: str) -> Path:
         path = Path(p)
         return path if path.is_absolute() else self.root / path
+
+    @property
+    def run_test(self) -> bool:
+        """Whether stages should also process the test split."""
+        return self.data.slice is None and self.data.with_test
 
     @property
     def data_dir(self) -> Path:
@@ -152,7 +239,11 @@ def _apply_override(d: dict, expr: str) -> None:
 
 
 def _check_scalar(hint: Any, value: Any, where: str) -> None:
-    allowed = typing.get_args(hint) or (hint,)
+    # list[float] / dict[...] are containers, not unions: don't unpack their args
+    if typing.get_origin(hint) in (list, dict):
+        allowed: tuple = (hint,)
+    else:
+        allowed = typing.get_args(hint) or (hint,)
     if value is None:
         if type(None) not in allowed:
             raise ConfigError(f"{where}: may not be null")

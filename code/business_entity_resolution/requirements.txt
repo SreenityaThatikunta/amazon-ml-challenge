@@ -10,4 +10,7 @@ scikit-learn==1.9.1
 rapidfuzz==3.14.6
 lightgbm==4.7.0
 PyYAML==6.0.3
+indic-transliteration==2.3.82   # MIT; rule-based Indic→Latin fallback (T1.3)
+sparse_dot_topn==1.2.0         # Apache-2.0; multithreaded sparse top-k (T2.1)
+psutil==7.2.2
 pytest==9.1.1

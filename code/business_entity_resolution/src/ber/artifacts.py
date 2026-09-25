@@ -20,6 +20,7 @@ import platform
 import subprocess
 import time
 import traceback
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -117,30 +118,33 @@ class StageRun:
         return False  # never swallow exceptions
 
     # ------------------------------------------------------------ inputs
-    def input_path(self, stage: str, name: str) -> Path:
-        """Path of output ``name`` of an earlier ``stage`` in the same run."""
-        m = load_manifest(self.cfg, stage)
+    def input_path(self, stage: str, name: str, run: str | None = None) -> Path:
+        """Path of output ``name`` of an earlier ``stage`` in this run (or in ``run``)."""
+        cfg = self.cfg if run in (None, self.cfg.run_id) else replace(self.cfg, run_id=run)
+        m = load_manifest(cfg, stage)
         if name not in m["outputs"]:
             raise StageError(f"stage '{stage}' has no output '{name}'; "
                              f"available: {sorted(m['outputs'])}")
-        path = self.cfg.run_dir / stage / m["outputs"][name]["file"]
-        self.inputs[f"{stage}/{name}"] = {"file": str(path.relative_to(self.cfg.run_dir)),
-                                          "config_hash": m["config_hash"]}
-        if m["config_hash"] != self.cfg.hash():
+        path = cfg.run_dir / stage / m["outputs"][name]["file"]
+        self.inputs[f"{cfg.run_id}:{stage}/{name}"] = {"file": str(path),
+                                                       "config_hash": m["config_hash"]}
+        if run in (None, self.cfg.run_id) and m["config_hash"] != self.cfg.hash():
             self.log.warning("input %s/%s was built with config %s (current %s)",
                              stage, name, m["config_hash"], self.cfg.hash())
         return path
 
-    def read_input(self, stage: str, name: str,
-                   columns: list[str] | None = None) -> pd.DataFrame:
-        return read_parquet(self.input_path(stage, name), columns)
+    def read_input(self, stage: str, name: str, columns: list[str] | None = None,
+                   run: str | None = None) -> pd.DataFrame:
+        return read_parquet(self.input_path(stage, name, run), columns)
 
     # ----------------------------------------------------------- outputs
     def path(self, filename: str) -> Path:
         return self.dir / filename
 
     def _record(self, name: str, path: Path, **extra: Any) -> None:
-        self.outputs[name] = {"file": path.name, "bytes": path.stat().st_size, **extra}
+        size = (sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
+                if path.is_dir() else path.stat().st_size)
+        self.outputs[name] = {"file": path.name, "bytes": size, **extra}
 
     def write_parquet(self, df: pd.DataFrame, name: str) -> Path:
         path = self.path(f"{name}.parquet")
@@ -157,7 +161,8 @@ class StageRun:
         return path
 
     def register(self, name: str, path: Path, **extra: Any) -> None:
-        """Record a file written some other way (e.g. a TSV) as an output."""
+        """Record a file or directory written some other way (a TSV, a directory of
+        parquet parts, ...) as an output."""
         self._record(name, path, **extra)
 
     def metric(self, key: str, value: Any) -> None:

@@ -21,7 +21,7 @@ def test_stage_writes_manifest_and_outputs(cfg):
         df = st.read_input("a", "table")
         assert df.x.tolist() == [1, 2, 3]
     m = json.loads((cfg.run_dir / "b" / "manifest.json").read_text())
-    assert m["inputs"]["a/table"]["config_hash"] == cfg.hash()
+    assert m["inputs"]["test:a/table"]["config_hash"] == cfg.hash()
 
 
 def test_failed_stage_is_recorded_and_blocks_downstream(cfg):
@@ -59,6 +59,6 @@ def test_cli_config_error_exit_code(capsys):
     assert "unknown config key" in capsys.readouterr().err
 
 
-def test_planned_stage_says_which_task():
-    with pytest.raises(SystemExit, match="T1.4"):
-        main(["normalize"])
+def test_all_stages_implemented():
+    from ber.cli import COMMANDS
+    assert all(c.task is None for c in COMMANDS.values())
