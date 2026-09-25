@@ -79,7 +79,7 @@ class StageRun:
     def __enter__(self) -> StageRun:
         setup_logging(self.cfg.log_level)  # stages log even when not started via the CLI
         self.dir.mkdir(parents=True, exist_ok=True)
-        if self.cfg.data.phase == "test":
+        if self.cfg.data.phase == "test" and (self.dir / MANIFEST).exists():
             # test-only pass: keep the train-side outputs/metrics of the earlier run
             prev = load_manifest(self.cfg, self.stage)
             self.outputs.update(prev.get("outputs", {}))

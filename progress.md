@@ -46,7 +46,13 @@ final ranking** (smaller candidate set per S1 = ranked higher).
 | 2026-09-25 | dev2 (dev slice) | v2 features, stage 1 only | 99.73 % | 0.98079 | | | | main's dev slice: 0.97655 |
 | 2026-09-25 | dev2 (dev slice) | + stage-2 re-ranker + exact expected F | | **0.98771** | | | | p2 AUC 0.9985 vs p1 0.9951 on kept pairs |
 | 2026-09-25 | v2 (full) candidates | v2 normalisation, CPU top-k | 99.046 % (cluster 96.79 %) | | | | | 24.5 cands/query, 2.53e8 train pairs; India 101 min + US 44 min on the laptop CPU; India S3 Latin 98.2 % is the weakest segment |
-| | v2 (full) | all of the above | | TBD | | | | |
+| 2026-09-25 | v2 (full) | v2 normalisation + features, **stage 1 only** (4.5M training rows, 102 features) | 99.046 % | 0.98337 | 0.98617 | 0.97898 | 0.97771 | pair P 0.99655 / R 0.9586; AUC 0.99994; val +0.0013 over main with a third of main's training rows |
+| 2026-09-25 | v2 (full) | **+ stage-2 re-ranker** (expected-F, min_p 0.25) | 99.046 % | **0.98748** | 0.98923 | 0.98473 | 0.98220 | pair P 0.99645 / R 0.97349; p2 AUC 0.99917 vs p1 0.99620 on the kept pairs; sweep flat (0.98743–0.98748 for min_p 0.02–0.5); exact expected-F 0.98744 (no gain, kept the approximation) |
+
+Stage-2 input (= `candidate_pairs.tsv`): at p1 ≥ 0.001, **1.075 pairs per S2/S3 record**
+keeping 99.97 % of the true pairs that TF-IDF found (24.6 per record before the filter).
+Top stage-2 features: the record's margin over its other candidates, p1, then the S1-side
+claims (`c_expected`, `c_best_other`, `c_sum_other`), i.e. exactly the group context stage 1 lacks.
 
 ### Open questions / what the user can help with
 - ~~Which file produced the ≈ 0.975 leaderboard score?~~ **Answered 2026-09-25: main's
