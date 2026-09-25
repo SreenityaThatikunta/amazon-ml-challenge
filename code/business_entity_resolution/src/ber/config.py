@@ -137,7 +137,7 @@ class DecideConfig:
     min_p: float | None = None      # expected_f: drop p below this; None = best on val sweep
     empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
     tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
-    scores_stage: str = "scorer"    # "scorer", "rerank" (stage 2) or "llm-import" (LLM blend)
+    scores_stage: str = "rerank"    # "scorer" (stage 1 only), "rerank" (stage 2) or "llm-import"
     sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
                                                         0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])
 

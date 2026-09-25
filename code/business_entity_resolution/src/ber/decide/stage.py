@@ -40,6 +40,20 @@ def dup_keys(recs: pd.DataFrame) -> pd.Series:
                      index=recs.entity_id.to_numpy())
 
 
+def dup_keys_streamed(path, filters=None) -> pd.Series:
+    """:func:`dup_keys` for the S2/S3 records of a ``records_<split>`` directory,
+    one parquet part at a time (only the 8-byte hashes are kept, not the raw
+    names and addresses)."""
+    cols = ["entity_id", "source", "country", "name_raw", "addr_raw"]
+    out = []
+    for f in sorted(path.glob("*.parquet")):
+        r = pd.read_parquet(f, columns=cols, filters=filters)
+        r = r[r.source != 1]
+        if len(r):
+            out.append(dup_keys(r))
+    return pd.concat(out) if out else pd.Series(dtype=np.uint64)
+
+
 def tie_duplicates(assigned: pd.DataFrame, keys: pd.Series) -> pd.DataFrame:
     """Exact duplicates within a source (~20k per source, EDA 01) must share an
     owner: every member takes the owner and p of the group's best-scoring member."""
@@ -79,9 +93,11 @@ def _decide_val(st: StageRun, cfg: Config) -> dict:
     """Val side: sweep the decision parameters, score macro F0.5, return the
     chosen parameters (also written as ``decision_params.json``)."""
     dc = cfg.decide
-    recs = pd.read_parquet(st.input_path("normalize", "records_train"),
-                           columns=["entity_id", "source", "country", "side", "dev",
-                                    "owner", "name_indic", "name_raw", "addr_raw"])
+    # val side only: val S1, their true matches and every val-side query (memory)
+    rec_path = st.input_path("normalize", "records_train")
+    recs = pd.read_parquet(rec_path, columns=["entity_id", "source", "country", "side", "dev",
+                                              "owner", "name_indic"],
+                           filters=[("side", "==", "val")])
     s1 = recs[(recs.source == 1) & slice_mask(recs, cfg, "val")]
     s1_meta = s1.set_index("entity_id")[["country"]]
     q = recs[(recs.source != 1) & recs.owner.isin(s1_meta.index)]
@@ -96,7 +112,7 @@ def _decide_val(st: StageRun, cfg: Config) -> dict:
     assigned = one_owner(scores)
     st.metric("val_one_owner_precision_at_1", round(float(assigned.y.mean()), 5))
     if dc.tie_duplicates:
-        q_keys = dup_keys(recs[recs.source != 1])
+        q_keys = dup_keys_streamed(rec_path, filters=[("side", "==", "val")])
         before = assigned.s1_id.copy()
         assigned = tie_duplicates(assigned, q_keys)
         st.metric("val_duplicates_retied", int((assigned.s1_id != before).sum()))
@@ -153,10 +169,8 @@ def run_decide(cfg: Config) -> None:
                 if a_t.q_id.duplicated().any():  # a query split across parts: resolve globally
                     a_t = one_owner(a_t)
                 if dc.tie_duplicates:
-                    rt = pd.read_parquet(st.input_path("normalize", "records_test"),
-                                         columns=["entity_id", "source", "country", "name_raw",
-                                                  "addr_raw"])
-                    a_t = tie_duplicates(a_t, dup_keys(rt[rt.source != 1]))
+                    a_t = tie_duplicates(a_t, dup_keys_streamed(
+                        st.input_path("normalize", "records_test")))
                 kept_t = decide(a_t, dc.method, chosen["threshold"], chosen["min_p"],
                                 dc.empty_prior)
                 st.write_parquet(kept_t.reset_index(drop=True), "decisions_test")

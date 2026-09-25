@@ -30,6 +30,7 @@ final ranking** (smaller candidate set per S1 = ranked higher).
 | 10 | `candidate_pairs.tsv` from the final model's input | `submit.py` | Main didn't write it (3 GB at 2.4 e8 TF-IDF pairs). The rules: "the exact set of records you feed into your matching model … if your pipeline has several blocking/filtering stages, the last one". With stage 2 that is the stage-1-filtered set (~1.3 pairs per record), a few candidates per S1 instead of ~140. Validator now also checks the candidate file. |
 | 11 | Exact expected F0.5 (`decide.method = expected_f_exact`) | `decide/expected_f.py` | The ratio-of-expectations approximation is biased on the tiny groups here (1–6 candidates per S1). Exact expectation via Poisson-binomial distributions (brute-force checked in tests). Both variants are reported by `ber decide`. |
 | 12 | Ablation switch `scorer.drop_features` | `scorer/gbm.py` | Train the scorer without a feature group (`k_*`, names) to measure what each change buys. |
+| 13 | Optional GPU top-k (`candidates.device = auto`) | `candidates/tfidf.py`, `requirements-gpu.txt` | Stage 1 is the slowest step on the laptop (train India alone: 101 min). With CuPy (MIT) the S1 block is uploaded once as CSR, query chunks are densified on the GPU, one cuSPARSE product gives all similarities, and 10 arg-max passes give the top-10 (a full sort was slower than the CPU). Only blocks with ≥ 50k S1 go to the GPU: on small blocks the CPU kernel is as fast. Checked against the CPU path: identical k-th similarities (≤ 3e-7); only ties are broken differently. Large synthetic block: 27.9 s CPU → 2.6 s GPU. Falls back to CPU when CuPy/CUDA is missing. |
 
 ### Evidence behind the changes (raw-data checks, 2026-09-25)
 - **Name noise per country (test S2/S3 vs S1, % of names):** US/India carry `(ID: …)` 0.26–0.32 %, phone numbers 0.26–0.32 %, `#nnnnn` 0.26–0.32 %; France none of those but quotes (0.05 %), `et` for `&` (0.27 %) and far more accents (17 %). Injected honorifics in India only (8 %).
@@ -44,7 +45,8 @@ final ranking** (smaller candidate set per S1 = ranked higher).
 | 2026-09-25 | main (reported) | baseline | 99.04 % | 0.98211 | 0.98539 | 0.97696 | 0.97707 | Mac, from progress below |
 | 2026-09-25 | dev2 (dev slice) | v2 features, stage 1 only | 99.73 % | 0.98079 | | | | main's dev slice: 0.97655 |
 | 2026-09-25 | dev2 (dev slice) | + stage-2 re-ranker + exact expected F | | **0.98771** | | | | p2 AUC 0.9985 vs p1 0.9951 on kept pairs |
-| | v2 (full) | all of the above | TBD | TBD | | | | |
+| 2026-09-25 | v2 (full) candidates | v2 normalisation, CPU top-k | 99.046 % (cluster 96.79 %) | | | | | 24.5 cands/query, 2.53e8 train pairs; India 101 min + US 44 min on the laptop CPU; India S3 Latin 98.2 % is the weakest segment |
+| | v2 (full) | all of the above | | TBD | | | | |
 
 ### Open questions / what the user can help with
 - ~~Which file produced the ≈ 0.975 leaderboard score?~~ **Answered 2026-09-25: main's

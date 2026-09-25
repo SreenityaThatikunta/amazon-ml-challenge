@@ -89,7 +89,7 @@ decide:               # stage 4 (T3.5/T4.1)
   min_p: null         # expected_f: drop assigned pairs below this p; null = best from sweep
   empty_prior: 1.0    # expected_f: multiplier on P(no true match) for the "no match" option
   tie_duplicates: true  # exact duplicate S2/S3 records (same source/name/address) share one owner
-  scores_stage: scorer  # scorer | rerank (stage 2) | llm-import (after the LLM round trip)
+  scores_stage: rerank  # scorer (stage 1 only) | rerank (stage 2) | llm-import (after the LLM round trip)
   sweep: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8]
 
 llm:                  # stage 3 (T3.6, T5.x): routed select-prompts for the LLM matcher
