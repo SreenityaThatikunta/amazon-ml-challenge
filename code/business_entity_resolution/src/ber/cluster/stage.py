@@ -42,7 +42,7 @@ from ..config import Config
 from ..eval.split import stable_unit
 from ..log import timed
 
-STAGE1_FEATS = ["n_core_eq", "n_ratio", "hn_rel", "a_tsr", "l_quality", "cos_combo"]
+STAGE1_FEATS = ["n_core_eq", "n_ratio", "hn_rel", "a_tsr", "l_quality", "cos_combo"]  # default
 MAX_MEMBERS = 8  # cluster members compared per S1 (highest p first)
 
 
@@ -139,12 +139,21 @@ def member_similarity(pairs: pd.DataFrame, members: pd.DataFrame, rec: pd.DataFr
     return out
 
 
-def build(pairs: pd.DataFrame, rec: pd.DataFrame, conf: float) -> pd.DataFrame:
-    cf, members = cluster_features(pairs, conf)
-    ms = member_similarity(pairs, members, rec)
+def build(pairs: pd.DataFrame, rec: pd.DataFrame, conf: float,
+          prev: np.ndarray | None = None, stage1_feats: list[str] = STAGE1_FEATS) -> pd.DataFrame:
+    """Rescore features. ``prev``: the previous round's rescored p (rounds > 1);
+    clusters, owners and ranks are then rebuilt from it, and it is a feature."""
     base = pairs[["p", "rank", "p_margin", "q_p1", "q_p2"] +
-                 [c for c in STAGE1_FEATS if c in pairs]].copy()
+                 [c for c in stage1_feats if c in pairs]].copy()
     base["q_source"] = pairs.q_id.str[1].astype(np.int8)
+    cp = pairs
+    if prev is not None:
+        tmp = pairs[["q_id", "s1_id"]].assign(p=prev, _i=np.arange(len(pairs)))
+        cp = top_k(tmp, len(tmp)).sort_values("_i").set_index(pairs.index)
+        base["p_prev"], base["p_prev_margin"] = cp.p, cp.p_margin
+        base["rank_prev"] = cp["rank"]
+    cf, members = cluster_features(cp, conf)
+    ms = member_similarity(cp, members, rec)
     return pd.concat([base, cf, ms], axis=1).astype(np.float32)
 
 
@@ -168,13 +177,15 @@ def _fit(X, y, cfg: Config, rounds: int | None = None):
                      callbacks=[lgb.early_stopping(50, verbose=False)])
 
 
-def load_top_k(st: StageRun, split: str, k: int) -> pd.DataFrame:
-    """Top-k pairs per query with stage-1 p and a few stage-1 features. Scores and
+def load_top_k(st: StageRun, split: str, k: int, stage1_feats: list[str]) -> pd.DataFrame:
+    """Top-k pairs per query with stage-1 p and the given stage-1 features. Scores and
     features are read in lockstep: the scorer writes its rows in feature-part
     order (val: the val-side rows of ``features_train``; test: part i of
-    ``features_test`` -> part i of ``scores_test``), so no join is needed."""
+    ``features_test`` -> part i of ``scores_test``), so no join is needed.
+    Test rows keep ``_part`` / ``_row`` (their position in the features parts), so
+    stage-1 features can be fetched part by part later instead of held in memory."""
     fdir = st.input_path("features", f"features_{split}")
-    cols = ["q_id", "s1_id"] + STAGE1_FEATS + (["y", "side"] if split == "train" else [])
+    cols = ["q_id", "s1_id"] + stage1_feats + (["y", "side"] if split == "train" else [])
     out = []
     if split == "train":
         sv = st.read_input("scorer", "scores_val")
@@ -195,8 +206,32 @@ def load_top_k(st: StageRun, split: str, k: int) -> pd.DataFrame:
             d = pd.read_parquet(ff, columns=cols)
             s = pd.read_parquet(sf, columns=["q_id", "p"])
             assert len(s) == len(d) and s.q_id.iloc[0] == d.q_id.iloc[0], f"{sf.name} not aligned"
-            out.append(top_k(d.assign(p=s.p.to_numpy()).astype({"q_id": str, "s1_id": str}), k))
+            d = d.assign(p=s.p.to_numpy(), _part=np.int16(len(out)),
+                         _row=np.arange(len(d), dtype=np.int32))
+            out.append(top_k(d.astype({"q_id": str, "s1_id": str}), k))
     return pd.concat(out, ignore_index=True)
+
+
+def predict_parts(mdl, pairs: pd.DataFrame, ctx: pd.DataFrame, fparts: list,
+                  mask: np.ndarray) -> np.ndarray:
+    """Score ``pairs`` (with ``_part`` / ``_row`` positions in ``fparts``) part by
+    part: the model's stage-1 features are read from each part and joined to the
+    global ``ctx`` rows. Rows outside ``mask`` keep their stage-1 p."""
+    order = np.argsort(pairs._part.to_numpy(), kind="stable")
+    bounds = np.searchsorted(pairs._part.to_numpy()[order], np.arange(len(fparts) + 1))
+    need = [c for c in mdl.feature_name() if c not in ctx.columns]
+    rows = pairs._row.to_numpy()
+    p = pairs.p.to_numpy(dtype=np.float32).copy()
+    for i, ff in enumerate(fparts):
+        sel = order[bounds[i]:bounds[i + 1]]
+        sel = sel[mask[sel]]
+        if not len(sel):
+            continue
+        f1 = pd.read_parquet(ff, columns=need).iloc[rows[sel]]
+        X = pd.concat([ctx.iloc[sel].reset_index(drop=True),
+                       f1.reset_index(drop=True).astype(np.float32)], axis=1)
+        p[sel] = mdl.predict(X[mdl.feature_name()]).astype(np.float32)
+    return p
 
 
 def _records(st: StageRun, split: str, ids: set[str]) -> pd.DataFrame:
@@ -208,61 +243,82 @@ def _records(st: StageRun, split: str, ids: set[str]) -> pd.DataFrame:
 
 def run_rescore(cfg: Config) -> None:
     rc = cfg.rescore
+    feats1 = rc.stage1_feats or STAGE1_FEATS
     with StageRun(cfg, "rescore") as st:
-        with timed(st.log, "val: top-k + features"):
-            pv = load_top_k(st, "train", rc.k)
+        if feats1 == ["*"]:  # every stage-1 feature column
+            import pyarrow.parquet as pq
+            first = next(st.input_path("features", "features_train").glob("*.parquet"))
+            feats1 = [c for c in pq.read_schema(first).names
+                      if c not in ("q_id", "s1_id", "y", "side")]
+        st.metric("stage1_feats", len(feats1))
+        with timed(st.log, "val: top-k"):
+            pv = load_top_k(st, "train", rc.k, feats1)
             rec = _records(st, "train", set(pv.q_id))
-            Xv = build(pv, rec, rc.conf)
             yv = pv.y.to_numpy()
         st.metric("val_pairs", len(pv))
-        feats = list(Xv.columns)
-        if rc.model_from_run:  # apply an existing rescore model (e.g. France proxy)
-            mdl = lgb.Booster(model_file=str(st.input_path("rescore", "model",
-                                                           run=rc.model_from_run)))
-            p = mdl.predict(Xv[mdl.feature_name()]).astype(np.float32)
-            st.metric("val_auc_stage1", round(float(roc_auc_score(yv, pv.p)), 6))
-            st.metric("val_auc_rescore", round(float(roc_auc_score(yv, p)), 6))
-            st.write_parquet(pv[["q_id", "s1_id", "y"]].assign(p=p), "scores_val")
+        st.metric("val_auc_stage1", round(float(roc_auc_score(yv, pv.p)), 6))
+        st.metric("val_logloss_stage1", round(float(log_loss(yv, pv.p.clip(1e-7, 1 - 1e-7))), 6))
+        if rc.model_from_run:  # apply an existing rescore model chain (e.g. France proxy)
+            prev = None
+            for r in range(rc.rounds):
+                mdl = lgb.Booster(model_file=str(st.input_path("rescore", f"model_r{r}",
+                                                               run=rc.model_from_run)))
+                prev = mdl.predict(build(pv, rec, rc.conf, prev, feats1)[mdl.feature_name()]
+                                   ).astype(np.float32)
+            st.metric("val_auc_rescore", round(float(roc_auc_score(yv, prev)), 6))
+            st.write_parquet(pv[["q_id", "s1_id", "y"]].assign(p=prev), "scores_val")
             return
 
-        with timed(st.log, f"val: {rc.folds}-fold cross-fit"):
-            best = pv[pv["rank"] == 0].set_index("q_id").s1_id
-            fold = (stable_unit(best.reindex(pv.q_id).reset_index(drop=True), cfg.seed + 6)
-                    * rc.folds).astype(int)
-            p_cf = np.empty(len(pv), dtype=np.float32)
-            iters = []
-            for k in range(rc.folds):
-                m = fold == k
-                mdl = _fit(Xv[~m], yv[~m], cfg)
-                iters.append(mdl.best_iteration or mdl.current_iteration())
-                p_cf[m] = mdl.predict(Xv[m], num_iteration=mdl.best_iteration)
-        st.metric("val_auc_stage1", round(float(roc_auc_score(yv, pv.p)), 6))
-        st.metric("val_auc_rescore", round(float(roc_auc_score(yv, p_cf)), 6))
-        st.metric("val_logloss_stage1", round(float(log_loss(yv, pv.p.clip(1e-7, 1 - 1e-7))), 6))
-        st.metric("val_logloss_rescore", round(float(log_loss(yv, p_cf.clip(1e-7, 1 - 1e-7))), 6))
-        st.write_parquet(pv[["q_id", "s1_id", "y"]].assign(p=p_cf), "scores_val")
-
-        with timed(st.log, "train final model on all val"):
-            final = _fit(Xv, yv, cfg, rounds=int(np.mean(iters)))
-        final.save_model(str(st.path("model.txt")))
-        st.register("model", st.path("model.txt"))
-        imp = pd.DataFrame({"feature": feats, "gain": final.feature_importance("gain")}
-                           ).sort_values("gain", ascending=False)
+        best = pv[pv["rank"] == 0].set_index("q_id").s1_id
+        fold = (stable_unit(best.reindex(pv.q_id).reset_index(drop=True), cfg.seed + 6)
+                * rc.folds).astype(int)
+        models, prev = [], None
+        for r in range(rc.rounds):
+            with timed(st.log, f"round {r}: features + {rc.folds}-fold cross-fit"):
+                Xv = build(pv, rec, rc.conf, prev, feats1)
+                p_cf = np.empty(len(pv), dtype=np.float32)
+                iters = []
+                for k in range(rc.folds):
+                    m = fold == k
+                    mdl = _fit(Xv[~m], yv[~m], cfg)
+                    iters.append(mdl.best_iteration or mdl.current_iteration())
+                    p_cf[m] = mdl.predict(Xv[m], num_iteration=mdl.best_iteration)
+                final = _fit(Xv, yv, cfg, rounds=int(np.mean(iters)))
+            st.metric(f"val_auc_rescore_r{r}", round(float(roc_auc_score(yv, p_cf)), 6))
+            st.metric(f"val_logloss_rescore_r{r}",
+                      round(float(log_loss(yv, p_cf.clip(1e-7, 1 - 1e-7))), 6))
+            final.save_model(str(st.path(f"model_r{r}.txt")))
+            st.register(f"model_r{r}", st.path(f"model_r{r}.txt"))
+            imp = pd.DataFrame({"feature": list(Xv.columns),
+                                "gain": final.feature_importance("gain")}
+                               ).sort_values("gain", ascending=False)
+            st.log.info("round %d rescore features by gain:\n%s", r, imp.to_string(index=False))
+            models.append(final)
+            prev = p_cf  # out-of-fold, so round r+1 trains on honest round-r scores
+        st.metric("val_auc_rescore", round(float(roc_auc_score(yv, prev)), 6))
+        st.metric("val_logloss_rescore", round(float(log_loss(yv, prev.clip(1e-7, 1 - 1e-7))), 6))
         st.write_parquet(imp, "importance")
-        st.log.info("rescore features by gain:\n%s", imp.to_string(index=False))
+        st.write_parquet(pv[["q_id", "s1_id", "y"]].assign(p=prev), "scores_val")
         del Xv, pv, rec
 
         if cfg.run_test:
             with timed(st.log, "test: top-k + features + score"):
-                pt = load_top_k(st, "test", rc.k)
+                # ~30M top-k pairs: cluster/member features are built globally (few
+                # columns); stage-1 features are fetched and scored part by part
+                pt = load_top_k(st, "test", rc.k, [])
                 rec = _records(st, "test", set(pt.q_id))
-                Xt = build(pt, rec, rc.conf)[feats]
                 info = json.loads(st.input_path("scorer", "model_info").read_text())
                 s1c = pd.read_parquet(st.input_path("normalize", "records_test"),
                                       columns=["entity_id", "country"],
                                       filters=[("source", "==", 1)]).set_index("entity_id").country
                 seen = s1c.reindex(pt.s1_id.to_numpy()).isin(info["train_countries"]).to_numpy()
-                pt.loc[seen, "p"] = final.predict(Xt[seen]).astype(np.float32)
+                fparts = sorted(st.input_path("features", "features_test").glob("*.parquet"))
+                prev = None
+                for mdl in models:  # unseen-country pairs keep their stage-1 p every round
+                    ctx = build(pt, rec, rc.conf, prev, [])
+                    prev = predict_parts(mdl, pt, ctx, fparts, seen)
+                    del ctx
+                pt["p"] = prev
                 st.metric("test_pairs_rescored", int(seen.sum()))
                 st.metric("test_pairs_kept_stage1", int((~seen).sum()))
                 out_dir = st.path("scores_test")

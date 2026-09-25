@@ -49,3 +49,31 @@ def test_build_member_similarity():
     assert X.loc[("S2-2", "S1-a"), "m_dup"] == 1 and X.loc[("S2-2", "S1-a"), "m_name_max"] == 100
     assert X.loc[("S2-2", "S1-b"), "m_name_max"] < 50
     assert X.loc[("S3-2", "S1-b"), "m_n"] == 0            # no other member to compare with
+
+
+def test_predict_parts_matches_direct(tmp_path):
+    """Part-by-part test scoring == scoring the fully joined frame."""
+    import lightgbm as lgb
+    from ber.cluster.stage import predict_parts
+    rng = np.random.default_rng(0)
+    parts, frames = [], []
+    for i in range(3):
+        f = pd.DataFrame({"a": rng.random(50).astype(np.float32),
+                          "b": rng.random(50).astype(np.float32)})
+        f.to_parquet(tmp_path / f"part-{i}.parquet")
+        parts.append(tmp_path / f"part-{i}.parquet")
+        frames.append(f)
+    # 40 pairs pointing at random rows of random parts, shuffled
+    part = rng.integers(0, 3, 40).astype(np.int16)
+    row = rng.integers(0, 50, 40).astype(np.int32)
+    pairs = pd.DataFrame({"_part": part, "_row": row, "p": rng.random(40).astype(np.float32)})
+    ctx = pd.DataFrame({"c": rng.random(40).astype(np.float32)})
+    full = pd.concat([ctx, pd.DataFrame([frames[q].iloc[r] for q, r in zip(part, row)]
+                                        ).reset_index(drop=True)], axis=1)
+    y = (full.a + full.c > 1).astype(int)
+    mdl = lgb.train({"objective": "binary", "verbose": -1, "min_data_in_leaf": 2},
+                    lgb.Dataset(full[["c", "b", "a"]], y), num_boost_round=5)
+    mask = rng.random(40) < 0.7
+    got = predict_parts(mdl, pairs, ctx, parts, mask)
+    want = np.where(mask, mdl.predict(full[["c", "b", "a"]]), pairs.p)
+    np.testing.assert_allclose(got, want, rtol=1e-5)

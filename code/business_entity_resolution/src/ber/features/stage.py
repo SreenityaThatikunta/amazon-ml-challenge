@@ -10,7 +10,9 @@ the feature columns of :mod:`ber.features.build`.
 
 from __future__ import annotations
 
+import os
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import pandas as pd
@@ -83,9 +85,36 @@ def join_records(chunk: pd.DataFrame, rec: pd.DataFrame, ctx: pd.DataFrame) -> p
     return pd.concat([chunk.reset_index(drop=True), qf, sf, c], axis=1)
 
 
+def _sub_chunks(chunk: pd.DataFrame, n: int) -> list[pd.DataFrame]:
+    """Split a chunk into ~n pieces at query boundaries (context features need
+    every candidate of a query in the same piece)."""
+    return list(_query_chunks(chunk, max(1, -(-len(chunk) // n))))
+
+
 def run_features(cfg: Config) -> None:
     fc = cfg.features
+    workers = fc.workers or max(1, min(4, (os.cpu_count() or 4) - 2))
+    pool = ProcessPoolExecutor(workers) if workers > 1 else None
+    try:
+        _run_features(cfg, pool, workers)
+    finally:
+        if pool is not None:
+            pool.shutdown()
+
+
+def _features(pool, d: pd.DataFrame, workers: int) -> pd.DataFrame:
+    """build_features, split over worker processes (the pure-Python lookalike
+    features dominate the stage's time)."""
+    if pool is None or len(d) < 50_000:
+        return build_features(d)
+    pieces = _sub_chunks(d, workers)
+    return pd.concat(list(pool.map(build_features, pieces)))
+
+
+def _run_features(cfg: Config, pool, workers: int) -> None:
+    fc = cfg.features
     with StageRun(cfg, "features") as st:
+        st.metric("workers", workers)
         splits = ["train"] + (["test"] if cfg.run_test else [])
         for split in splits:
             extra = ["side", "owner"] if split == "train" else []
@@ -119,7 +148,7 @@ def run_features(cfg: Config) -> None:
                         continue
                     for chunk in _query_chunks(part, fc.chunk_rows):
                         d = join_records(chunk, rec, ctx)
-                        feats = build_features(d)
+                        feats = _features(pool, d, workers)
                         keys = d[["q_id", "s1_id"]].copy()
                         if split == "train":
                             keys["y"] = (d.s1_id == d.q_owner).astype(np.int8)

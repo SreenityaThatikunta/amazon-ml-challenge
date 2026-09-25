@@ -106,3 +106,30 @@ def test_lookalike_features_french_twins():
     assert f.loc["S1-e", "n_nocity_ratio"] < f.loc["S1-e", "n_ratio"] - 10  # city word removed
     assert f.loc["S1-e", "n_shared_only_city"] == 1
     assert f.loc["S1-a", "n_s_city_frac"] == 0.5
+
+
+def test_unmatched_word_threshold_inclusive():
+    from ber.features.build import _unmatched
+    assert _unmatched(["nagar"], ["naga", "urban"]) == 0      # similarity exactly 0.8 counts
+    assert _unmatched(["chateau"], ["magasin"]) == 1
+    assert _unmatched(["x"], []) == 1
+
+
+def test_parallel_features_match_serial():
+    from concurrent.futures import ProcessPoolExecutor
+    from ber.features.stage import _features, join_records
+    recs = pd.DataFrame([_rec(f"S1-{i}", 1, f"name {i % 7}", f"{i} main st town", str(i))
+                         for i in range(40)] +
+                        [_rec(f"S2-{i}", 2, f"name {i % 5}", f"{i} main st town", str(i))
+                         for i in range(40)])
+    rec = record_extras(recs).set_index("entity_id")
+    q = [f"S2-{i}" for i in range(40) for _ in range(3)]
+    s = [f"S1-{(i + j) % 40}" for i in range(40) for j in range(3)]
+    cands = pd.DataFrame({"q_id": q, "s1_id": s, "cos_name": 0.5, "cos_addr": 0.5,
+                          "cos_combo": 0.5, "rank_name": 0, "rank_addr": 0, "rank_combo": 0})
+    ctx = pd.DataFrame({"s_n_cands": 1, "s_n_top1": 1}, index=sorted(set(s)))
+    d = join_records(cands, rec, ctx)
+    with ProcessPoolExecutor(2) as pool:
+        par = pd.concat(list(pool.map(build_features, [d.iloc[:60], d.iloc[60:]])))
+    pd.testing.assert_frame_equal(build_features(d), par)
+    assert _features(None, d, 1).equals(build_features(d))

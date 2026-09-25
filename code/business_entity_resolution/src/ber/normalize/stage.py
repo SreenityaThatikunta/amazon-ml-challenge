@@ -1,7 +1,12 @@
 """``ber normalize`` (task T1.4): learn the Indic dictionary, then normalise records.
 
 Outputs in ``artifacts/<run>/normalize/``:
-  * ``translit_dict.parquet``: learned Indic -> Latin dictionary (train-side pairs only)
+  * ``translit_dict.parquet``: learned Indic -> Latin dictionary (train-side pairs only),
+    used for train/val records so val stays honest
+  * ``translit_dict_all.parquet`` (``normalize.test_dict_all_pairs``): the same learned
+    from **all** train pairs, used for test records. Whole val regions are held out,
+    so the train-side dictionary has no Gurmukhi at all (Punjab is a val region);
+    test Punjab records (12.5k Gurmukhi names, 33% with unknown words) need it
   * ``records_train/``: parquet parts, one row per train record (S1, S2, S3) with
     split side/dev/owner, raw fields and normalised fields
   * ``records_test/``: same for test (skipped for the dev slice)
@@ -65,7 +70,7 @@ def _workers(cfg: Config) -> int:
 
 
 def _learn(st: StageRun, cfg: Config,
-           split_q: pd.DataFrame) -> tuple[dict[str, str], dict[str, str]]:
+           split_q: pd.DataFrame) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
     """Learn the dictionary on train-side pairs, build the S1 skeleton vocabulary
     (train + test S1: fully known at inference), report coverage on val pairs."""
     with timed(st.log, "learn Indic->Latin dictionary + S1 vocabulary"):
@@ -91,7 +96,14 @@ def _learn(st: StageRun, cfg: Config,
                                             for k, v in dictionary_coverage(
                                                 lut, vocab, va.business_name,
                                                 va.s1_name).items()})
-    return lut, vocab
+        lut_all = lut
+        if cfg.normalize.test_dict_all_pairs:
+            d_all = learn_dictionary(q.business_name, q.s1_name,
+                                     cfg.normalize.dict_min_count, cfg.normalize.dict_min_share)
+            st.write_parquet(d_all, "translit_dict_all")
+            lut_all = dict(zip(d_all.indic, d_all.latin))
+            st.metric("translit.dictionary_size_all_pairs", len(lut_all))
+    return lut, vocab, lut_all
 
 
 def _normalize_split(st: StageRun, cfg: Config, split: str, lut: dict[str, str],
@@ -125,7 +137,7 @@ def run_normalize(cfg: Config) -> None:
     with StageRun(cfg, "normalize") as st:
         s1_split = st.read_input("split", "s1", run=cfg.data.split_run)
         q_split = st.read_input("split", "queries", run=cfg.data.split_run)
-        lut, vocab = _learn(st, cfg, q_split)
+        lut, vocab, lut_all = _learn(st, cfg, q_split)
 
         cols = ["entity_id", "side", "dev", "geo"]
         sides = {1: s1_split[cols].assign(owner=""),
@@ -133,7 +145,7 @@ def run_normalize(cfg: Config) -> None:
                  3: q_split.loc[q_split.entity_id.str.startswith("S3-"), cols + ["owner"]]}
         _normalize_split(st, cfg, "train", lut, vocab, sides)
         if cfg.run_test:
-            _normalize_split(st, cfg, "test", lut, vocab, None)
+            _normalize_split(st, cfg, "test", lut_all, vocab, None)
         else:
             st.log.info("test split skipped (slice=%s, with_test=%s)", cfg.data.slice,
                         cfg.data.with_test)

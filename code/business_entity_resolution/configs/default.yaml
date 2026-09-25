@@ -28,6 +28,7 @@ normalize:            # stage 0 (T1.x)
   chunk_size: 100000  # records per worker task
   dict_min_count: 2   # Indic->Latin dictionary: min aligned occurrences of a token pair
   dict_min_share: 0.6 # ... and min share of the dominant Latin spelling
+  test_dict_all_pairs: true  # test records use a dictionary learned from all train pairs
 
 candidates:           # stage 1 (T2.x): char n-gram TF-IDF top-k per country
   ngram: 3            # character n-gram size (char_wb)
@@ -45,6 +46,7 @@ candidates:           # stage 1 (T2.x): char n-gram TF-IDF top-k per country
 features:             # stage 2 (T3.3)
   train_query_frac: 0.2   # share of train-side queries featurised (val side: all)
   chunk_rows: 2000000     # candidate pairs per feature chunk (memory vs speed)
+  workers: 0            # processes for build_features; 0 = min(4, cpu_count - 2)
 
 scorer:               # stage 2 (T3.4): LightGBM pair scorer
   learning_rate: 0.05
@@ -70,6 +72,8 @@ rescore:               # M8: second-stage scorer with cluster context (ber resco
   k: 3                 # top-k stage-1 candidates per query that get rescored
   conf: 0.5            # stage-1 p for a query to count as a confident cluster member
   folds: 2             # cross-fitting folds on val (by the query's best S1)
+  rounds: 1            # rescore rounds; round r+1 rebuilds clusters from round-r p
+  stage1_feats: ["*"]  # stage-1 features joined in: ["*"] = all (E17: dev +0.0027); [] = short list
   model_from_run: null # apply that run's rescore model to val instead (France proxy)
 
 decide:               # stage 4 (T3.5/T4.1)

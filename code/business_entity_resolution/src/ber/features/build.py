@@ -112,8 +112,10 @@ def _unmatched(a: list[str], b: list[str]) -> int:
     rest = set(a).difference(b)
     if not rest or not b:
         return len(rest)
-    return sum(process.extractOne(x, b, scorer=Levenshtein.normalized_similarity,
-                                  score_cutoff=WORD_SIM) is None for x in rest)
+    # distance form: a similarity cutoff is converted to an integer edit budget and
+    # drops pairs at exactly WORD_SIM ("naga"/"nagar"); distance <= 1 - WORD_SIM keeps them
+    return sum(process.extractOne(x, b, scorer=Levenshtein.normalized_distance,
+                                  score_cutoff=1 - WORD_SIM + 1e-9) is None for x in rest)
 
 
 def lookalike_features(d: pd.DataFrame, f: pd.DataFrame) -> pd.DataFrame:

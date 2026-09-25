@@ -55,6 +55,8 @@ class NormalizeConfig:
     chunk_size: int = 100_000     # records per worker task
     dict_min_count: int = 2       # translit dictionary: min aligned occurrences
     dict_min_share: float = 0.6   # translit dictionary: min share of the dominant spelling
+    test_dict_all_pairs: bool = True  # test records: dictionary from all train pairs (not
+                                      # only train-side ones; val regions hold all Gurmukhi)
 
 
 @dataclass
@@ -83,6 +85,7 @@ class CandidatesConfig:
 class FeaturesConfig:
     train_query_frac: float = 0.2  # share of train-side queries used (val side: all)
     chunk_rows: int = 2_000_000    # candidate pairs per feature chunk
+    workers: int = 0               # processes for build_features; 0 = min(4, cpu_count - 2)
 
 
 @dataclass
@@ -113,6 +116,9 @@ class RescoreConfig:
     k: int = 3                 # top-k stage-1 candidates per query that get rescored
     conf: float = 0.5          # stage-1 p for a query to count as a confident cluster member
     folds: int = 2             # cross-fitting folds on val (by the query's best S1)
+    rounds: int = 1            # rescore rounds; round r+1 rebuilds clusters from round-r p
+    stage1_feats: list[str] = field(default_factory=list)  # stage-1 features joined in;
+                                                           # [] = the default short list
     model_from_run: str | None = None  # apply that run's rescore model to val (France proxy)
 
 
