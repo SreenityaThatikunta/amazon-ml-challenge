@@ -1,0 +1,14 @@
+# Synthetic French *training* pairs (T7.1b/T7.4): same generator as the proxy, on a
+# disjoint S1 sample, featurised only (no scorer/decide). Added to the main scorer's
+# training via `scorer.extra_train: [frtrain]`. Build the data first with:
+#   ber synth-france --run frtrain -s seed=7 -s france.n_entities=60000 \
+#       -s france.exclude=artifacts/main/synth-france/data/eval_s1.tsv
+extends: france_proxy.yaml
+
+run_id: frtrain
+paths:
+  data_dir: artifacts/frtrain/synth-france/data
+data:
+  split_run: frtrain
+decide:
+  eval_s1: artifacts/frtrain/synth-france/data/eval_s1.tsv

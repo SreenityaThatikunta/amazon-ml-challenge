@@ -14,6 +14,8 @@ split:                # everything is validation
   dev_val_frac: 0.0
 features:
   train_query_frac: 0.0
+decide:               # all France S1 are indexed; only the synthesised sample is scored
+  eval_s1: artifacts/main/synth-france/data/eval_s1.tsv
 scorer:
   model_from_run: main  # apply the US/India model: measures generalisation to France
   oof_folds: 1
