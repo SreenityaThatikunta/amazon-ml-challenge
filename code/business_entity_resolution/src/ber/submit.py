@@ -1,9 +1,11 @@
 """``ber submit`` (task T3.5): write output/matching_results.tsv for the test
 set and run the official validator on it.
 
-Optionally (``submit.write_candidates``) also output/candidate_pairs.tsv, the
-full stage-1 candidate set (~2.4e8 pairs, ~3 GB; grouped with integer codes).
-Not needed for our submission.
+Also (``submit.write_candidates``, on by default) output/candidate_pairs.tsv,
+the full stage-1 candidate set (~2.4e8 pairs, ~3 GB; grouped with integer
+codes). It is required in the final submission zip: it is the exact set the
+scorer runs inference over. Every match is checked to be one of its S1's
+candidates here, because the official validator needs ~30 GB of RAM for that.
 """
 
 from __future__ import annotations
@@ -59,7 +61,7 @@ def run_submit(cfg: Config) -> None:
         st.metric("matched_pairs", len(dec))
 
         if cfg.submit.write_candidates:
-            _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat)
+            _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat, s_codes, q_codes)
         else:
             st.log.info("candidate_pairs.tsv skipped (submit.write_candidates=false)")
 
@@ -67,7 +69,8 @@ def run_submit(cfg: Config) -> None:
             _validate(st, cfg, out)
 
 
-def _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat) -> None:
+def _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat,
+                      match_s: np.ndarray, match_q: np.ndarray) -> None:
     with timed(st.log, "candidate_pairs.tsv"):
         sc, qc = [], []
         for f in sorted(st.input_path("candidates", "candidates_test").glob("*.parquet")):
@@ -75,10 +78,24 @@ def _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat) -> None:
             sc.append(pd.Categorical(p.s1_id.astype(str), dtype=s1_cat).codes)
             qc.append(pd.Categorical(p.q_id.astype(str), dtype=q_cat).codes)
         sc_all, qc_all = np.concatenate(sc), np.concatenate(qc)
+        if (sc_all < 0).any() or (qc_all < 0).any():
+            raise ValueError("candidates reference ids that are not in the test set")
+        n_missing = _matches_not_in_candidates(sc_all, qc_all, match_s, match_q, len(q_ids))
+        st.metric("matches_not_in_candidates", n_missing)
+        if n_missing:
+            raise ValueError(f"{n_missing} matched pairs are not in the candidate set")
         n = _write_grouped(out / "candidate_pairs.tsv", s1_ids, sc_all, q_ids, qc_all,
                            CANDIDATE_HEADER)
         st.register("candidate_pairs", out / "candidate_pairs.tsv", rows=n)
         st.metric("candidate_pairs", len(sc_all))
+
+
+def _matches_not_in_candidates(cand_s: np.ndarray, cand_q: np.ndarray, match_s: np.ndarray,
+                               match_q: np.ndarray, n_q: int) -> int:
+    """Number of matched (s1, q) pairs that are not candidate pairs."""
+    cand = cand_s.astype(np.int64) * n_q + cand_q
+    match = match_s.astype(np.int64) * n_q + match_q
+    return int((~np.isin(match, cand)).sum())
 
 
 def _validate(st, cfg: Config, out) -> None:

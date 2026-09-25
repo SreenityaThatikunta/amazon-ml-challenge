@@ -29,3 +29,11 @@ def test_read_tsv_keeps_quotes_and_empty(tmp_path):
                  'S1-1\t"Joe\'s" "Bar\t\tUS\n')
     df = read_tsv(p)
     assert df.business_name[0] == '"Joe\'s" "Bar' and df.business_address[0] == ""
+
+
+def test_matches_not_in_candidates():
+    import numpy as np
+    from ber.submit import _matches_not_in_candidates
+    cs, cq = np.array([0, 0, 1, 2]), np.array([0, 3, 1, 2])
+    assert _matches_not_in_candidates(cs, cq, np.array([0, 1]), np.array([3, 1]), 4) == 0
+    assert _matches_not_in_candidates(cs, cq, np.array([0, 1]), np.array([1, 1]), 4) == 1
