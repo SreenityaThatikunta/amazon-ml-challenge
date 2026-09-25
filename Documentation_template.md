@@ -1,74 +1,225 @@
-# ML Challenge 2026: Business Entity Resolution Solution Template
+# ML Challenge 2026: Business Entity Resolution Solution
 
-**Team Name:** [Your Team Name]  
-**Team Members:** [List all team members]  
-**Submission Date:** [Date]
+**Team Name:** pootato
+**Team Members:** Sreenitya Thatikunta, Rudraksha Dev Sharma
+**Submission Date:** 2026-09-27
 
 ---
 
 ## 1. Executive Summary
-*Provide a brief 2-3 sentence overview of your approach and key innovations.*
+
+A four-stage cascade that never compares all pairs: normalisation tuned to the noise we
+measured in the data, region-blocked character-trigram TF-IDF retrieval (24.6 S1
+candidates per S2/S3 record, 99.05 % of true pairs), a LightGBM pair scorer with 102
+features that also acts as a learned filter (**1.08 candidates per record kept, 99.97 %
+of the retrieved true pairs**), and a second LightGBM that re-ranks the survivors with
+*group context*: how many other records claim the same S1, how strongly and from which
+source. A per-S1 expected-F0.5 rule (one owner per record) produces the final links.
+Validation macro F0.5 is **0.98748** on a geographic hold-out (10 % of the S1 entities,
+whole states), up from 0.98211 for our first submission. Everything runs on one laptop
+(16 GB RAM; optional NVIDIA GPU for the retrieval step) with MIT/BSD/Apache
+dependencies and no pretrained model.
 
 ---
 
 ## 2. Methodology
 
 ### 2.1 Problem Analysis
-*Key insights discovered during EDA — noise patterns, address variations, missing fields, etc.*
+
+Findings that shaped the design (EDA scripts in `eda/`, summary in `eda/FINDINGS.md`,
+v2 checks in `progress.md`):
+
+- **Structure.** Every S2/S3 record belongs to at most one S1 (all 7.6 M matched ids are
+  unique) and true pairs never cross countries → one owner per record, blocking within
+  a country. 5.6 % of S1 are singletons; S1 have 3.46 matches on average (≤ 5 from S2,
+  ≤ 6 from S3). US and India share one generator; France (test only) follows the same one.
+- **Names are ambiguous, addresses decide.** 50 % of S1 share their core name with
+  another S1 ("Meridian" × 572), only 6.8 % share an exact address.
+- **Name noise** (true pairs): legal-form swaps and typos in legal words (`PRlVATE`,
+  `Priavte`), OCR digits (`Hea1th 5ervices`), arbitrary letter typos (`Mitllls`),
+  word-order transpositions, doubled words, aliases (`aka`, `dba`, `formerly`, `nee`),
+  domains (`bwford.com`), injected record ids / phone numbers (`(ID: 63317)`, `#32038`,
+  `- 9334025793`, ~1 % of US/India records), **filler words** appended per country
+  (US `Riverside/Westgate/Holdings/Services`, India `Smt/Shri/Sweets/Infratech`, France
+  `Participations/Holding/Distribution/Développement`), Indian-script transliterations
+  (23 % of Indian S2 names), and **made-up brand names replacing the whole name**
+  (`Grand Physical Therapy` → `Jaxdrexquo`, 1.6 % of true pairs).
+- **Address noise:** abbreviations (Rd/Road, R./Rue), state ↔ code ↔ Indian-script
+  state ↔ French département, reordered components, dropped units, zero padding,
+  truncated house numbers (7622 → 762), digit typos in leading positions (394 → 894), and
+  in India a **fake house number prepended** (`H.NO 937 33, …`). 4 % of S2/S3 addresses
+  are empty.
+- **Distractors** (unmatched records): copies of an S1 with a one-letter name edit,
+  a credential swap (MD → JD) or the house number **shifted by a few units**
+  (5835 → 5838), often with an added PO box.
+- **Test differs from train:** France is new, and test has ~5.7 S2/S3 records per S1
+  vs 4.7 in train (≈ 40 % unmatched vs 26 %). Our first leaderboard score (0.975) was
+  ≈ 0.007 below its validation score (0.982).
 
 ### 2.2 Solution Strategy
-*Outline your high-level approach.*
 
-**Approach Type:** [Blocking + Classifier / End-to-End / Graph-Based / Hybrid, etc]  
-**Core Innovation:** [Brief description of your main technical contribution]
+**Approach Type:** Blocking + learned filter + group-aware re-ranker + expected-F0.5 decision.
+**Core Innovation:** a *cascade* where the stage-1 classifier doubles as the final
+blocking filter (tiny candidate set without losing recall), and a stage-2 re-ranker
+trained cross-fitted on complete S1 groups that reasons about competing claims on the
+same S1, the information a pairwise matcher cannot see.
+
+```
+records ─► [0] normalise ─► [1] TF-IDF top-k (region-blocked, 24.6/record)
+        ─► [2] 102 pair features ─► stage-1 LightGBM p1 ─► keep p1 ≥ 0.001 (1.08/record)
+        ─► [3] stage-2 LightGBM p2 (group context) ─► [4] one owner + expected F0.5 per S1
+```
+
+Validation: whole regions (US and Indian states) are held out (10 % of S1 per country),
+so lookalike distractors, which sit at nearby addresses, stay on the same side as the
+entities they imitate. Val queries (S2/S3) follow their owner; all val records are scored,
+so val F0.5 includes blocking losses, singletons and every stage, like the leaderboard.
 
 ---
 
 ## 3. Candidate Generation (Blocking)
-*Describe how you reduced the comparison space to a manageable candidate set.*
 
-- **Blocking keys used:** [e.g., PIN code, phonetic name encoding, TF-IDF, etc.]
-- **Candidate pairs generated:** [total]
-- **How you ensured true matches were not lost:**
+- **Normalisation first** (`src/ber/normalize/`): Latin accents stripped, `&/+/et` → `and`,
+  aliases split (pre/alt parts kept), domains and handles unwrapped, injected ids and phone
+  numbers dropped, OCR digit → letter fixes in mixed tokens, single-letter runs joined
+  (`L.L.C.` → `llc`), legal forms canonicalised and moved out of the core (one typo or
+  one adjacent swap tolerated in long legal words), stopwords and honorifics dropped,
+  doubled words collapsed. Indian-script tokens: a dictionary learned from training pairs
+  (1,164 words), then rule-based romanisation snapped to the S1 vocabulary by consonant
+  skeleton (95.8 % exact on held-out tokens). Addresses: placeholders dropped, region
+  components (state names/codes, Indian-script states, French région/département)
+  extracted to a `region` field, street types canonicalised per country, unit/house
+  prefixes dropped, zero padding removed; raw digit strings kept for number features.
+- **Blocking keys:** three character-trigram TF-IDF indexes over S1 per country: core
+  name, address words (order-free) and name + address. Each S2/S3 record takes the union
+  of the top 10 of each (top 30 names when its address is empty).
+- **Region blocking:** a record searches only the S1 of its region's neighbourhood,
+  learned from training pairs (e.g. AP ↔ TG, Telangana addresses written as Andhra
+  Pradesh); records without a detectable region search the whole country.
+- **Learned filter (stage 1):** the pair scorer (section 4) keeps pairs with p1 ≥ 0.001.
+  This is the last filter before the final model and defines `candidate_pairs.tsv`.
+- **Candidate pairs generated (test):** TF-IDF: 243,753,102 pairs (24.4 per record);
+  after the stage-1 filter (= `candidate_pairs.tsv`): {TBD_CAND_PAIRS} pairs,
+  {TBD_CAND_PER_S1} per S1 entity.
+- **How true matches were not lost:** recall measured on the validation side at every
+  step: TF-IDF 99.05 % of true pairs (US 99.3 %, India 98.2–99.2 %), the stage-1 filter
+  keeps 99.97 % of those (trade-off table in `artifacts/<run>/rerank/manifest.json`:
+  0.001 → 1.08 pairs/record, 0.01 → 0.88 pairs/record at 99.78 %). The remaining misses
+  are dominated by address-less records whose name dozens of S1 share.
+- **Scale:** streaming per country and per region block; one country's records in memory
+  at a time; optional GPU top-k (CuPy, cuSPARSE) for large blocks. Test retrieval: 78 min
+  on a laptop with an RTX 4050 (2.4 h CPU-only for train).
 
 ---
 
 ## 4. Matching Model
 
-**Features used:**
-- Name features: [e.g., Jaccard, Levenshtein, phonetic encoding]
-- Address features: [e.g., token overlap, edit distance, PIN code matching]
-- Other: []
+**Features used (stage 1, 102):**
+- Name features: exact core/compact equality; Levenshtein, substitutions vs indels vs
+  transpositions, ratio, token-set/sort ratio, partial ratio, Jaro-Winkler; alias parts;
+  initials (`VPC` ↔ `Vision Precision Clinic`); first/last token; legal-form agreement and
+  conflict; domain / alias / Indic flags; share of tokens unknown to the S1 vocabulary;
+  how many S1 share the exact core name. **Filler-free name key** (sorted unique core
+  tokens without the injected filler words, learned without labels as tokens ≥ 2× more
+  frequent in S2/S3 names than in S1 names): equality, Levenshtein, ratio, token-set
+  ratio, **IDF-weighted recall/precision**, largest IDF of an unmatched token on each
+  side. **Made-up-brand flag** (name is a concatenation of ~45 learned syllables: covers
+  96 % of brand replacements, fires on 0.03 % of S1 names).
+- Address features: equality, token-set / ratio / partial ratio; region agreement /
+  conflict / missing; house-number relation (equal / padded / truncated / shifted /
+  different) and log difference; number-set overlap; **S1 house number present anywhere
+  in the record's numbers (and vice versa), best relation to any number, digit edit
+  distance, position of the first differing digit**; PO box / PMB flags;
+  **IDF-weighted overlap of address words**.
+- Retrieval and context: the three TF-IDF cosines and ranks; for 8 key similarities the
+  margin over the record's best *other* candidate, the gap to its best and the rank;
+  candidates per record and per S1.
 
-**Model type:** [e.g., XGBoost, Siamese Network, Transformer, etc.]  
-**Threshold selection method:** [e.g., F_0.5 optimization on validation set]
+**Stage-2 features (re-ranker, 50):** p1 and logit; record context (rank, best/sum/count
+of the record's other p1); **S1 context** (rank of the record among all records listing
+the S1, best/sum/count of competing p1, the same within the record's source, and
+"claims": records whose best S1 this is, their expected count and best competitor);
+25 stage-1 features passed through.
+
+**Model type:** LightGBM (MIT) binary classifiers. Stage 1: 127 leaves, lr 0.05, early
+stopping on 5 % of val records (best iteration 346), trained on 4.5 M pairs from 10 % of
+the featurised train-side records. Stage 2: 63 leaves, trained on the val side only
+(1.12 M pairs, complete S1 groups) with **4-fold cross-fitting** grouped by the record's
+top S1: every val pair gets an out-of-fold p2 (honest validation), test pairs get the mean
+of the 4 fold models. No pretrained model, far below the 8 B parameter limit.
+
+**Threshold selection method:** one owner per record (its highest p2), then per S1 the
+prefix of its records (sorted by p2) that maximises the expected F0.5
+(≈ 1.25·Σp / (0.25·Σp_all + k), vs P(no match) = Π(1 − p) for the empty prediction), after
+dropping p2 < min_p. min_p = 0.25 chosen on validation; the curve is flat (0.98743–0.98748
+for 0.02–0.5). Exact duplicate records share one owner.
 
 ---
 
 ## 5. Results & Error Analysis
 
-- **F_0.5 Score (macro):** [your best validation score]
-- **Common false positives (wrong merges):** [brief description]
-- **Common false negatives (missed matches):** [brief description]
+- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.98748** (US 0.98923,
+  India 0.98473, singletons 0.98220; pair precision 0.99645, recall 0.97349).
+  Progression: first submission 0.98211 → v2 features, stage 1 only 0.98337 → + stage-2
+  re-ranker 0.98748.
+- **Common false positives (wrong merges):** 2,765 of 752,513 predicted links: 1,842
+  lookalike distractors (same address, one-letter name edit or house number shifted by a
+  few units, often indistinguishable from a true pair with a digit typo), 923 records of
+  another S1 with the same generic name at a nearby address.
+- **Common false negatives (missed matches):** 2.65 % of true pairs. More than half come
+  from the 4 % of records with an **empty address** (they lose 32.5 % of their pairs):
+  with half of all S1 names shared, the name alone often can't choose. Others: pairs whose
+  noise mimics a distractor (house number ±2 and city renamed), made-up brand names at an
+  address that hosts several S1, and retrieval ties among dozens of S1 with the same name.
+- **Leaderboard:** first submission 0.975 public (val 0.982). v2: {TBD_LB}.
 
 ---
 
 ## 6. Conclusion
-*Summarize your approach, key achievements, and lessons learned in 2-3 sentences.*
+
+Measuring the generator's noise in the raw data and encoding it (filler words, brand
+names, prepended house numbers, injected ids) gave the pair model better evidence; the
+largest single gain came from letting a second model see the competition for each S1
+entity. The cascade keeps the candidate set to about one S1 per record while retaining
+99.97 % of the retrieved true pairs. The main remaining loss is records without an
+address whose name is shared by many S1, which no feature of the pair can resolve.
 
 ---
 
 ## Appendix
 
 ### A. Code Artefacts
-*Your complete, runnable code ships in the submission zip under
-`code/business_entity_resolution/` (all source in `src/`, with a `README.md` and
-`requirements.txt`). Summarise its structure and the entry point(s) to reproduce
-`output/matching_results.tsv` and `output/candidate_pairs.tsv` here.*
+
+`code/business_entity_resolution/` (Python ≥ 3.11; `requirements.txt` pinned,
+`requirements-gpu.txt` optional): package `ber`, one CLI command per stage, each reading
+the previous stage's artifacts from `artifacts/<run>/<stage>/` and writing its own with a
+`manifest.json` (config hash, git commit, timings, peak memory, metrics). All thresholds
+live in `configs/default.yaml`.
+
+```bash
+pip install -r code/business_entity_resolution/requirements.txt
+pip install -e code/business_entity_resolution
+B=ber   # run from the directory that contains dataset/
+$B split --run main && $B normalize --run main && $B candidates --run main
+$B features --run main && $B scorer --run main && $B rerank --run main
+$B decide --run main && $B submit --run main   # -> output/matching_results.tsv, candidate_pairs.tsv
+```
+
+`--set data.phase=train` / `test` run the train/val side and the test side separately
+(same outputs). `ber explain <entity_id>` traces one record through every stage.
+Main modules: `normalize/` (text, address, geo, transliteration, lookup tables),
+`candidates/` (TF-IDF, region blocking, GPU top-k), `features/` (pair + context features),
+`scorer/` (stage 1), `rerank/` (stage 2), `decide/` (one owner, expected F0.5),
+`submit.py` (TSVs + official validator), `eval/` (geographic split, macro F0.5).
 
 ### B. Additional Results
-*Include any additional charts, graphs, or detailed results.*
 
----
+| Stage | Pairs per S2/S3 record | True pairs kept (val) |
+|---|---|---|
+| All S1 of the country | ~10⁶ | 100 % |
+| TF-IDF top-k union | 24.6 | 99.05 % |
+| Stage-1 filter (p1 ≥ 0.001) = `candidate_pairs.tsv` | 1.08 | 99.02 % |
+| Final links | 0.72 | 97.35 % |
 
-**Note:** Teams can modify sections according to their approach while maintaining clarity and technical depth.
+Stage-2 features by gain: record margin over its other candidates, p1, then the S1-side
+claim features (`c_expected`, `c_best_other`, `c_sum_other`).
