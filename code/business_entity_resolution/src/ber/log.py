@@ -7,7 +7,6 @@ its log to ``artifacts/<run>/<stage>/log.txt`` (see :mod:`ber.artifacts`).
 from __future__ import annotations
 
 import logging
-import resource
 import sys
 import time
 from contextlib import contextmanager
@@ -48,6 +47,12 @@ def remove_handler(h: logging.Handler) -> None:
 
 def peak_rss_gb() -> float:
     """Peak resident memory of this process so far, in GB."""
+    try:
+        import resource  # Unix only
+    except ImportError:  # Windows: psutil exposes the peak working set
+        import psutil
+        info = psutil.Process().memory_info()
+        return getattr(info, "peak_wset", info.rss) / 1e9
     rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     return rss / 1e9 if sys.platform == "darwin" else rss * 1024 / 1e9  # bytes vs KiB
 

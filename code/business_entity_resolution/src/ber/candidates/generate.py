@@ -19,6 +19,7 @@ Outputs ``candidates_<split>.parquet``; for train, also a recall report.
 
 from __future__ import annotations
 
+import json
 import os
 
 import numpy as np
@@ -225,8 +226,11 @@ class RecallReport:
 
 def run_candidates(cfg: Config) -> None:
     with StageRun(cfg, "candidates") as st:
-        splits = ["train"] + (["test"] if cfg.run_test else [])
+        splits = (["train"] if cfg.run_train else []) + (["test"] if cfg.run_test else [])
         neighbors: dict[str, dict[str, list[str]]] = {}
+        if not cfg.run_train:  # test-only pass: neighbourhoods learned by the train pass
+            with open(st.path("region_neighbors.json"), encoding="utf-8") as f:
+                neighbors = json.load(f)
         for split in splits:
             cols = RECORD_COLS + (TRAIN_COLS if split == "train" else [])
             recs = pd.read_parquet(st.input_path("normalize", f"records_{split}"), columns=cols)

@@ -1,9 +1,14 @@
 """``ber submit`` (task T3.5): write output/matching_results.tsv for the test
 set and run the official validator on it.
 
-Optionally (``submit.write_candidates``) also output/candidate_pairs.tsv, the
-full stage-1 candidate set (~2.4e8 pairs, ~3 GB; grouped with integer codes).
-Not needed for our submission.
+With ``submit.write_candidates`` also output/candidate_pairs.tsv, required in the
+final package: "the exact set of records you feed into your matching model for
+inference ... if your pipeline has several blocking/filtering stages, the last
+one". That is the pair set of the scores ``decide`` consumed
+(``decide.scores_stage``): with the stage-2 re-ranker, the pairs that passed the
+stage-1 filter (p1 >= rerank.min_p1, ~3 per record); with the stage-1 scorer
+alone, every TF-IDF candidate (~2.4e8 pairs, ~3 GB). Matches are a subset by
+construction.
 """
 
 from __future__ import annotations
@@ -59,7 +64,7 @@ def run_submit(cfg: Config) -> None:
         st.metric("matched_pairs", len(dec))
 
         if cfg.submit.write_candidates:
-            _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat)
+            _write_candidates(st, cfg, out, s1_ids, q_ids, s1_cat, q_cat)
         else:
             st.log.info("candidate_pairs.tsv skipped (submit.write_candidates=false)")
 
@@ -67,10 +72,11 @@ def run_submit(cfg: Config) -> None:
             _validate(st, cfg, out)
 
 
-def _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat) -> None:
+def _write_candidates(st, cfg: Config, out, s1_ids, q_ids, s1_cat, q_cat) -> None:
     with timed(st.log, "candidate_pairs.tsv"):
         sc, qc = [], []
-        for f in sorted(st.input_path("candidates", "candidates_test").glob("*.parquet")):
+        src = st.input_path(cfg.decide.scores_stage, "scores_test")
+        for f in sorted(src.glob("*.parquet")):
             p = pd.read_parquet(f, columns=["q_id", "s1_id"])
             sc.append(pd.Categorical(p.s1_id.astype(str), dtype=s1_cat).codes)
             qc.append(pd.Categorical(p.q_id.astype(str), dtype=q_cat).codes)
@@ -82,15 +88,18 @@ def _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat) -> None:
 
 
 def _validate(st, cfg: Config, out) -> None:
-    """Official validator on matching_results.tsv only. It runs from utils/ on
-    purpose: when --candidate is omitted the validator loads
-    ./output/candidate_pairs.tsv if it exists, and at ~2.4e8 ids that needs
-    ~30 GB of RAM."""
-    res = subprocess.run(
-        [sys.executable, "validate_submission.py",
-         "--matching", str(out / "matching_results.tsv"),
-         "--test-dir", str(cfg.data_dir / "test")],
-        capture_output=True, text=True, cwd=cfg.root / "utils")
+    """Official validator. It runs from utils/ on purpose: when --candidate is
+    omitted the validator loads ./output/candidate_pairs.tsv if it exists, and at
+    ~2.4e8 ids (stage-1 candidates) that needs ~30 GB of RAM. The candidate file
+    is checked only when it is the small stage-2 input (``decide.scores_stage``
+    is not the stage-1 scorer)."""
+    cmd = [sys.executable, "validate_submission.py",
+           "--matching", str(out / "matching_results.tsv"),
+           "--test-dir", str(cfg.data_dir / "test")]
+    cand = out / "candidate_pairs.tsv"
+    if cfg.submit.write_candidates and cfg.decide.scores_stage != "scorer" and cand.exists():
+        cmd += ["--candidate", str(cand)]
+    res = subprocess.run(cmd, capture_output=True, text=True, cwd=cfg.root / "utils")
     st.log.info("validator output:\n%s%s", res.stdout, res.stderr)
     st.metric("validator", "PASS" if res.returncode == 0 else "FAIL")
     if res.returncode != 0:

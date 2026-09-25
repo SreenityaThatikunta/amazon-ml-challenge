@@ -17,6 +17,8 @@ data:
   slice: null         # null = full data; "dev" = small dev slice (defined in T0.3)
   split_run: main     # run whose `split` stage defines train/val sides and the dev slice
   with_test: true     # also process the test split (only when slice is null)
+  phase: all          # all | train (train/val side only, for fast experiments) |
+                      # test (test side only; reuses the train-side outputs of each stage)
 
 split:                # geographic train/val split + dev slice (T0.3); whole regions per country
   val_frac: 0.10      # share of each country's S1 entities held out for validation
@@ -45,6 +47,9 @@ candidates:           # stage 1 (T2.x): char n-gram TF-IDF top-k per country
 features:             # stage 2 (T3.3)
   train_query_frac: 0.2   # share of train-side queries featurised (val side: all)
   chunk_rows: 2000000     # candidate pairs per feature chunk (memory vs speed)
+  name_key: true          # v2: filler-free name keys + IDF-weighted token overlap (k_* features)
+  filler_min_rate: 0.0005 # filler words (learned, no labels): >= this share of S2/S3 names ...
+  filler_min_ratio: 2.0   # ... and >= this many times their share of S1 names
 
 scorer:               # stage 2 (T3.4): LightGBM pair scorer
   learning_rate: 0.05
@@ -56,18 +61,31 @@ scorer:               # stage 2 (T3.4): LightGBM pair scorer
   num_boost_round: 3000
   early_stopping: 100   # rounds without val logloss improvement
   n_threads: 0          # 0 = cpu_count - 2
-  oof_folds: 3          # >1: out-of-fold scores for train-side pairs (LLM training prompts)
+  oof_folds: 1          # >1: out-of-fold scores for train-side pairs (only llm-export needs them; set 3)
   model_from_run: null  # apply the model trained in that run instead of training (e.g. France proxy)
   train_query_frac: 0.3   # share of featurised train-side queries used to train (~14M rows on 16 GB)
   es_query_frac: 0.2      # share of val-side queries used for early stopping (all val pairs are scored)
+  drop_features: []       # ablations: feature names or "prefix*" left out of the model
+
+rerank:               # stage 2b: re-ranker with S1/query group context from stage-1 p (ber rerank)
+  min_p1: 0.001       # pairs below this stage-1 p are dropped first (never selected anyway)
+  folds: 4            # trained on the val side, cross-fitted: out-of-fold p2 for every val pair
+  learning_rate: 0.05
+  num_leaves: 63
+  min_data_in_leaf: 200
+  num_boost_round: 2000
+  early_stopping: 50
+  raw_features: [q_source, hn_rel, n_core_eq, n_compact_eq, a_bag_eq, a_q_empty, a_s_empty,
+                 cos_combo, cos_name, cos_addr, n_lev, n_sub, a_tsr, n_tsr, s_name_freq,
+                 s_n_cands, r_eq, num_q_only, num_s_only]   # stage-1 features passed through
 
 decide:               # stage 4 (T3.5/T4.1)
-  method: expected_f  # threshold | expected_f
+  method: expected_f  # threshold | expected_f (ratio approximation) | expected_f_exact (v2)
   threshold: null     # threshold method: null = best value from the val sweep
   min_p: null         # expected_f: drop assigned pairs below this p; null = best from sweep
   empty_prior: 1.0    # expected_f: multiplier on P(no true match) for the "no match" option
   tie_duplicates: true  # exact duplicate S2/S3 records (same source/name/address) share one owner
-  scores_stage: scorer  # scorer | llm-import (after the LLM round trip)
+  scores_stage: scorer  # scorer | rerank (stage 2) | llm-import (after the LLM round trip)
   sweep: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8]
 
 llm:                  # stage 3 (T3.6, T5.x): routed select-prompts for the LLM matcher
@@ -85,4 +103,4 @@ france:               # T5.1: synthetic French validation proxy (from unlabelled
   distractor_rate: 0.35  # per S1 and source: chance of one lookalike distractor
 
 submit:
-  write_candidates: false  # output/candidate_pairs.tsv (~3 GB, 244M ids) is not needed for our submission
+  write_candidates: true   # output/candidate_pairs.tsv = pairs the final model scores (required in the final zip)

@@ -130,3 +130,22 @@ def test_skeleton_vocab_fallback():
     assert tr("ਲਿਮਟਿਡ") == ("limited", True)      # Gurmukhi, never in any dictionary
     assert tr("ਪ੍ਰਾਈਵੇਟ") == ("private", True)
     assert tr("ਪ੍ਰਾ") == ("pvt", True)              # short form via overrides table
+
+
+@pytest.mark.parametrize("a, b", [
+    # v2: injected ids / phone numbers, doubled words, swapped letters in legal words
+    ("Happy Yoga", "Happy Yoga (ID: 76971)"),
+    ("Arti Project", "Arti Project - 8778657304"),
+    ("Green Infotech Private Ltd", "Green Infotech Private Ltd (ID: [43998)]"),
+    ("Dominquez Lake Co", "Dominquez Lake Co [#53957]"),
+    ("Royal Biomedical Company", "ROYAL BIOMEDICAL BIOMEDICAL COMPANY"),
+    ("Tech Software Private Limited", "Tech Software Priavte Limited"),
+    ("Bnp Group of Companies", "Bnp Group Companies"),
+])
+def test_v2_true_pairs_share_core(a, b):
+    assert N(a).core == N(b).core
+
+
+def test_v2_keeps_real_numbers():
+    assert N("Electricians Local 786 LLC").core == "electricians local 786"
+    assert N("3543 Seventh Blvd Apartments Partners").core.startswith("3543 ")

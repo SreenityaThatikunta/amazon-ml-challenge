@@ -79,6 +79,11 @@ class StageRun:
     def __enter__(self) -> StageRun:
         setup_logging(self.cfg.log_level)  # stages log even when not started via the CLI
         self.dir.mkdir(parents=True, exist_ok=True)
+        if self.cfg.data.phase == "test":
+            # test-only pass: keep the train-side outputs/metrics of the earlier run
+            prev = load_manifest(self.cfg, self.stage)
+            self.outputs.update(prev.get("outputs", {}))
+            self.metrics.update(prev.get("metrics", {}))
         self._handler = add_file_handler(self.dir / "log.txt")
         self._t0 = time.perf_counter()
         self._started = datetime.now(timezone.utc).isoformat(timespec="seconds")

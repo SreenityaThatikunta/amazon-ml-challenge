@@ -66,6 +66,11 @@ def cmd_scorer(cfg: Config, args: argparse.Namespace) -> None:
     run_scorer(cfg)
 
 
+def cmd_rerank(cfg: Config, args: argparse.Namespace) -> None:
+    from .rerank.stage import run_rerank
+    run_rerank(cfg)
+
+
 def cmd_decide(cfg: Config, args: argparse.Namespace) -> None:
     from .decide.stage import run_decide
     run_decide(cfg)
@@ -110,6 +115,7 @@ COMMANDS: dict[str, Command] = {
     "candidates": Command(cmd_candidates, "stage 1: TF-IDF top-k candidates + recall"),
     "features": Command(cmd_features, "stage 2: pair + context features"),
     "scorer": Command(cmd_scorer, "stage 2: train/apply LightGBM scorer"),
+    "rerank": Command(cmd_rerank, "stage 2b: re-rank with S1/query group context (cross-fitted)"),
     "llm-export": Command(cmd_llm_export, "stage 3: route uncertain queries, export prompts"),
     "llm-import": Command(cmd_llm_import, "stage 3: import Kaggle LLM scores, blend on val"),
     "decide": Command(cmd_decide, "stage 4: one-owner assignment + expected-F0.5, val F0.5"),

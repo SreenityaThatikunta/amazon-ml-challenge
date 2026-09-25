@@ -15,11 +15,11 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 
-from ..artifacts import StageRun
+from ..artifacts import StageError, StageRun, load_manifest
 from ..config import Config
 from ..eval.split import stable_unit
 from ..log import timed
-from .build import build_features, initials
+from .build import KeyIndex, build_features, initials
 
 REC_COLS = ["entity_id", "source", "country", "name_core", "name_compact", "name_legal",
             "name_pre_core", "name_alt_core", "name_is_domain", "name_has_alias", "name_indic",
@@ -27,12 +27,54 @@ REC_COLS = ["entity_id", "source", "country", "name_core", "name_compact", "name
             "addr_has_box"]
 
 
-def record_extras(recs: pd.DataFrame) -> pd.DataFrame:
+def learn_fillers(frames: list[pd.DataFrame], min_rate: float, min_ratio: float) -> list[str]:
+    """Filler words the noise appends to S2/S3 names ("Riverside", "Services",
+    "Participations", "Smt" ...), learned without labels: tokens whose share of
+    S2/S3 core names (per country and split) is >= ``min_ratio`` times their share
+    of S1 core names, and >= ``min_rate``. A copy of an S1 name keeps its tokens at
+    the S1 rate, so only tokens the noise injects stand out. The union over every
+    (split, country) is used everywhere, so train and test features agree."""
+    out: set[str] = set()
+    for df in frames:
+        for _, g in df.groupby("country"):
+            s1, q = g.name_core[g.source == 1], g.name_core[g.source != 1]
+            if len(s1) == 0 or len(q) == 0:
+                continue
+            cs = Counter(t for n in s1 for t in set(n.split()))
+            cq = Counter(t for n in q for t in set(n.split()))
+            for t, c in cq.items():
+                rate = c / len(q)
+                if rate >= min_rate and rate >= min_ratio * (cs[t] + 1) / len(s1):
+                    out.add(t)
+    return sorted(out)
+
+
+def name_key(core: pd.Series, fillers: frozenset[str]) -> pd.Series:
+    """Sorted unique core tokens without filler words (order- and filler-free
+    form of the name); the plain sorted tokens if nothing else is left."""
+    def key(n: str) -> str:
+        toks = sorted(set(n.split()))
+        kept = [t for t in toks if t not in fillers]
+        return " ".join(kept or toks)
+    return core.map(key)
+
+
+def token_idf(keys: pd.Series) -> dict[str, float]:
+    """Smoothed IDF of name-key tokens over S1 records."""
+    df = Counter(t for n in keys for t in n.split())
+    n = len(keys)
+    return {t: float(np.log((n + 1) / (c + 1)) + 1.0) for t, c in df.items()}
+
+
+def record_extras(recs: pd.DataFrame, fillers: list[str] | None = None) -> pd.DataFrame:
     """Per-record extras: initials, share of name tokens unknown to the S1 name
-    vocabulary of the country (gibberish brand names score high), and for S1 how
-    many S1 of the country share the exact core name (ambiguity)."""
+    vocabulary of the country (gibberish brand names score high), for S1 how
+    many S1 of the country share the exact core name (ambiguity), and (with
+    ``fillers``) the filler-free name key."""
     recs = recs.copy()
     recs["initials"] = initials(recs.name_core)
+    if fillers is not None:
+        recs["name_key"] = name_key(recs.name_core, frozenset(fillers))
     s1 = recs[recs.source == 1]
     vocab = {c: Counter(t for n in g.name_core for t in set(n.split()))
              for c, g in s1.groupby("country")}
@@ -79,16 +121,39 @@ def join_records(chunk: pd.DataFrame, rec: pd.DataFrame, ctx: pd.DataFrame) -> p
     return pd.concat([chunk.reset_index(drop=True), qf, sf, c], axis=1)
 
 
+def _has_output(st: StageRun, name: str) -> bool:
+    try:
+        return name in load_manifest(st.cfg, "normalize")["outputs"]
+    except StageError:
+        return False
+
+
 def run_features(cfg: Config) -> None:
     fc = cfg.features
     with StageRun(cfg, "features") as st:
-        splits = ["train"] + (["test"] if cfg.run_test else [])
+        splits = (["train"] if cfg.run_train else []) + (["test"] if cfg.run_test else [])
+        fillers = None
+        if fc.name_key:
+            with timed(st.log, "learn filler words"):
+                # both splits whenever test records exist (also in a train-only pass),
+                # so the train and test passes learn the same list
+                frames = [pd.read_parquet(st.input_path("normalize", f"records_{sp}"),
+                                          columns=["source", "country", "name_core"])
+                          for sp in ("train", "test") if _has_output(st, f"records_{sp}")]
+                fillers = learn_fillers(frames, fc.filler_min_rate, fc.filler_min_ratio)
+                del frames
+            st.write_json(fillers, "fillers")
+            st.metric("fillers", " ".join(fillers))
         for split in splits:
             extra = ["side", "owner"] if split == "train" else []
             with timed(st.log, f"{split}: load records + extras"):
                 recs = pd.read_parquet(st.input_path("normalize", f"records_{split}"),
                                        columns=REC_COLS + extra)
-                recs = record_extras(recs)
+                recs = record_extras(recs, fillers)
+                kidx = None
+                if fillers is not None:
+                    kidx = KeyIndex(recs.name_key, token_idf(recs.name_key[recs.source == 1]))
+                    recs["kpos"] = np.arange(len(recs), dtype=np.int32)
                 if split == "train":
                     q = recs[recs.source != 1]
                     u = stable_unit(q.entity_id, cfg.seed + 1)
@@ -115,7 +180,7 @@ def run_features(cfg: Config) -> None:
                         continue
                     for chunk in _query_chunks(part, fc.chunk_rows):
                         d = join_records(chunk, rec, ctx)
-                        feats = build_features(d)
+                        feats = build_features(d, kidx)
                         keys = d[["q_id", "s1_id"]].copy()
                         if split == "train":
                             keys["y"] = (d.s1_id == d.q_owner).astype(np.int8)

@@ -29,6 +29,9 @@ class ConfigError(ValueError):
     pass
 
 
+PHASES = ("all", "train", "test")
+
+
 # ---------------------------------------------------------------- schema
 # Stage sections only hold parameters that exist today; tasks add fields as
 # they introduce them (and document them in configs/default.yaml).
@@ -47,6 +50,8 @@ class DataConfig:
     slice: str | None = None  # None = full data; "dev" = dev slice (T0.3)
     split_run: str = "main"   # run whose `split` stage defines sides and the dev slice
     with_test: bool = True    # also process the test split (needs full data, no slice)
+    phase: str = "all"        # "all" | "train" (train/val side only) | "test" (test side only,
+                              # reusing the train-side outputs already in the stage dirs)
 
 
 @dataclass
@@ -83,6 +88,9 @@ class CandidatesConfig:
 class FeaturesConfig:
     train_query_frac: float = 0.2  # share of train-side queries used (val side: all)
     chunk_rows: int = 2_000_000    # candidate pairs per feature chunk
+    name_key: bool = True          # v2: filler-free name keys + IDF token overlap
+    filler_min_rate: float = 0.0005  # filler words: min share of S2/S3 names ...
+    filler_min_ratio: float = 2.0    # ... and min ratio to their share of S1 names
 
 
 @dataclass
@@ -100,6 +108,22 @@ class ScorerConfig:
     model_from_run: str | None = None  # apply that run's model instead of training
     train_query_frac: float = 0.3   # share of featurised train-side queries used for training
     es_query_frac: float = 0.2      # share of val-side queries used for early stopping
+    drop_features: list[str] = field(default_factory=list)  # ablations: names or "prefix*"
+
+
+@dataclass
+class RerankConfig:
+    min_p1: float = 0.001           # drop pairs below this stage-1 p before stage 2
+    folds: int = 4                  # cross-fitting folds on the val side
+    learning_rate: float = 0.05
+    num_leaves: int = 63
+    min_data_in_leaf: int = 200
+    num_boost_round: int = 2000
+    early_stopping: int = 50
+    raw_features: list[str] = field(default_factory=lambda: [
+        "q_source", "hn_rel", "n_core_eq", "n_compact_eq", "a_bag_eq", "a_q_empty",
+        "a_s_empty", "cos_combo", "cos_name", "cos_addr", "n_lev", "n_sub", "a_tsr", "n_tsr",
+        "s_name_freq", "s_n_cands", "r_eq", "num_q_only", "num_s_only"])
 
 
 @dataclass
@@ -109,7 +133,7 @@ class DecideConfig:
     min_p: float | None = None      # expected_f: drop p below this; None = best on val sweep
     empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
     tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
-    scores_stage: str = "scorer"    # "scorer" or "llm-import" (blended LLM scores)
+    scores_stage: str = "scorer"    # "scorer", "rerank" (stage 2) or "llm-import" (LLM blend)
     sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
                                                         0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])
 
@@ -135,7 +159,7 @@ class FranceConfig:
 
 @dataclass
 class SubmitConfig:
-    write_candidates: bool = False  # also write output/candidate_pairs.tsv (~3 GB; not needed)
+    write_candidates: bool = True   # output/candidate_pairs.tsv = input pairs of the final model
 
 
 @dataclass
@@ -150,6 +174,7 @@ class Config:
     candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
     scorer: ScorerConfig = field(default_factory=ScorerConfig)
+    rerank: RerankConfig = field(default_factory=RerankConfig)
     decide: DecideConfig = field(default_factory=DecideConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
     france: FranceConfig = field(default_factory=FranceConfig)
@@ -167,7 +192,17 @@ class Config:
     @property
     def run_test(self) -> bool:
         """Whether stages should also process the test split."""
-        return self.data.slice is None and self.data.with_test
+        return (self.data.slice is None and self.data.with_test
+                and self.data.phase in ("all", "test"))
+
+    @property
+    def run_train(self) -> bool:
+        """Whether stages should process the train split (train + val sides).
+        False only for ``data.phase=test``: the test pass reuses the model,
+        region neighbourhoods and decision parameters of an earlier train pass."""
+        if self.data.phase not in PHASES:
+            raise ConfigError(f"unknown data.phase {self.data.phase!r}; valid: {PHASES}")
+        return self.data.phase in ("all", "train")
 
     @property
     def data_dir(self) -> Path:
@@ -186,9 +221,11 @@ class Config:
         return asdict(self)
 
     def hash(self) -> str:
-        """Stable short hash of the full config (excluding run_id)."""
+        """Stable short hash of the full config (excluding run_id and data.phase,
+        which only choose which part of a stage runs)."""
         d = self.to_dict()
         d.pop("run_id")
+        d["data"].pop("phase")
         blob = json.dumps(d, sort_keys=True, default=str).encode()
         return hashlib.sha256(blob).hexdigest()[:12]
 

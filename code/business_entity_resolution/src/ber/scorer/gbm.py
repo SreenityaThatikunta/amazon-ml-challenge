@@ -28,13 +28,18 @@ KEY_COLS = ["q_id", "s1_id", "y", "side"]
 CATEGORICAL = ["hn_rel", "q_source"]
 
 
-def feature_columns(df: pd.DataFrame) -> list[str]:
-    return [c for c in df.columns if c not in KEY_COLS]
+def feature_columns(df: pd.DataFrame, drop: list[str] | tuple[str, ...] = ()) -> list[str]:
+    """Feature columns of a features frame; ``drop`` are feature names or name
+    prefixes ending in ``*`` (``scorer.drop_features``, for ablations)."""
+    exact = {d for d in drop if not d.endswith("*")}
+    prefixes = tuple(d[:-1] for d in drop if d.endswith("*"))
+    return [c for c in df.columns if c not in KEY_COLS and c not in exact
+            and not (prefixes and c.startswith(prefixes))]
 
 
 def train_model(tr: pd.DataFrame, va: pd.DataFrame, cfg: Config, log) -> lgb.Booster:
     sc = cfg.scorer
-    feats = feature_columns(tr)
+    feats = feature_columns(tr, sc.drop_features)
     params = {
         "objective": "binary", "learning_rate": sc.learning_rate, "num_leaves": sc.num_leaves,
         "min_data_in_leaf": sc.min_data_in_leaf, "feature_fraction": sc.feature_fraction,
@@ -94,15 +99,37 @@ def predict_side(model: lgb.Booster, path, side: str, feats: list[str]) -> pd.Da
     return pd.concat(out, ignore_index=True)
 
 
+def score_test(st: StageRun, model: lgb.Booster, feats: list[str]) -> None:
+    """Score every test pair, one feature part at a time."""
+    out_dir = st.path("scores_test")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for old in out_dir.glob("*.parquet"):
+        old.unlink()
+    n = 0
+    with timed(st.log, "score test"):
+        src = st.input_path("features", "features_test")
+        for i, f in enumerate(sorted(src.glob("*.parquet"))):
+            t = _prep(pd.read_parquet(f))
+            pt = model.predict(t[feats], num_iteration=model.best_iteration)
+            t[["q_id", "s1_id"]].assign(p=pt.astype(np.float32)).to_parquet(
+                out_dir / f"part-{i:05d}.parquet", index=False)
+            n += len(t)
+    st.register("scores_test", out_dir, rows=n)
+
+
 def run_scorer(cfg: Config) -> None:
     with StageRun(cfg, "scorer") as st:
+        if not cfg.run_train:  # test-only pass with the model of the train pass
+            model = lgb.Booster(model_file=str(st.path("model.txt")))
+            score_test(st, model, model.feature_name())
+            return
         feat_dir = st.input_path("features", "features_train")
         with timed(st.log, "load sampled train features"):
             tr, va = load_sampled(feat_dir, cfg, st.log)
         st.metric("rows", {"train": len(tr), "val": len(va),
                            "train_pos": int(tr.y.sum()) if len(tr) else 0,
                            "val_pos": int(va.y.sum()) if len(va) else 0})
-        feats = feature_columns(tr if len(tr) else va)
+        feats = feature_columns(tr if len(tr) else va, cfg.scorer.drop_features)
         if cfg.scorer.model_from_run:  # apply an existing model (e.g. France proxy)
             path = st.input_path("scorer", "model", run=cfg.scorer.model_from_run)
             model = lgb.Booster(model_file=str(path))
@@ -147,17 +174,4 @@ def run_scorer(cfg: Config) -> None:
         st.write_parquet(sv, "scores_val")
 
         if cfg.run_test:
-            out_dir = st.path("scores_test")
-            out_dir.mkdir(parents=True, exist_ok=True)
-            for old in out_dir.glob("*.parquet"):
-                old.unlink()
-            n = 0
-            with timed(st.log, "score test"):
-                src = st.input_path("features", "features_test")
-                for i, f in enumerate(sorted(src.glob("*.parquet"))):
-                    t = _prep(pd.read_parquet(f))
-                    pt = model.predict(t[feats], num_iteration=model.best_iteration)
-                    t[["q_id", "s1_id"]].assign(p=pt.astype(np.float32)).to_parquet(
-                        out_dir / f"part-{i:05d}.parquet", index=False)
-                    n += len(t)
-            st.register("scores_test", out_dir, rows=n)
+            score_test(st, model, feats)
