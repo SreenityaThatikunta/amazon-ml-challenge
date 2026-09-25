@@ -49,6 +49,16 @@ final ranking** (smaller candidate set per S1 = ranked higher).
 | 2026-09-25 | v2 (full) | v2 normalisation + features, **stage 1 only** (4.5M training rows, 102 features) | 99.046 % | 0.98337 | 0.98617 | 0.97898 | 0.97771 | pair P 0.99655 / R 0.9586; AUC 0.99994; val +0.0013 over main with a third of main's training rows |
 | 2026-09-25 | v2 (full) | **+ stage-2 re-ranker** (expected-F, min_p 0.25) | 99.046 % | **0.98748** | 0.98923 | 0.98473 | 0.98220 | pair P 0.99645 / R 0.97349; p2 AUC 0.99917 vs p1 0.99620 on the kept pairs; sweep flat (0.98743–0.98748 for min_p 0.02–0.5); exact expected-F 0.98744 (no gain, kept the approximation) |
 
+**Test pass (2026-09-26 02:38, `output/`):** validator PASS (matching + candidate file).
+5,933,335 links (main: 5,835,284); `candidate_pairs.tsv` 9,649,852 pairs = **5.57 per S1**
+(TF-IDF: 243.8 M = 141 per S1). Per country the predictions look alike and match val:
+links per S1 France 3.436 / India 3.415 / US 3.432 (val 3.380, val truth 3.460); empty S1
+5.5 / 5.6 / 5.7 % (val 5.8 %). So France is not under-linked. Test has more records whose
+best p2 is in the ambiguous 0.01–0.5 band (India 7.4 % of records vs 3.5 % on val), which
+fits the larger share of unmatched records in test; France also has more in 0.5–0.99
+(6.9 % vs 4.0 %), a possible precision risk there. Timings (laptop): candidates 78 min
+(GPU), features 115 min, scorer 12 min, rerank 6 min, decide + submit 2 min.
+
 Stage-2 input (= `candidate_pairs.tsv`): at p1 ≥ 0.001, **1.075 pairs per S2/S3 record**
 keeping 99.97 % of the true pairs that TF-IDF found (24.6 per record before the filter).
 Top stage-2 features: the record's margin over its other candidates, p1, then the S1-side

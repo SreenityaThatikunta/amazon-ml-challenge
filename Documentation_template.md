@@ -99,8 +99,8 @@ so val F0.5 includes blocking losses, singletons and every stage, like the leade
 - **Learned filter (stage 1):** the pair scorer (section 4) keeps pairs with p1 ≥ 0.001.
   This is the last filter before the final model and defines `candidate_pairs.tsv`.
 - **Candidate pairs generated (test):** TF-IDF: 243,753,102 pairs (24.4 per record);
-  after the stage-1 filter (= `candidate_pairs.tsv`): {TBD_CAND_PAIRS} pairs,
-  {TBD_CAND_PER_S1} per S1 entity.
+  after the stage-1 filter (= `candidate_pairs.tsv`): 9,649,852 pairs (0.97 per record),
+  5.57 per S1 entity (the S1 has 3.4 true matches on average).
 - **How true matches were not lost:** recall measured on the validation side at every
   step: TF-IDF 99.05 % of true pairs (US 99.3 %, India 98.2–99.2 %), the stage-1 filter
   keeps 99.97 % of those (trade-off table in `artifacts/<run>/rerank/manifest.json`:
