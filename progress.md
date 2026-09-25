@@ -54,6 +54,18 @@ keeping 99.97 % of the true pairs that TF-IDF found (24.6 per record before the 
 Top stage-2 features: the record's margin over its other candidates, p1, then the S1-side
 claims (`c_expected`, `c_best_other`, `c_sum_other`), i.e. exactly the group context stage 1 lacks.
 
+### v2 error budget (val, 770,168 true pairs; `D:\aml\analysis\errors_v2.py`)
+| Outcome | Share of true pairs | Notes |
+|---|---|---|
+| matched | 97.35 % | |
+| dropped (p2 too low) | 1.22 % | median p2 0.46: inherently ambiguous cases, e.g. true pairs whose house number moved by 2 *and* city changed (`334 Acrebrook Dr, Northampton` → `336 …, Florence`), i.e. exactly what a distractor looks like |
+| never a candidate | 0.98 % | 1/3 have the owner's exact core name but lose a tie: dozens of S1 share it ("Noida Solutions", "Ghaziabad Enterprises", 60 per name country-wide), 2/3 of those have no address at all |
+| another S1 won | 0.45 % | mostly made-up brand names at an address shared by several S1 (`489 Boylston St, Unit 2` hosts two S1) and address-less records whose name several S1 share |
+
+- **Records with an empty address** (~4 % of records) lose 32.5 % of their true pairs vs 1.3 % for the rest: **more than half of all missed pairs**. With 50 % of S1 names shared, most of these are unrecoverable.
+- False links: 2,765 of 752,513 kept (P 0.9963): 1,842 link an unmatched record (a lookalike), 923 a record owned by another S1.
+- Checked and dropped: (i) exact-name blocking (a 4th candidate source) would recover only ~800 val pairs (0.1 %) that still have an address: not worth a 7 h re-run; (ii) brand names are drawn independently per record (an S1's S2 and S3 copies get different brands), so they can't be linked across records.
+
 ### Open questions / what the user can help with
 - ~~Which file produced the ≈ 0.975 leaderboard score?~~ **Answered 2026-09-25: main's
   `output/matching_results.tsv`** (val 0.98211). So val over-estimates the public
