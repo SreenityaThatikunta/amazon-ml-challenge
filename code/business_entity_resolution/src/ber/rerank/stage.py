@@ -66,6 +66,7 @@ def group_features(q: np.ndarray, s: np.ndarray, src: np.ndarray,
     query's source (2/3) and the stage-1 probability p."""
     p = p.astype(np.float64)
     f = {"p1": p, "p1_logit": np.log(np.clip(p, 1e-7, 1 - 1e-7) / np.clip(1 - p, 1e-7, 1))}
+    f = _F32(f)
     g = _group_stats(q, p)
     f["q_rank"], f["q_best_other"], f["q_sum_other"] = g["rank"], g["best_other"], g["sum_other"]
     f["q_n_hi_other"], f["q_n"] = g["n_hi_other"], g["size"]
@@ -89,10 +90,19 @@ def group_features(q: np.ndarray, s: np.ndarray, src: np.ndarray,
     g = _group_stats(ss, claim)
     f["cs_best_other"], f["cs_n_hi_other"] = g["best_other"], g["n_hi_other"]
     f["c_expected"] = f["c_sum_other"] + claim  # expected true matches claimed by this S1
-    out = pd.DataFrame(f)
-    for c in out.columns:
-        out[c] = out[c].astype(np.float32)
-    return out
+    return pd.DataFrame(dict(f), copy=False)
+
+
+class _F32(dict):
+    """dict that stores every value as float32 (keeps the test pass in memory)."""
+
+    def __init__(self, d):
+        super().__init__()
+        for k, v in d.items():
+            self[k] = v
+
+    def __setitem__(self, k, v):
+        super().__setitem__(k, np.asarray(v, dtype=np.float32))
 
 
 def _codes(values: pd.Series, dtype: pd.CategoricalDtype) -> np.ndarray:
@@ -125,19 +135,26 @@ def _params(cfg: Config) -> dict:
 def _read_val(st: StageRun, cfg: Config, raw_cols: list[str]):
     """Val pairs with p1 >= min_p1: keys (q_id, s1_id, y, p) and raw stage-1 features,
     row-aligned. scores_val was written by streaming the features_train parts
-    in order (val side only), so the two line up row by row; this is checked."""
+    in order (val side only), so the two line up row by row (checked part by
+    part); only the kept rows of each part are held in memory."""
     sv = st.read_input("scorer", "scores_val")
-    parts = []
+    keep_all = (sv.p >= cfg.rerank.min_p1).to_numpy()
+    sv_q = sv.q_id.astype(str).to_numpy()
+    parts, off = [], 0
     for f in sorted(st.input_path("features", "features_train").glob("*.parquet")):
-        d = pd.read_parquet(f, columns=["q_id", "s1_id", "side"] + raw_cols)
-        parts.append(d[d.side == "val"].drop(columns="side"))
+        d = pd.read_parquet(f, columns=["q_id", "side"] + raw_cols)
+        d = d[(d.side == "val").to_numpy()]
+        n = len(d)
+        if n == 0:
+            continue
+        if off + n > len(sv) or not (d.q_id.astype(str).to_numpy() == sv_q[off:off + n]).all():
+            raise RuntimeError(f"scores_val and features_train val rows are not aligned ({f.name})")
+        parts.append(d.loc[keep_all[off:off + n], raw_cols])
+        off += n
+    if off != len(sv):
+        raise RuntimeError("scores_val has rows beyond the val features")
     raw = pd.concat(parts, ignore_index=True)
-    if len(raw) != len(sv) or not (raw.q_id.astype(str).to_numpy()
-                                   == sv.q_id.astype(str).to_numpy()).all():
-        raise RuntimeError("scores_val and features_train val rows are not aligned")
-    keep = (sv.p >= cfg.rerank.min_p1).to_numpy()
-    return (sv[keep].reset_index(drop=True),
-            raw.loc[keep, raw_cols].reset_index(drop=True))
+    return sv[keep_all].reset_index(drop=True), raw
 
 
 def run_rerank(cfg: Config) -> None:
@@ -198,46 +215,64 @@ def run_rerank(cfg: Config) -> None:
 
 
 def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
-    """All test pairs with p1 >= min_p1 (the S1 context needs every part at once),
-    scored by the mean of the fold models."""
+    """Test pairs with p1 >= min_p1, one country at a time (S1 and query groups
+    never cross countries, and the stage-1 score parts are written country by
+    country), scored by the mean of the fold models."""
     rc = cfg.rerank
     rt = pd.read_parquet(st.input_path("normalize", "records_test"),
-                         columns=["entity_id", "source"])
+                         columns=["entity_id", "source", "country"])
     q_cat = pd.CategoricalDtype(rt.entity_id[rt.source != 1].to_numpy())
     s_cat = pd.CategoricalDtype(rt.entity_id[rt.source == 1].to_numpy())
+    s1_country = rt[rt.source == 1].set_index("entity_id").country
     models = [lgb.Booster(model_file=str(st.path(f"model_fold{k}.txt")))
               for k in range(rc.folds)]
-    with timed(st.log, "load test pairs"):
-        sc_dir = st.input_path("scorer", "scores_test")
-        ft_dir = st.input_path("features", "features_test")
-        ks, rs = [], []
-        for f in sorted(sc_dir.glob("*.parquet")):
-            sc = pd.read_parquet(f)
-            ft = pd.read_parquet(ft_dir / f.name, columns=["q_id"] + raw_cols)
-            if len(ft) != len(sc) or not (ft.q_id.astype(str).to_numpy()
-                                          == sc.q_id.astype(str).to_numpy()).all():
-                raise RuntimeError(f"scores/features part {f.name} not aligned")
-            keep = (sc.p >= rc.min_p1).to_numpy()
-            sc = sc[keep]
-            ks.append(pd.DataFrame({"q": _codes(sc.q_id, q_cat), "s": _codes(sc.s1_id, s_cat),
-                                    "p": sc.p.to_numpy()}))
-            rs.append(ft.loc[keep, raw_cols].reset_index(drop=True))
-        k = pd.concat(ks, ignore_index=True)
-        raw = pd.concat(rs, ignore_index=True)
-    st.metric("test_pairs_kept", len(k))
-    with timed(st.log, "stage-2 test scores"):
-        X = group_features(k.q.to_numpy(), k.s.to_numpy(), raw.q_source.to_numpy(),
-                           k.p.to_numpy())
-        for c in raw_cols:
-            X[c] = raw[c].to_numpy(dtype=np.float32)
-        del raw
-        p2 = np.mean([m.predict(X, num_iteration=m.best_iteration) for m in models], axis=0)
+    sc_dir = st.input_path("scorer", "scores_test")
+    ft_dir = st.input_path("features", "features_test")
+    by_country: dict[str, list] = {}
+    for f in sorted(sc_dir.glob("*.parquet")):
+        first = pd.read_parquet(f, columns=["s1_id"]).s1_id.iloc[:1].astype(str)
+        if len(first):
+            by_country.setdefault(s1_country[first.iloc[0]], []).append(f)
     out_dir = st.path("scores_test")
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("*.parquet"):
         old.unlink()
-    out = pd.DataFrame({"q_id": q_cat.categories.to_numpy()[k.q.to_numpy()],
-                        "s1_id": s_cat.categories.to_numpy()[k.s.to_numpy()],
-                        "p": p2.astype(np.float32), "p1": k.p.to_numpy()})
-    out.to_parquet(out_dir / "part-00000.parquet", index=False)
-    st.register("scores_test", out_dir, rows=len(out))
+    n_total = 0
+    for country, files in sorted(by_country.items()):
+        with timed(st.log, f"test {country}: {len(files)} parts"):
+            ks, rs = [], []
+            for f in files:
+                sc = pd.read_parquet(f)
+                ft = pd.read_parquet(ft_dir / f.name, columns=["q_id"] + raw_cols)
+                if len(ft) != len(sc) or not (ft.q_id.astype(str).to_numpy()
+                                              == sc.q_id.astype(str).to_numpy()).all():
+                    raise RuntimeError(f"scores/features part {f.name} not aligned")
+                keep = (sc.p >= rc.min_p1).to_numpy()
+                sc = sc[keep]
+                ks.append(pd.DataFrame({"q": _codes(sc.q_id, q_cat),
+                                        "s": _codes(sc.s1_id, s_cat), "p": sc.p.to_numpy()}))
+                rs.append(ft.loc[keep, raw_cols].reset_index(drop=True))
+                del sc, ft
+            k = pd.concat(ks, ignore_index=True)
+            raw = pd.concat(rs, ignore_index=True)
+            del ks, rs
+            X = group_features(k.q.to_numpy(), k.s.to_numpy(), raw.q_source.to_numpy(),
+                               k.p.to_numpy())
+            for c in raw_cols:
+                X[c] = raw[c].to_numpy(dtype=np.float32)
+            del raw
+            p2 = np.zeros(len(X), dtype=np.float64)
+            step = 2_000_000
+            for a in range(0, len(X), step):
+                xa = X.iloc[a:a + step]
+                p2[a:a + step] = np.mean([m.predict(xa, num_iteration=m.best_iteration)
+                                          for m in models], axis=0)
+            del X
+            out = pd.DataFrame({"q_id": q_cat.categories.to_numpy()[k.q.to_numpy()],
+                                "s1_id": s_cat.categories.to_numpy()[k.s.to_numpy()],
+                                "p": p2.astype(np.float32), "p1": k.p.to_numpy()})
+            out.to_parquet(out_dir / f"part-{country}.parquet", index=False)
+            n_total += len(out)
+            st.metric(f"test_pairs_kept.{country}", len(out))
+            del out, k, p2
+    st.register("scores_test", out_dir, rows=n_total)

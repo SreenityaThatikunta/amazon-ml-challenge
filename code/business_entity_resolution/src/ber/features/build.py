@@ -77,6 +77,9 @@ def name_features(d: pd.DataFrame) -> pd.DataFrame:
     f["q_indic_oov"] = d.q_name_n_indic_oov
     f["q_vocab_oov"] = d.q_vocab_oov
     f["s_name_freq"] = d.s_name_freq
+    if "q_brand" in d:  # v2: query name is a made-up brand (only the address can match it)
+        f["q_brand"] = d.q_brand.astype(np.int8)
+        f["s_brand"] = d.s_brand.astype(np.int8)
     return f
 
 
@@ -124,11 +127,26 @@ def key_features(d: pd.DataFrame, kidx: KeyIndex, chunk: int = 500_000) -> pd.Da
     f["k_lev"] = _cp(qx, sx, Levenshtein.distance)
     f["k_ratio"] = _cp(qk, sk, fuzz.ratio)
     f["k_tsr"] = _cp(qk, sk, fuzz.token_set_ratio)
-    qp, spos = d.q_kpos.to_numpy(np.int64), d.s_kpos.to_numpy(np.int64)
-    out = np.zeros((len(d), 6), dtype=np.float32)
+    out = idf_overlap(kidx, d.q_kpos.to_numpy(np.int64), d.s_kpos.to_numpy(np.int64), chunk)
+    for j, c in enumerate(IDF_COLS):
+        f[f"k_{c}"] = out[:, j]
+    return f
+
+
+IDF_COLS = ["idf_rec", "idf_prec", "idf_unmatched_s", "idf_unmatched_q", "n_unmatched_q",
+            "n_unmatched_s"]
+
+
+def idf_overlap(kidx: KeyIndex, qp: np.ndarray, spos: np.ndarray,
+                chunk: int = 500_000) -> np.ndarray:
+    """Per pair (query row qp, S1 row spos of ``kidx``): IDF-weighted share of the
+    S1 tokens found in the query (recall) and of the query tokens found in the S1
+    (precision), the largest IDF of an unmatched S1 / query token, and the
+    numbers of unmatched query / S1 tokens (columns of IDF_COLS)."""
+    out = np.zeros((len(qp), 6), dtype=np.float32)
     B, W = kidx.B, kidx.W
-    for a in range(0, len(d), chunk):
-        b = min(a + chunk, len(d))
+    for a in range(0, len(qp), chunk):
+        b = min(a + chunk, len(qp))
         q, s = qp[a:b], spos[a:b]
         Bq, Bs, Wq, Ws = B[q], B[s], W[q], W[s]
         Is, Iq = Ws.multiply(Bq).tocsr(), Wq.multiply(Bs).tocsr()
@@ -141,10 +159,7 @@ def key_features(d: pd.DataFrame, kidx: KeyIndex, chunk: int = 500_000) -> pd.Da
         out[a:b, 3] = _rowmax((Wq - Iq).tocsr())
         out[a:b, 4] = kidx.n[q] - n_i
         out[a:b, 5] = kidx.n[s] - n_i
-    for j, c in enumerate(["k_idf_rec", "k_idf_prec", "k_idf_unmatched_s", "k_idf_unmatched_q",
-                           "k_n_unmatched_q", "k_n_unmatched_s"]):
-        f[c] = out[:, j]
-    return f
+    return out
 
 
 def address_features(d: pd.DataFrame) -> pd.DataFrame:
@@ -170,6 +185,19 @@ def address_features(d: pd.DataFrame) -> pd.DataFrame:
     f["hn_rel"] = f.hn_rel.astype(np.int8)
     f["box_q"], f["box_s"] = d.q_addr_has_box.astype(np.int8), d.s_addr_has_box.astype(np.int8)
     return f
+
+
+def address_key(bag: pd.Series) -> pd.Series:
+    """Address tokens without numbers (numbers have their own features)."""
+    return bag.map(lambda b: " ".join(t for t in b.split() if not t.isdigit()))
+
+
+def address_idf_features(d: pd.DataFrame, aidx: KeyIndex) -> pd.DataFrame:
+    """v2: IDF-weighted overlap of the address words (street and locality names
+    are rare, city and street types common), for pairs whose names can't help
+    (made-up brands, initials) and for lookalikes at a different street."""
+    out = idf_overlap(aidx, d.q_kpos.to_numpy(np.int64), d.s_kpos.to_numpy(np.int64))
+    return pd.DataFrame({f"a_{c}": out[:, j] for j, c in enumerate(IDF_COLS)}, index=d.index)
 
 
 def _best_other(q: np.ndarray, v: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -206,10 +234,12 @@ def context_features(d: pd.DataFrame, f: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def build_features(d: pd.DataFrame, kidx: KeyIndex | None = None) -> pd.DataFrame:
+def build_features(d: pd.DataFrame, kidx: KeyIndex | None = None,
+                   aidx: KeyIndex | None = None) -> pd.DataFrame:
     """All features for a frame of candidate pairs with q_/s_ record fields,
     stage-1 retrieval columns, and per-S1 context (s_n_cands, s_n_top1). With
-    ``kidx`` (and q_/s_name_key, q_/s_kpos columns) also the key features."""
+    ``kidx`` / ``aidx`` (and q_/s_name_key, q_/s_kpos columns) also the v2 name-key
+    and address-word IDF features."""
     retr = d[["cos_name", "cos_addr", "cos_combo", "rank_name", "rank_addr", "rank_combo",
               "s_n_cands", "s_n_top1"]].copy()
     retr["q_source"] = d.q_source.astype(np.int8)
@@ -218,5 +248,7 @@ def build_features(d: pd.DataFrame, kidx: KeyIndex | None = None) -> pd.DataFram
     parts = [retr, nf, af]
     if kidx is not None and "q_name_key" in d:
         parts.append(key_features(d, kidx))
+    if aidx is not None and "q_kpos" in d:
+        parts.append(address_idf_features(d, aidx))
     f = pd.concat(parts, axis=1)
     return pd.concat([f, context_features(d, f)], axis=1)

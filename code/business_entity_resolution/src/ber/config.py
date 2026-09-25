@@ -87,7 +87,7 @@ class CandidatesConfig:
 @dataclass
 class FeaturesConfig:
     train_query_frac: float = 0.2  # share of train-side queries used (val side: all)
-    chunk_rows: int = 2_000_000    # candidate pairs per feature chunk
+    chunk_rows: int = 1_000_000    # candidate pairs per feature chunk
     name_key: bool = True          # v2: filler-free name keys + IDF token overlap
     filler_min_rate: float = 0.0005  # filler words: min share of S2/S3 names ...
     filler_min_ratio: float = 2.0    # ... and min ratio to their share of S1 names
@@ -106,8 +106,8 @@ class ScorerConfig:
     n_threads: int = 0
     oof_folds: int = 3            # >1: also write out-of-fold scores for train-side pairs
     model_from_run: str | None = None  # apply that run's model instead of training
-    train_query_frac: float = 0.3   # share of featurised train-side queries used for training
-    es_query_frac: float = 0.2      # share of val-side queries used for early stopping
+    train_query_frac: float = 0.1   # share of featurised train-side queries used for training
+    es_query_frac: float = 0.05     # share of val-side queries used for early stopping
     drop_features: list[str] = field(default_factory=list)  # ablations: names or "prefix*"
 
 

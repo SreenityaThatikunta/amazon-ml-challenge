@@ -46,7 +46,7 @@ candidates:           # stage 1 (T2.x): char n-gram TF-IDF top-k per country
 
 features:             # stage 2 (T3.3)
   train_query_frac: 0.2   # share of train-side queries featurised (val side: all)
-  chunk_rows: 2000000     # candidate pairs per feature chunk (memory vs speed)
+  chunk_rows: 1000000     # candidate pairs per feature chunk (memory vs speed)
   name_key: true          # v2: filler-free name keys + IDF-weighted token overlap (k_* features)
   filler_min_rate: 0.0005 # filler words (learned, no labels): >= this share of S2/S3 names ...
   filler_min_ratio: 2.0   # ... and >= this many times their share of S1 names
@@ -63,8 +63,8 @@ scorer:               # stage 2 (T3.4): LightGBM pair scorer
   n_threads: 0          # 0 = cpu_count - 2
   oof_folds: 1          # >1: out-of-fold scores for train-side pairs (only llm-export needs them; set 3)
   model_from_run: null  # apply the model trained in that run instead of training (e.g. France proxy)
-  train_query_frac: 0.3   # share of featurised train-side queries used to train (~14M rows on 16 GB)
-  es_query_frac: 0.2      # share of val-side queries used for early stopping (all val pairs are scored)
+  train_query_frac: 0.1   # share of featurised train-side queries used to train (~4.5M rows, ~2.5 GB float32)
+  es_query_frac: 0.05     # share of val-side queries used for early stopping (all val pairs are scored)
   drop_features: []       # ablations: feature names or "prefix*" left out of the model
 
 rerank:               # stage 2b: re-ranker with S1/query group context from stage-1 p (ber rerank)

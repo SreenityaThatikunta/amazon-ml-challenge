@@ -10,6 +10,7 @@ the feature columns of :mod:`ber.features.build`.
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 
 import numpy as np
@@ -19,7 +20,7 @@ from ..artifacts import StageError, StageRun, load_manifest
 from ..config import Config
 from ..eval.split import stable_unit
 from ..log import timed
-from .build import KeyIndex, build_features, initials
+from .build import KeyIndex, address_key, build_features, initials
 
 REC_COLS = ["entity_id", "source", "country", "name_core", "name_compact", "name_legal",
             "name_pre_core", "name_alt_core", "name_is_domain", "name_has_alias", "name_indic",
@@ -27,7 +28,7 @@ REC_COLS = ["entity_id", "source", "country", "name_core", "name_compact", "name
             "addr_has_box"]
 
 
-def learn_fillers(frames: list[pd.DataFrame], min_rate: float, min_ratio: float) -> list[str]:
+def learn_fillers(frames, min_rate: float, min_ratio: float) -> list[str]:
     """Filler words the noise appends to S2/S3 names ("Riverside", "Services",
     "Participations", "Smt" ...), learned without labels: tokens whose share of
     S2/S3 core names (per country and split) is >= ``min_ratio`` times their share
@@ -49,6 +50,46 @@ def learn_fillers(frames: list[pd.DataFrame], min_rate: float, min_ratio: float)
     return sorted(out)
 
 
+def learn_brand_units(frames) -> list[str]:
+    """Syllables of the made-up brand names the noise substitutes for a whole
+    business name ("Grand Physical Therapy" -> "Jaxdrexquo", "Eye Peak Group" ->
+    "Jaxvantage"; ~1.6% of true pairs). Learned from train true pairs whose query
+    name is one token unknown to the S1 vocabulary and unlike the owner's name:
+    the maximal prefixes shared by many of them (tavo, jax, kelo, zeph, ...).
+    Such names can only be matched by address; the model needs to know that."""
+    from rapidfuzz import fuzz, process
+    pre: Counter = Counter()
+    for recs in frames:  # train records, one country at a time
+        s1 = recs[recs.source == 1]
+        vocab = set(t for n in s1.name_core for t in n.split())
+        q = recs[(recs.source != 1) & (recs.owner != "") & ~recs.name_indic]
+        q = q[~q.name_core.str.contains(" ", regex=False) & (q.name_core.str.len() >= 6)
+              & ~q.name_core.isin(vocab) & q.name_compact.str.fullmatch("[a-z]+")]
+        s_compact = s1.set_index("entity_id").name_compact.reindex(q.owner).fillna("")
+        sim = process.cpdist(q.name_compact.tolist(), s_compact.tolist(), scorer=fuzz.ratio,
+                             workers=-1)
+        words = q.name_compact[sim < 40]
+        pre.update(w[:n] for w in words for n in range(2, min(len(w), 8) + 1))
+    if not pre:
+        return []
+    thr = 0.25 * float(np.median([c for _, c in pre.most_common(40)]))
+    letters = "abcdefghijklmnopqrstuvwxyz"
+    return sorted(p for p, c in pre.items()
+                  if c >= thr and all(pre.get(p + ch, 0) < 0.9 * c for ch in letters))
+
+
+def is_brand(compact: pd.Series, units: frozenset[str], max_len: int = 8) -> pd.Series:
+    """Whether each name (compact form) is a concatenation of brand syllables."""
+    def seg(w: str) -> bool:
+        if len(w) < 5 or not w.isalpha():
+            return False
+        ok = [True] + [False] * len(w)
+        for i in range(1, len(w) + 1):
+            ok[i] = any(ok[j] and w[j:i] in units for j in range(max(0, i - max_len), i))
+        return ok[-1]
+    return compact.map(seg).astype(np.int8)
+
+
 def name_key(core: pd.Series, fillers: frozenset[str]) -> pd.Series:
     """Sorted unique core tokens without filler words (order- and filler-free
     form of the name); the plain sorted tokens if nothing else is left."""
@@ -66,15 +107,18 @@ def token_idf(keys: pd.Series) -> dict[str, float]:
     return {t: float(np.log((n + 1) / (c + 1)) + 1.0) for t, c in df.items()}
 
 
-def record_extras(recs: pd.DataFrame, fillers: list[str] | None = None) -> pd.DataFrame:
+def record_extras(recs: pd.DataFrame, fillers: list[str] | None = None,
+                  brand_units: list[str] | None = None) -> pd.DataFrame:
     """Per-record extras: initials, share of name tokens unknown to the S1 name
     vocabulary of the country (gibberish brand names score high), for S1 how
-    many S1 of the country share the exact core name (ambiguity), and (with
-    ``fillers``) the filler-free name key."""
+    many S1 of the country share the exact core name (ambiguity), and (v2) the
+    filler-free name key and the made-up-brand flag."""
     recs = recs.copy()
     recs["initials"] = initials(recs.name_core)
     if fillers is not None:
         recs["name_key"] = name_key(recs.name_core, frozenset(fillers))
+    if brand_units is not None:
+        recs["brand"] = is_brand(recs.name_compact, frozenset(brand_units))
     s1 = recs[recs.source == 1]
     vocab = {c: Counter(t for n in g.name_core for t in set(n.split()))
              for c, g in s1.groupby("country")}
@@ -121,76 +165,111 @@ def join_records(chunk: pd.DataFrame, rec: pd.DataFrame, ctx: pd.DataFrame) -> p
     return pd.concat([chunk.reset_index(drop=True), qf, sf, c], axis=1)
 
 
-def _has_output(st: StageRun, name: str) -> bool:
+def _has_output(st: StageRun, stage: str, name: str) -> bool:
     try:
-        return name in load_manifest(st.cfg, "normalize")["outputs"]
+        return name in load_manifest(st.cfg, stage)["outputs"]
     except StageError:
         return False
 
 
+def _by_country(path, columns: list[str]):
+    """(country, records) one country at a time (parquet filter: bounded memory)."""
+    for c in sorted(pd.read_parquet(path, columns=["country"]).country.unique()):
+        yield c, pd.read_parquet(path, columns=columns, filters=[("country", "==", c)])
+
+
+def _learn_vocabularies(st: StageRun, cfg: Config) -> tuple[list[str], list[str]]:
+    """Filler words (both splits whenever test records exist, also in a train-only
+    pass, so the train and test passes agree) and brand syllables (train)."""
+    fc = cfg.features
+    with timed(st.log, "learn filler words"):
+        paths = [st.input_path("normalize", f"records_{sp}") for sp in ("train", "test")
+                 if _has_output(st, "normalize", f"records_{sp}")]
+        fillers = learn_fillers((r for p in paths for _, r in _by_country(
+            p, ["source", "country", "name_core"])), fc.filler_min_rate, fc.filler_min_ratio)
+    st.write_json(fillers, "fillers")
+    st.metric("fillers", " ".join(fillers))
+    with timed(st.log, "learn brand syllables"):
+        cols = ["entity_id", "source", "owner", "name_core", "name_compact", "name_indic"]
+        brand_units = learn_brand_units(r for _, r in _by_country(
+            st.input_path("normalize", "records_train"), cols))
+    st.write_json(brand_units, "brand_units")
+    st.metric("brand_units", " ".join(brand_units))
+    return fillers, brand_units
+
+
+def _country_records(recs: pd.DataFrame, fillers, brand_units):
+    """Extras + v2 key indexes for one country's records."""
+    recs = record_extras(recs, fillers, brand_units)
+    kidx = aidx = None
+    if fillers is not None:
+        s1m = (recs.source == 1).to_numpy()
+        kidx = KeyIndex(recs.name_key, token_idf(recs.name_key[s1m]))
+        akey = address_key(recs.addr_bag)
+        aidx = KeyIndex(akey, token_idf(akey[s1m]))
+        recs["kpos"] = np.arange(len(recs), dtype=np.int32)
+    return recs, kidx, aidx
+
+
 def run_features(cfg: Config) -> None:
+    """Candidate parts are grouped by country (``parts_<split>.json`` of the
+    candidates stage), so only one country's records are in memory at a time."""
     fc = cfg.features
     with StageRun(cfg, "features") as st:
         splits = (["train"] if cfg.run_train else []) + (["test"] if cfg.run_test else [])
-        fillers = None
+        fillers = brand_units = None
         if fc.name_key:
-            with timed(st.log, "learn filler words"):
-                # both splits whenever test records exist (also in a train-only pass),
-                # so the train and test passes learn the same list
-                frames = [pd.read_parquet(st.input_path("normalize", f"records_{sp}"),
-                                          columns=["source", "country", "name_core"])
-                          for sp in ("train", "test") if _has_output(st, f"records_{sp}")]
-                fillers = learn_fillers(frames, fc.filler_min_rate, fc.filler_min_ratio)
-                del frames
-            st.write_json(fillers, "fillers")
-            st.metric("fillers", " ".join(fillers))
+            fillers, brand_units = _learn_vocabularies(st, cfg)
         for split in splits:
             extra = ["side", "owner"] if split == "train" else []
-            with timed(st.log, f"{split}: load records + extras"):
-                recs = pd.read_parquet(st.input_path("normalize", f"records_{split}"),
-                                       columns=REC_COLS + extra)
-                recs = record_extras(recs, fillers)
-                kidx = None
-                if fillers is not None:
-                    kidx = KeyIndex(recs.name_key, token_idf(recs.name_key[recs.source == 1]))
-                    recs["kpos"] = np.arange(len(recs), dtype=np.int32)
-                if split == "train":
-                    q = recs[recs.source != 1]
-                    u = stable_unit(q.entity_id, cfg.seed + 1)
-                    keep = (q.side == "val").to_numpy() | (u < fc.train_query_frac)
-                    selected = set(q.entity_id[keep])
-                    st.metric("train_queries_selected", {"train": int((keep & (q.side == "train")
-                                                                       ).sum()),
-                                                         "val": int((q.side == "val").sum())})
-                rec = recs.set_index("entity_id")
+            rec_path = st.input_path("normalize", f"records_{split}")
             cand_dir = st.input_path("candidates", f"candidates_{split}")
             with timed(st.log, f"{split}: per-S1 candidate context"):
                 ctx = s1_context(cand_dir)
+            with open(st.input_path("candidates", f"parts_{split}"), encoding="utf-8") as fh:
+                parts_by_country = json.load(fh)
             out_dir = st.path(f"features_{split}")
             out_dir.mkdir(parents=True, exist_ok=True)
             for old in out_dir.glob("*.parquet"):
                 old.unlink()
-            n_parts = n_rows = n_pos = 0
-            with timed(st.log, f"{split}: features"):
-                for f in sorted(cand_dir.glob("*.parquet")):
-                    part = pd.read_parquet(f).astype({"q_id": str, "s1_id": str})
+            n_parts = n_rows = n_pos = n_sel_train = n_sel_val = 0
+            for country, recs in _by_country(rec_path, REC_COLS + extra):
+                with timed(st.log, f"{split} {country}: records + extras"):
+                    recs, kidx, aidx = _country_records(recs, fillers, brand_units)
                     if split == "train":
-                        part = part[part.q_id.isin(selected)]
-                    if part.empty:
-                        continue
-                    for chunk in _query_chunks(part, fc.chunk_rows):
-                        d = join_records(chunk, rec, ctx)
-                        feats = build_features(d, kidx)
-                        keys = d[["q_id", "s1_id"]].copy()
+                        q = recs[recs.source != 1]
+                        u = stable_unit(q.entity_id, cfg.seed + 1)
+                        keep = (q.side == "val").to_numpy() | (u < fc.train_query_frac)
+                        selected = set(q.entity_id[keep])
+                        n_sel_train += int((keep & (q.side == "train")).sum())
+                        n_sel_val += int((q.side == "val").sum())
+                        del q
+                    rec = recs.set_index("entity_id")
+                    del recs
+                with timed(st.log, f"{split} {country}: features"):
+                    for name in parts_by_country.get(country, []):
+                        part = pd.read_parquet(cand_dir / name).astype({"q_id": str, "s1_id": str})
                         if split == "train":
-                            keys["y"] = (d.s1_id == d.q_owner).astype(np.int8)
-                            keys["side"] = d.q_side.to_numpy()
-                            n_pos += int(keys.y.sum())
-                        out = pd.concat([keys, feats], axis=1)
-                        out.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False)
-                        n_parts += 1
-                        n_rows += len(out)
-                    st.log.debug("features %s: %d rows so far", f.name, n_rows)
+                            part = part[part.q_id.isin(selected)]
+                        if part.empty:
+                            continue
+                        for chunk in _query_chunks(part, fc.chunk_rows):
+                            d = join_records(chunk, rec, ctx)
+                            feats = build_features(d, kidx, aidx)
+                            keys = d[["q_id", "s1_id"]].copy()
+                            if split == "train":
+                                keys["y"] = (d.s1_id == d.q_owner).astype(np.int8)
+                                keys["side"] = d.q_side.to_numpy()
+                                n_pos += int(keys.y.sum())
+                            out = pd.concat([keys, feats], axis=1)
+                            out.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False)
+                            n_parts += 1
+                            n_rows += len(out)
+                            del d, feats, out
+                        st.log.debug("features %s: %d rows so far", name, n_rows)
+                del rec, kidx, aidx
+            if split == "train":
+                st.metric("train_queries_selected", {"train": n_sel_train, "val": n_sel_val})
             st.register(f"features_{split}", out_dir, rows=n_rows, parts=n_parts)
             st.metric(f"{split}_pairs", n_rows)
             if split == "train":
