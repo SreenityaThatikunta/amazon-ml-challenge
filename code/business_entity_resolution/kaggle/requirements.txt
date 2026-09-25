@@ -1,0 +1,5 @@
+# Kaggle GPU image already ships torch/transformers/accelerate; pin what we rely on.
+# All Apache-2.0 / BSD / MIT. Model: Qwen/Qwen3-1.7B (Apache-2.0, 1.7B params <= 8B).
+transformers>=4.51
+peft>=0.15
+accelerate>=1.6
