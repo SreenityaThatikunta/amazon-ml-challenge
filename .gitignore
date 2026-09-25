@@ -1,1 +1,5 @@
 dataset/
+eda/.cache/
+__pycache__/
+docs/
+eda/reports/
