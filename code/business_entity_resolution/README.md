@@ -6,12 +6,15 @@ EDA: [../../eda/FINDINGS.md](../../eda/FINDINGS.md).
 
 ## Setup
 
-From the `student_resource/` directory (Python 3.12; the data in `dataset/`):
+From the `student_resource/` directory (the directory that contains `dataset/`;
+Python 3.11–3.13, tested with 3.12 on macOS and 3.13 on Windows 11):
 
 ```bash
-python3.12 -m venv .venv
-.venv/bin/pip install -r code/business_entity_resolution/requirements.txt
+python -m venv .venv
+.venv/bin/pip install -r code/business_entity_resolution/requirements.txt      # Windows: .venv\Scripts\pip
 .venv/bin/pip install -e code/business_entity_resolution
+# optional, NVIDIA GPU + CUDA 13 toolkit: GPU top-k search in stage 1 (~2x faster end to end)
+.venv/bin/pip install -r code/business_entity_resolution/requirements-gpu.txt
 ```
 
 Check the environment:
@@ -24,18 +27,32 @@ cd code/business_entity_resolution && ../../.venv/bin/pytest && ../../.venv/bin/
 
 Every stage is one command that reads the previous stage's artifacts from
 `artifacts/<run>/` and writes its own (with `manifest.json` + `log.txt`).
-Run them one at a time: several heavy stages in parallel will swap on a 16 GB machine.
+Run them one at a time: heavy stages in parallel swap on a 16 GB machine
+(peak ~10 GB per stage).
 
 ```bash
-B=.venv/bin/ber
-$B split       --run main   # geographic train/val split + dev slice          (~2 min)
-$B normalize   --run main   # normalise 24M records, learn Indic dictionary   (~4 min)
-$B candidates  --run main   # region-blocked TF-IDF top-k + recall report      (~1-2 h)
-$B features    --run main   # pair + context features                          (long)
-$B scorer      --run main   # LightGBM (+ out-of-fold train scores)
-$B decide      --run main   # one owner per record + expected-F0.5; val F0.5
-$B submit      --run main   # output/matching_results.tsv + candidate_pairs.tsv + validator
+B=.venv/bin/ber            # Windows: .venv\Scripts\ber.exe (set PYTHONUTF8=1)
+$B split       --run main  # geographic train/val split + dev slice            (~3 min)
+$B normalize   --run main  # normalise 24M records, learn Indic dictionary     (~7 min)
+$B candidates  --run main  # region-blocked TF-IDF top-k + recall report       (~1.5 h GPU / ~4 h CPU, train+test)
+$B features    --run main  # 102 pair + context features                       (~4 h, train+test)
+$B scorer      --run main  # stage-1 LightGBM, scores val + test pairs         (~20 min)
+$B rerank      --run main  # stage-2 re-ranker (cross-fitted on val) + test    (~15 min)
+$B decide      --run main  # one owner per record + expected F0.5; val F0.5     (~10 min)
+$B submit      --run main  # output/matching_results.tsv + candidate_pairs.tsv + official validator
 ```
+
+The train/val side and the test side can also run as two passes (the test pass reuses
+the model, region neighbourhoods and decision parameters of the train pass):
+
+```bash
+for s in candidates features scorer rerank decide; do $B $s --run main --set data.phase=train; done
+for s in candidates features scorer rerank decide submit; do $B $s --run main --set data.phase=test; done
+```
+
+`output/candidate_pairs.tsv` is the input of the final model: the pairs that passed the
+stage-1 filter (`rerank.min_p1`), ~1 per S2/S3 record. `decide.scores_stage=scorer` gives
+the stage-1-only pipeline (then candidate_pairs.tsv holds every TF-IDF candidate, ~3 GB).
 
 LLM stage (optional, on Kaggle; see [kaggle/README.md](kaggle/README.md)):
 
@@ -69,9 +86,10 @@ stage. `$B config` prints the resolved configuration.
 | Path | Contents |
 |---|---|
 | `src/ber/normalize/` | Stage 0: text/address normalisation, region detection, Indic transliteration, lookup tables (`tables/*.tsv`) |
-| `src/ber/candidates/` | Stage 1: per-country, region-blocked char-TF-IDF top-k candidates |
+| `src/ber/candidates/` | Stage 1: per-country, region-blocked char-TF-IDF top-k candidates (CPU or GPU) |
 | `src/ber/features/` | Stage 2: pair + context features |
-| `src/ber/scorer/` | Stage 2: LightGBM scorer (+ out-of-fold scores) |
+| `src/ber/scorer/` | Stage 2: stage-1 LightGBM scorer (also the learned candidate filter) |
+| `src/ber/rerank/` | Stage 2b: re-ranker with S1/record group context, cross-fitted on val |
 | `src/ber/llm/` | Stage 3: routing, select-prompts, LLM score import/blend |
 | `src/ber/decide/` | Stage 4: one-owner assignment, expected-F0.5 selection, val metrics |
 | `src/ber/france/` | Synthetic French labelled data (validation proxy / LLM training) |
