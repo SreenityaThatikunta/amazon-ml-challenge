@@ -15,7 +15,7 @@ features that also acts as a learned filter (**1.08 candidates per record kept, 
 of the retrieved true pairs**), and a second LightGBM that re-ranks the survivors with
 *group context*: how many other records claim the same S1, how strongly and from which
 source. A per-S1 expected-F0.5 rule (one owner per record) produces the final links.
-Validation macro F0.5 is **0.98748** on a geographic hold-out (10 % of the S1 entities,
+Validation macro F0.5 is **0.98895** on a geographic hold-out (10 % of the S1 entities,
 whole states), up from 0.98211 for our first submission. Everything runs on one laptop
 (16 GB RAM; optional NVIDIA GPU for the retrieval step) with MIT/BSD/Apache
 dependencies and no pretrained model.
@@ -135,11 +135,11 @@ so val F0.5 includes blocking losses, singletons and every stage, like the leade
   margin over the record's best *other* candidate, the gap to its best and the rank;
   candidates per record and per S1.
 
-**Stage-2 features (re-ranker, 50):** p1 and logit; record context (rank, best/sum/count
+**Stage-2 features (re-ranker, 127):** p1 and logit; record context (rank, best/sum/count
 of the record's other p1); **S1 context** (rank of the record among all records listing
 the S1, best/sum/count of competing p1, the same within the record's source, and
 "claims": records whose best S1 this is, their expected count and best competitor);
-25 stage-1 features passed through.
+all 102 stage-1 features passed through (25 of them: val 0.98748; all: 0.98895).
 
 **Model type:** LightGBM (MIT) binary classifiers. Stage 1: 127 leaves, lr 0.05, early
 stopping on 5 % of val records (best iteration 346), trained on 4.5 M pairs from 10 % of
@@ -151,18 +151,22 @@ of the 4 fold models. No pretrained model, far below the 8 B parameter limit.
 **Threshold selection method:** one owner per record (its highest p2), then per S1 the
 prefix of its records (sorted by p2) that maximises the expected F0.5
 (≈ 1.25·Σp / (0.25·Σp_all + k), vs P(no match) = Π(1 − p) for the empty prediction), after
-dropping p2 < min_p. min_p = 0.25 chosen on validation; the curve is flat (0.98743–0.98748
+dropping p2 < min_p. min_p = 0.2 chosen on validation; the curve is flat (within 0.0001
 for 0.02–0.5). Exact duplicate records share one owner.
 
 ---
 
 ## 5. Results & Error Analysis
 
-- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.98748** (US 0.98923,
-  India 0.98473, singletons 0.98220; pair precision 0.99645, recall 0.97349).
+- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.98895** (singletons
+  0.98445; pair precision 0.99709, recall 0.97582).
   Progression: first submission 0.98211 → v2 features, stage 1 only 0.98337 → + stage-2
-  re-ranker 0.98748.
-- **Common false positives (wrong merges):** 2,765 of 752,513 predicted links: 1,842
+  re-ranker on 25 stage-1 features 0.98748 → on all 102 features 0.98895. With whole val
+  regions held out per cross-fitting fold (harsher, closer to test's unseen regions):
+  0.98684 vs 0.98581, so the gain transfers across regions. Stage 2 trained on US val only
+  and applied to Indian val still beats stage 1 there (0.9807 vs 0.9790), our best proxy
+  for France.
+- **Common false positives (wrong merges)** (error analysis of the 25-feature re-ranker): 2,765 of 752,513 predicted links: 1,842
   lookalike distractors (same address, one-letter name edit or house number shifted by a
   few units, often indistinguishable from a true pair with a digit typo), 923 records of
   another S1 with the same generic name at a nearby address.
@@ -219,7 +223,7 @@ Main modules: `normalize/` (text, address, geo, transliteration, lookup tables),
 | All S1 of the country | ~10⁶ | 100 % |
 | TF-IDF top-k union | 24.6 | 99.05 % |
 | Stage-1 filter (p1 ≥ 0.001) = `candidate_pairs.tsv` | 1.08 | 99.02 % |
-| Final links | 0.72 | 97.35 % |
+| Final links | 0.72 | 97.58 % |
 
 Stage-2 features by gain: record margin over its other candidates, p1, then the S1-side
 claim features (`c_expected`, `c_best_other`, `c_sum_other`).

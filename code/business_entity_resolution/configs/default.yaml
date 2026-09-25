@@ -73,15 +73,14 @@ scorer:               # stage 2 (T3.4): LightGBM pair scorer
 rerank:               # stage 2b: re-ranker with S1/query group context from stage-1 p (ber rerank)
   min_p1: 0.001       # pairs below this stage-1 p are dropped first (never selected anyway)
   folds: 4            # trained on the val side, cross-fitted: out-of-fold p2 for every val pair
+  fold_by: s1         # s1 (folds grouped by the record's top S1) | region (whole regions per fold: robustness check)
   learning_rate: 0.05
   num_leaves: 63
   min_data_in_leaf: 200
   num_boost_round: 2000
   early_stopping: 50
-  raw_features: [q_source, hn_rel, n_core_eq, n_compact_eq, a_bag_eq, a_q_empty, a_s_empty,
-                 cos_combo, cos_name, cos_addr, n_lev, n_sub, a_tsr, n_tsr, s_name_freq,
-                 s_n_cands, r_eq, num_q_only, num_s_only, k_idf_rec, k_idf_unmatched_s,
-                 a_idf_rec, hn_s_in_q, hn_best_rel, q_brand]   # stage-1 features passed through
+  raw_features: [all]  # stage-1 features passed through: all (val F0.5 0.98895) or a list
+                       # (the 25 of the first v2 file: 0.98748; region-held-out CV 0.98684 vs 0.98581)
 
 decide:               # stage 4 (T3.5/T4.1)
   method: expected_f  # threshold | expected_f (ratio approximation) | expected_f_exact (v2)

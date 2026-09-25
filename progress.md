@@ -49,6 +49,32 @@ final ranking** (smaller candidate set per S1 = ranked higher).
 | 2026-09-25 | v2 (full) | v2 normalisation + features, **stage 1 only** (4.5M training rows, 102 features) | 99.046 % | 0.98337 | 0.98617 | 0.97898 | 0.97771 | pair P 0.99655 / R 0.9586; AUC 0.99994; val +0.0013 over main with a third of main's training rows |
 | 2026-09-25 | v2 (full) | **+ stage-2 re-ranker** (expected-F, min_p 0.25) | 99.046 % | **0.98748** | 0.98923 | 0.98473 | 0.98220 | pair P 0.99645 / R 0.97349; p2 AUC 0.99917 vs p1 0.99620 on the kept pairs; sweep flat (0.98743–0.98748 for min_p 0.02–0.5); exact expected-F 0.98744 (no gain, kept the approximation) |
 
+**Stage-2 experiments (2026-09-26, run `v2x` = v2's upstream stages via junctions, val only):**
+
+| Stage-2 variant | CV folds | Val F0.5 | US | India | Singletons | Pair P / R |
+|---|---|---|---|---|---|---|
+| 25 stage-1 features (first v2 file) | by S1 | 0.98748 | 0.98923 | 0.98473 | 0.98220 | 0.99645 / 0.97349 |
+| **all 102 stage-1 features** | by S1 | **0.98895** | | | 0.98445 | 0.99709 / 0.97582 |
+| all, 127 leaves, lr 0.03 | by S1 | 0.98897 | 0.99046 | 0.98663 | 0.98381 | 0.99706 / 0.97605 |
+| 25 features | whole regions held out | 0.98581 | 0.98860 | 0.98144 | | |
+| all 102 features | whole regions held out | 0.98684 | 0.98970 | 0.98234 | | |
+| (stage 1 only, for reference) | — | 0.98337 | 0.98617 | 0.97898 | 0.97771 | 0.99655 / 0.9586 |
+
+- Region-held-out CV (each fold = whole val regions, largest first to the smallest fold;
+  Uttar Pradesh, most of India's val data, is one fold) is the harsher check that the gain
+  transfers to unseen regions (test regions are all unseen by stage 2). All-features wins
+  there too (+0.0010), and both beat stage 1 alone by ≥ 0.0025. Chosen: all 102 features,
+  default size, folds by S1 (each fold model then sees every val region).
+- A first region split put all Indian regions in one fold, i.e. stage 2 trained on US val
+  only and applied to India: India still improved over stage 1 (0.9807 vs 0.9790). That
+  is the closest thing we have to a France check.
+
+**Refreshed submission v2.1 (2026-09-26 03:33, stage 2 on all 102 features):** val 0.98895;
+test 5,947,349 links, same `candidate_pairs.tsv` (9,649,852); validator PASS; 4.2 % of S1
+predictions differ from the first v2 file; links per S1 France 3.438 / India 3.422 / US 3.444.
+Files: `output/` and `D:ml\submissions2.1\` (first v2 file kept in `...\submissions2\`).
+Stage-2 test pass peaks at 9.3 GB with all 102 features.
+
 **Test pass (2026-09-26 02:38, `output/`):** validator PASS (matching + candidate file).
 5,933,335 links (main: 5,835,284); `candidate_pairs.tsv` 9,649,852 pairs = **5.57 per S1**
 (TF-IDF: 243.8 M = 141 per S1). Per country the predictions look alike and match val:

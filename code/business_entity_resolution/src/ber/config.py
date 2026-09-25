@@ -118,16 +118,13 @@ class ScorerConfig:
 class RerankConfig:
     min_p1: float = 0.001           # drop pairs below this stage-1 p before stage 2
     folds: int = 4                  # cross-fitting folds on the val side
+    fold_by: str = "s1"             # "s1" (groups by the record's top S1) | "region" (check)
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200
     num_boost_round: int = 2000
     early_stopping: int = 50
-    raw_features: list[str] = field(default_factory=lambda: [
-        "q_source", "hn_rel", "n_core_eq", "n_compact_eq", "a_bag_eq", "a_q_empty",
-        "a_s_empty", "cos_combo", "cos_name", "cos_addr", "n_lev", "n_sub", "a_tsr", "n_tsr",
-        "s_name_freq", "s_n_cands", "r_eq", "num_q_only", "num_s_only", "k_idf_rec",
-        "k_idf_unmatched_s", "a_idf_rec", "hn_s_in_q", "hn_best_rel", "q_brand"])
+    raw_features: list[str] = field(default_factory=lambda: ["all"])  # or a feature list
 
 
 @dataclass

@@ -164,10 +164,20 @@ def _read_val(st: StageRun, cfg: Config, raw_cols: list[str]):
     return sv[keep_all].reset_index(drop=True), raw
 
 
+def _raw_columns(st: StageRun, wanted: list[str]) -> list[str]:
+    """Stage-1 features passed to stage 2; ["all"] = every stage-1 feature."""
+    if list(wanted) != ["all"]:
+        return list(wanted)
+    import pyarrow.parquet as pq
+    first = sorted(st.input_path("features", "features_train").glob("*.parquet"))[0]
+    return [c for c in pq.ParquetFile(first).schema_arrow.names
+            if c not in ("q_id", "s1_id", "y", "side")]
+
+
 def run_rerank(cfg: Config) -> None:
     rc = cfg.rerank
-    raw_cols = list(rc.raw_features)
     with StageRun(cfg, "rerank") as st:
+        raw_cols = _raw_columns(st, rc.raw_features)
         recs = pd.read_parquet(st.input_path("normalize", "records_train"),
                                columns=["entity_id", "source"])
         if cfg.run_train:
@@ -186,6 +196,23 @@ def run_rerank(cfg: Config) -> None:
                             index=top.q.to_numpy())
             u = grp.reindex(q).to_numpy()
             fold = np.minimum((u * rc.folds).astype(int), rc.folds - 1)
+            if rc.fold_by == "region":  # robustness check: whole regions held out per fold
+                reg = pd.read_parquet(st.input_path("normalize", "records_train"),
+                                      columns=["entity_id", "region"],
+                                      filters=[("source", "==", 1), ("side", "==", "val")]
+                                      ).set_index("entity_id").region
+                top_reg = pd.Series(reg.reindex(top.s1_id.astype(str)).fillna("").to_numpy(),
+                                    index=top.q.to_numpy())
+                sizes = top_reg.value_counts()
+                # largest first, each region to the currently smallest fold (balanced sizes)
+                load, fold_of = [0] * rc.folds, {}
+                for r, n in sizes.items():
+                    k = int(np.argmin(load))
+                    fold_of[r] = k
+                    load[k] += int(n)
+                fold = np.array([fold_of[r] for r in top_reg.reindex(q).to_numpy()])
+                st.metric("fold_regions", {k: sorted(r for r, f in fold_of.items() if f == k)
+                                           for k in range(rc.folds)})
             oof = np.zeros(len(X), dtype=np.float64)
             imp = np.zeros(X.shape[1])
             with timed(st.log, f"cross-fit {rc.folds} folds"):
