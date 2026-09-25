@@ -189,6 +189,15 @@ logged in progress.md with the val → LB delta.
 | T8.2 | Second-order features: max/mean similarity (name, address, numbers) of the query to the S1's other confident members; cross-source agreement (S2↔S3); remaining capacity vs the 5 S2 / 6 S3 cap; the query's rank among the S1's candidates | `features2` built with OOF stage-1 scores for train (no leakage) |
 | T8.3 | Stage-2 LightGBM → decide | **Val pair recall up at equal precision; val F0.5 gain logged; LB submission** |
 
+### Status after the first build day (2026-09-25 evening)
+- Done: T7.1 (error dump), T7.1b (realistic proxy), T7.2/T7.3 (lookalike + relative features),
+  unseen-country scorer with synthetic French training (replaces T7.4 for now), M8 rescore (+ all
+  stage-1 features). **Dev val 0.97655 → 0.98859.** Details: `experiments/README.md` E1–E17.
+- Running: full-scale v2 (features → scorer → rescore → decide → submit). The next leaderboard check
+  needs the user's upload.
+- Next (v3 upstream rebuild): all-pairs transliteration dictionary for test (E15),
+  `candidates.k_name_noaddr` 30 → 100 (E16). Then the LLM stage on what's left, if time allows.
+
 ### Updates to existing tasks
 - **`output/candidate_pairs.tsv` is required** in the final zip (README: the exact set the model runs
   inference over, one row per test S1, matches ⊆ candidates). Reverses the earlier "don't produce it"

@@ -123,8 +123,84 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   Differences (±0.0004) are within noise on 26k dev S1. Keep k=3, conf=0.5 for v2, and re-check conf at
   full scale.
 
-### E11. Full-scale v2 chain (queued)
-- `FEATURES_PID=<pid> bash experiments/run_main_v2.sh` (log `logs/run_main_v2.log`). Waits for E8,
-  then: scorer (+ unseen model, frtrain) → decide (stage-1, kept as `logs/main_v2_decide_stage1.json`)
+### E12. Parallel features + address-word matcher fix
+- `features.workers` (default min(4, cpu−2)): `build_features` runs on query-aligned sub-chunks in
+  worker processes. Dev features 285 s → 114 s (while the full run competed for CPU). Test
+  `test_parallel_features_match_serial`.
+- Bug found by diffing dev features against the pre-E7 build (1% of `a_q_unmatched` differed):
+  rapidfuzz `extractOne(score_cutoff=0.8)` with a *similarity* scorer converts the cutoff to an integer
+  edit budget and drops pairs at exactly 0.8 ("naga"/"nagar"). Now uses `normalized_distance` with
+  cutoff `1 − 0.8`: 0 mismatches against the reference definition on 20k random address pairs.
+  Test `test_unmatched_word_threshold_inclusive`.
+- The E8 full run (serial, boundary bug) was stopped at 10/81 train parts (log
+  `logs/main_features_v2_aborted.log`); E11 restarted at 19:00 with features as its first step.
+
+### E11. Full-scale v2 chain (running since 19:00)
+- `bash experiments/run_main_v2.sh` (log `logs/run_main_v2.log`): features (parallel) →
+  scorer (+ unseen model, frtrain) → decide (stage-1, kept as `logs/main_v2_decide_stage1.json`)
   → rescore → decide (rescored) → submit (+ candidate_pairs.tsv) → France proxy with the new models.
 - The v1 submission is archived as `output/archive/matching_results_v1_val098211_lb0975.tsv`.
+
+### E13. Rescore rounds (dev)
+- `rescore.rounds` (round r+1 rebuilds clusters/owners from round-r out-of-fold p). Logs
+  `logs/dev_rescore_rounds{1,2,3}.log`. The dev baseline was rebuilt first with the E12 features (log
+  `logs/dev_v2_baseline.log`): stage-1 0.97823 and rescore 0.98593, unchanged by the matcher fix.
+
+| rounds | dev val F0.5 | val AUC per round |
+|---|---|---|
+| **1** | **0.98593** | 0.999832 |
+| 2 | 0.98560 | 0.999832, 0.999799 |
+| 3 | 0.98433 | 0.999832, 0.999799, 0.999744 |
+
+- Chaining out-of-fold probabilities compounds noise, so **keep rounds=1**.
+
+### E14. Where the dev loss is after rescore
+- `.venv/bin/python experiments/loss_breakdown.py dev` (log `logs/loss_breakdown_dev_rescore.log`):
+  loss **India 70%** / US 30%; fn-only 61%, fp-only 19%, singletons given a match 13%. Missed true pairs
+  2.3%: dropped at low p 1381 (median p 0.45), not a candidate 318, assigned to another S1 234, not in
+  the rescored top-3 140.
+- India dev misses (log `logs/india_misses_dev.log`): mostly **Gurmukhi** names that obviously match
+  ("ਸ਼ਕਤੀ ਐਨਰਜੀ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ" = Shakti Energy Private Limited, same address, p 0.02).
+
+### E15. Indic scripts and the transliteration dictionary
+- Log `logs/indic_scripts_test.log`. The train-side dictionary has **0 Gurmukhi words**: all 10.8k
+  Gurmukhi train names are on the val side, because Punjab is a val region. Gurmukhi names with unknown
+  words: 32–33% (other scripts ≤ 6%). Test has 12.5k Gurmukhi names (0.27% of Indian queries), so this
+  is worth at most ~+0.0007.
+- Fix (code, used from the next normalize run): `normalize.test_dict_all_pairs` learns a 2nd dictionary
+  from **all** train pairs (`translit_dict_all.parquet`) and uses it for test records only; train/val
+  records keep the train-side one, so val stays honest.
+- Val India (PB, UP, CH, MN, UK) includes Punjab's Gurmukhi, so val India likely *underestimates*
+  test India.
+
+### E16. Candidate recall misses (full scale)
+- `.venv/bin/python experiments/candidate_misses.py main` (log `logs/candidate_misses_main.log`, ~12 min):
+  0.95% of val true pairs are never candidates (India 1.35%, US 0.69%). **68% of misses have an empty
+  query address** (base rate 4.4%): with no address only the name index is searched (k=30,
+  country-wide), and noisy generic names ("Summit Éuiy LLC") fall outside the top 30. The rest are mostly
+  Indian names in Devanagari script with partial addresses.
+- Dev (log `logs/empty_addr_recall_dev.log`): empty-address true pairs have recall 0.835 (others 0.984);
+  0.882 when the owner is a candidate; decision precision 0.976 (others 0.996).
+- Plan: `candidates.k_name_noaddr` 30 → 100 (+~31M test pairs, +13%), expected ~+0.0005.
+
+### E17. Rescore with more stage-1 features (dev)
+- `rescore.stage1_feats` (list; `["*"]` = every stage-1 feature column). Logs
+  `logs/dev_rescore_extfeats.log`, `logs/dev_rescore_allfeats.log`,
+  `logs/dev_rescore_allfeats_default.log`.
+
+| stage-1 features in rescore | dev val F0.5 | US | India | val AUC |
+|---|---|---|---|---|
+| short list (6) | 0.98593 | 0.9915 | 0.9803 | 0.999832 |
+| 30 selected | 0.98814 | 0.9917 | 0.9846 | 0.999856 |
+| **all (91)** | **0.98859** | 0.9920 | 0.9852 | 0.999868 |
+
+- **Default is now `["*"]`**; v2 uses it. At full scale the test path would need ~12 GB for
+  30M top-3 pairs × 100 features, so cluster/member features are now built globally and the stage-1
+  features are fetched and scored part by part (`predict_parts`, test
+  `test_predict_parts_matches_direct`).
+- Total dev gain of the v2 stack over v1: **0.97655 → 0.98859 (+0.0120)**.
+
+### Next: v3 upstream rebuild (after the v2 LB check)
+- normalize (all-pairs dictionary for test) → candidates (k_name_noaddr=100) → features → scorer
+  (+ unseen model) → rescore → decide → submit. About 4 h, heavy stages one at a time.
+
