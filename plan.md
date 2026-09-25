@@ -1,6 +1,7 @@
 # Plan: Business Entity Resolution (Amazon ML Challenge 2026)
 
-**Goal:** beat the public leaderboard top of **0.971 macro F0.5** (as of 2026-09-25).
+**Goal:** beat the public leaderboard top of **0.986 macro F0.5** (as of 2026-09-25; was 0.971).
+**Current:** run `main` → val 0.98211, **public LB 0.975** (see §4 for the gap analysis and re-prioritised next steps).
 **Inputs:** [eda/FINDINGS.md](eda/FINDINGS.md), [docs/RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md).
 **Tracking:** every task, run, metric and decision is logged in [progress.md](progress.md).
 
@@ -141,7 +142,67 @@ kaggle/                    notebooks for LoRA training and inference
 
 ---
 
-## 4. Tasks
+## 4. Re-plan after first LB submission (2026-09-25)
+
+### Gap analysis
+- Test S1 mix: **US 38% / India 47% / France 15%** (France absent from train and val).
+- If US (0.985) and India (0.977) transfer from val, LB 0.975 implies **France ≈ 0.94**.
+  Even a perfect France gives only ≈ 0.984, so **US/India must also improve** to pass 0.986.
+- France test signals: two strong candidates (top > 0.5, runner-up > 0.2) on 0.79% of
+  queries vs 0.24% for the US; 3.48 predicted matches/S1 vs 3.37 for the US; 4.9% empty vs
+  5.6% → over-matching. Synthetic France proxy (`artifacts/synthfr`): F0.5 **0.888**,
+  singleton acc 0.545 (proxy may be harsher than the real data).
+- France failure modes seen in test (wrong runner-ups scored high):
+  - same number, different street ("Rue du Magasin" vs "Rue du Chateau") → p 0.90
+  - legal form conflict at same address (SAS vs SARL) → p 0.85
+  - initials mismatch ("TL" vs "Tourcoing Amicale") → p 0.74
+  - S1 names are "<City> <generic word> <legal form>" ("Lille Club EURL"): the city token in
+    the name carries almost no information but counts as name evidence.
+- Val loss: **80% missed matches only**, 10% wrong matches only, 7% singletons given a match.
+  Pair recall 0.955 vs candidate recall 0.990 → ~3.5 pts of recall lost at scorer/decision,
+  ~1 pt at blocking.
+
+### Priority order (supersedes the M5 → M6 order below)
+1. **M7 France fixes + pseudo-labels** (local), since France is the largest per-entity gap.
+2. **M8 second-stage cluster-context scorer** (local), the main US/India recall lever.
+3. **M5 LLM matcher** on the band that M7/M8 still can't settle (Kaggle).
+4. **T2.3/T2.4 candidate recall** (India 98.2%; Indic names, empty addresses).
+5. **M6** polish, reproducibility, docs.
+
+Every change is validated on val (US/India) **and** the France proxy, and each LB submission is
+logged in progress.md with the val → LB delta.
+
+### M7: France (new, priority 1)
+| ID | Task | Exit criterion |
+|---|---|---|
+| T7.1 | France error dump: top wrong/ambiguous test queries + proxy errors via `ber explain`; check that the proxy distractors resemble real test lookalikes, and fix `france/synth.py` if not | Written catalogue of France failure modes in progress.md; proxy realism verdict |
+| T7.1b | Proxy fix (T7.1 verdict: unrealistic): index **all** France S1 as confusers, generate copies for a sample and score only the sampled S1; draw (S2, S3) cluster sizes **jointly**; add unrelated unmatched records (real France queries with p1 < 0.01); keep the proxy distractor mix close to the real tag rates in `eda/reports/07` | Proxy stats (p1 bands, empty S1, name-freq p90, ambiguity) within ~2× of real France |
+| T7.2 | Name feature: strip the record's **own city/region token** from the name before comparing; feature for "city is the only shared word" | Tests; proxy F0.5 up; val not down |
+| T7.3 | Street-name mismatch at the same number (incl. street type: Impasse vs Rue); initials-mismatch feature; **relative context features**: another candidate of the same query has an equal house number / same street / same legal form / matching initials; TRUNCATED only for ≥ 3-digit numbers (French 13↔3 and 103↔10 are distractors) | Tests; wrong runner-up p in the T7.1 examples drops below 0.2; val not down |
+| T7.4 | Pseudo-labels: confident France test decisions (p > 0.99, unique owner, clear margin) as positives + their runner-up candidates as hard negatives → retrain scorer with them | Proxy F0.5 up; France predicted matches/S1 and empty rate move toward US/India |
+| T7.5 | Per-country calibration / decision check for France (predicted match count, empty rate) | **LB submission**; France estimate from the LB delta logged |
+
+### M8: Cluster-context scorer (new, priority 2)
+| ID | Task | Exit criterion |
+|---|---|---|
+| T8.1 | From stage-1 scores, build per-S1 confident clusters (one owner per query) | Artifact `clusters.parquet`; cluster stats logged |
+| T8.2 | Second-order features: max/mean similarity (name, address, numbers) of the query to the S1's other confident members; cross-source agreement (S2↔S3); remaining capacity vs the 5 S2 / 6 S3 cap; the query's rank among the S1's candidates | `features2` built with OOF stage-1 scores for train (no leakage) |
+| T8.3 | Stage-2 LightGBM → decide | **Val pair recall up at equal precision; val F0.5 gain logged; LB submission** |
+
+### Updates to existing tasks
+- **`output/candidate_pairs.tsv` is required** in the final zip (README: the exact set the model runs
+  inference over, one row per test S1, matches ⊆ candidates). Reverses the earlier "don't produce it"
+  decision. `submit.write_candidates` is now on by default and `ber submit` checks matches ⊆ candidates
+  itself (the official validator needs ~30 GB for that check). Whenever the pipeline changes, the file
+  must be the **last** candidate set before the model: stage-1 candidates while the GBM scores all of
+  them; if M8 or the LLM ever prunes candidates before scoring, write the pruned set instead.
+- T5.3/T5.6: route only the queries still uncertain after M7/M8; include France pseudo-labels in LLM training data.
+- T6.1 is replaced by T7.4.
+- T2.3: India recall 98.2% remains open; do after M8 unless an error dump shows blocking misses dominate.
+
+---
+
+## 5. Tasks
 
 Status is tracked in [progress.md](progress.md). Each task has an **exit
 criterion**, and it isn't done until that criterion is met and logged.
@@ -201,20 +262,22 @@ criterion**, and it isn't done until that criterion is met and logged.
 ### M6: France and final polish
 | ID | Task | Exit criterion |
 |---|---|---|
-| T6.1 | Pseudo-label high-confidence France test matches → fine-tune / recalibrate | Gain on the French proxy; LB check |
+| T6.1 | ~~Pseudo-label France~~ → moved to T7.4 | — |
 | T6.2 | Error-analysis loop on val segments (Indic, singletons, hard negatives) | Each fix logged with its Δ F0.5 |
-| T6.3 | End-to-end reproducibility run from a clean checkout | Both output files regenerate; validator PASS |
-| T6.4 | Documentation_template.md filled in, code README, submission zip | Zip matches the required structure |
+| T6.3 | End-to-end reproducibility run from a clean checkout | **Both** output files (matching_results.tsv **and** candidate_pairs.tsv) regenerate; validator PASS; matches ⊆ candidates |
+| T6.4 | Documentation_template.md filled in, code README, submission zip | Zip matches the required structure, incl. `output/candidate_pairs.tsv`; candidate count and recall ceiling reported in the doc |
 
 ---
 
-## 5. Risks and mitigations
+## 6. Risks and mitigations
 
 | Risk | Mitigation |
 |---|---|
 | Kaggle GPU budget (~30 h/week) too small for LLM inference on test | Route only the uncertain band; N≤5; prefill-only scoring; 1.7B before 4B; measure throughput early (T5.5) |
 | Candidate recall ceiling on Indic names | Learned dictionary (T1.3); dense ANN fallback (T2.4) |
-| France behaves differently from the proxy | Country-agnostic features; synthetic + pseudo-labels; check on the leaderboard |
+| France behaves differently from the proxy | Country-agnostic features; synthetic + pseudo-labels; check on the leaderboard. **Materialised:** France ≈ 0.94 on LB estimate → M7 |
+| Pseudo-label confirmation bias (France) | Only very confident, clear-margin decisions; hard negatives from runner-ups; judge on proxy + LB, not on pseudo-label fit |
+| Val over-optimistic vs LB (US/India) | Log val → LB delta per submission; if US/India gap appears, revisit the split |
 | Validation over-optimistic | Geographic split; compare val vs leaderboard at every submission |
 | Memory on a Mac with 10M+ records | Parquet + chunked processing; per-country indices |
 | Uploading data to Kaggle | Private Kaggle dataset; only the derived artifacts the notebooks need |

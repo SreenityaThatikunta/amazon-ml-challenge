@@ -42,10 +42,19 @@ Plan and task definitions: [plan.md](plan.md).
 | T5.5 | Kaggle batched inference + throughput | ⏸ | kaggle/infer.py + `ber llm-import` ready; needs T5.4 |
 | T5.6 | Blend LLM + GBM (**LB**) | ⬜ | |
 | T5.7 | (optional) Qwen3-4B / wider band | ⬜ | |
-| T6.1 | France pseudo-labelling | ⬜ | |
+| T6.1 | France pseudo-labelling | ❌ | moved to T7.4 |
 | T6.2 | Error-analysis loop | ⬜ | |
 | T6.3 | Clean-checkout reproducibility | ⬜ | |
 | T6.4 | Documentation + submission zip | ⬜ | |
+| T7.1 | France error dump + proxy realism check | ✅ | catalogue in `eda/reports/07_france_errors.txt`; old proxy unrealistic → T7.1b |
+| T7.1b | Realistic France proxy | ✅ | all 259k S1 indexed, 20k scored; joint cluster sizes; 37.8k real background records. Realism table within ~1.3× of real France on every stat; proxy F0.5 (main model) **0.87597**: used as a *relative* metric |
+| T7.2 | Strip own city token from names; city-only-overlap feature | ✅ | in `lookalike_features` |
+| T7.3 | French legal-form conflict, street-mismatch-at-same-number, initials mismatch | ✅ | + relative margins; dev +0.0017 |
+| T7.4 | France pseudo-labels → retrain scorer | 🔄 | replaced for now by synthetic French training + unseen-country model (proxy 0.880 → 0.971); pseudo-labels only if the LB shows a France gap |
+| T7.5 | France calibration check (**LB**) | ⬜ | |
+| T8.1 | Stage-1 confident clusters | ✅ | `ber rescore` (`cluster/stage.py`) |
+| T8.2 | Second-order cluster-context features | ✅ | cluster size/sum/cap/rank + member similarity; tests `test_cluster.py` |
+| T8.3 | Stage-2 LightGBM → decide (**LB**) | 🔄 | dev **0.97823 → 0.98593**; full-scale run queued (E11) |
 
 ---
 
@@ -60,6 +69,7 @@ Plan and task definitions: [plan.md](plan.md).
 ### Leaderboard submissions
 | Date | Run id | Val F0.5 | Public LB | Δ vs prev | Notes |
 |---|---|---|---|---|---|
+| 2026-09-25 | main | 0.98211 | **0.975** | — | LB top now 0.986. Test S1 = US 38% / India 47% / France 15%; if US/India transfer from val, France ≈ 0.94 |
 
 ---
 
@@ -73,7 +83,8 @@ Plan and task definitions: [plan.md](plan.md).
 | 2026-09-25 | Compute: Kaggle GPUs for LLM training/inference; local Mac for everything else | User's available compute |
 | 2026-09-25 | Unlabelled test data may be used for France (synthetic pairs + pseudo-labels) | User approval; document in methodology |
 | 2026-09-25 | Query direction S2/S3 → S1; one owner per record | EDA: all matched ids unique |
-| 2026-09-25 | Don't produce candidate_pairs.tsv (`submit.write_candidates=false`) | User: not needed for our submission; it is ~3 GB / 2.4e8 ids and the official validator needs ~30 GB RAM to check it |
+| 2026-09-25 | ~~Don't produce candidate_pairs.tsv (`submit.write_candidates=false`)~~ **reversed below** | User: not needed for our submission; it is ~3 GB / 2.4e8 ids and the official validator needs ~30 GB RAM to check it |
+| 2026-09-25 | **Produce candidate_pairs.tsv** (`submit.write_candidates=true` by default) | User: required in the final submission zip. `ber submit` checks matches ⊆ candidates itself (memory-light) |
 
 ---
 
@@ -204,6 +215,65 @@ Plan and task definitions: [plan.md](plan.md).
     `./output/candidate_pairs.tsv` if it exists → ~30 GB → every CLI run hung. `ber submit` now runs it from `utils/`
     on the matching file only; candidate_pairs.tsv is off by default (user decision). `submit` now takes 18 s.
 - Next: user uploads to LB; France proxy F0.5; LLM export; candidate recall (T2.3).
+
+---
+
+### 2026-09-25 (re-plan)
+- First LB: **0.975** (val 0.98211); LB top moved to 0.986. Gap analysis and new milestones M7 (France) and M8
+  (cluster-context scorer) added to plan.md §4. Priority: M7 → M8 → M5 (LLM) → T2.3/T2.4 → M6.
+- candidate_pairs.tsv was missing from `output/` because it was switched off, not deleted. Re-enabled by default;
+  `ber submit` now also checks every match is one of its S1's candidates (new test in tests/test_io.py).
+- **T7.1 France error dump** (`eda/07_france_errors.py` → `eda/reports/07_france_errors.txt`, 10 min, peak 5.7 GB;
+  US = 20% query sample). No labels for real France, so this finds *suspects*, not errors.
+  - **Where the France loss probably is: confident false matches.** Confident queries (p1 > 0.5) per S1:
+    France 3.54 vs US 3.42 / India 3.40, with the same generator. That excess of ~0.13/S1 ≈ 4% of France
+    predictions, which is enough to explain France ≈ 0.94.
+  - **France S1 is full of S1-level lookalikes that training never showed:** S1 sharing its exact address with
+    another S1: France **13.3%** vs US 4.6% / India 5.2%; same name + same street, different number: France
+    **1.2%** vs ~0 in US/India ("Lille Amicale SARL" at 13 and at 3 Rue du Vaisseau Le Vengeur). Names are
+    "<City> <generic word> <legal form>", so "city in S1 name" is 48% of ambiguous runner-ups (US 1%).
+  - Ambiguous queries (p1 > 0.5, p2 > 0.2): France 0.79% vs US 0.24%. Runner-up tags, France vs US:
+    S1 twin (same core name as the winner) 40% / 76%; empty query address 17% / 84%; different street, same
+    number 23% (US 2%); query gibberish 24%; initials mismatch 8%; legal conflict 5%.
+    US ambiguity is almost only empty addresses; France ambiguity has **fixable** causes.
+  - Concrete bad runner-ups: legal conflict at same address (SAS vs SARL p 0.87, SARL vs EURL 0.63);
+    street type differs (Impasse vs Rue de l'Hermitage 0.89); **truncated number while another candidate
+    matches exactly** (13 vs 3: 0.987; 103 vs 10: 0.80); initials of the other candidate (AC → "Mérignac
+    Societe" 0.88). These call for **relative** features: "another candidate has an equal number / same street
+    / same legal form / matching initials".
+  - House-number relation of the best candidate, share with p < 0.05: shifted France 87% / US 92% (fine);
+    truncated France **77%** vs US 11%: French numbers are short, so a different number on the same street
+    often looks "truncated" (13↔3, 103↔10, 42↔4). The TRUNCATED rule (also leading-digit drops) is
+    unreliable for 1–3 digit numbers.
+  - **Proxy verdict: not realistic, so its 0.888 is not a France estimate.** vs real France: p1 < 0.05 2.5% vs
+    30% (no unrelated unmatched records); empty S1 1.0% vs 4.9% (bug: S2/S3 cluster sizes drawn
+    independently → P(both 0) too small); S1 name-frequency p90 4 vs 38 (20k of 259k S1 indexed → S1 twins
+    ~13× too sparse); 99.6% of proxy FPs are synthetic distractors, mostly same name + shifted number
+    (33%), which the real data rejects fine. The proxy tests the wrong thing: it lacks the S1-twin confusions
+    that drive real France errors.
+
+- **T7.1b realistic proxy** (`ber synth-france` + `configs/france_proxy.yaml`, `decide.eval_s1`): every test
+  S1 France is indexed (twins confuse the proxy as they do the real test) but only a 20k sample gets copies
+  and is scored; (S2, S3) cluster sizes drawn jointly (scored singletons 5.5%, was 1.55%); 37.8k real test
+  France records with best main p < 0.01 added as unrelated unmatched records; synthetic ids are 10-digit.
+  Realism (real France vs proxy): p1<.05 0.30/0.33, ambiguous 0.79%/0.77%, pred/S1 3.48/3.68,
+  empty S1 4.9%/4.1%, top1 shifted 23%/24%, S1 name-frequency p90 38/37; shifted-number top1 rejected
+  (p<.05) 87.6%/86.3% with the same shift sizes. Proxy F0.5 with model `main`: **0.87597** (pair P 0.887,
+  R 0.937; singletons 0.640). This is lower than the LB implies for France (~0.94), so the absolute level is
+  pessimistic: use it to compare models. Remaining FPs: 99% synthetic distractors (legal-form swap at the
+  same address, shifted number with p ≈ 0.9).
+- New code (tests pass, 126): `features/build.py` lookalike features (name without the S1's city words,
+  address words each side lacks with fuzzy matching, house-number digit length and leading-digit truncation,
+  **relative margins** of number / legal / address-word / initials / exact-name agreement over the query's
+  other candidates); `scorer.extra_train` (labelled pairs of other runs added to training only);
+  `france.exclude`; `configs/france_train.yaml` (synthetic French training set, disjoint from the proxy).
+- **Experiments E6–E11** (full record in `experiments/README.md`):
+  - lookalike features: dev +0.0017;
+  - synthetic French training: proxy 0.880 → 0.971 but dev −0.0014, hence the **unseen-country model**
+    (a 2nd scorer used only for S1 countries absent from training);
+  - **M8 rescore: dev 0.97823 → 0.98593**, cross-fitted; it hurts the France proxy, so it's applied to
+    seen countries only.
+  - Full-scale v2 queued behind the features rerun (started 18:37, after the E7 speed fix).
 
 ---
 
