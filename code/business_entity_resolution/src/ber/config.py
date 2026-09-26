@@ -145,6 +145,9 @@ class RerankConfig:
     num_boost_round: int = 2000
     early_stopping: int = 50
     raw_features: list[str] = field(default_factory=lambda: ["all"])  # or a feature list
+    copy_features: bool = False     # N4: copy-group features (rerank/copies.py)
+    copy_min_p: float = 0.01        # claimants counted for the copy-group features
+    copy_cap: int = 20              # max claimants per S1 compared
     model_from_run: str | None = None  # apply that run's fold models to val (same fold
                                        # assignment) instead of training, e.g. on val_ts
 

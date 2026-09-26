@@ -44,6 +44,7 @@ from ..config import Config
 from ..eval.split import stable_unit
 from ..features.build import _best_other
 from ..log import timed
+from . import copies
 
 HI = 0.5  # "strong" candidate / claim
 # stage-1 features copied to the stage-2 score files: they define the segments of the
@@ -159,6 +160,24 @@ def _frame(keys: pd.DataFrame, raw: pd.DataFrame, q_cat, s_cat) -> tuple[pd.Data
     return X, q
 
 
+def add_copy_features(X: pd.DataFrame, q: np.ndarray, s: np.ndarray, p: np.ndarray,
+                      q_cat, s_cat, rec_path, rc, filters=None) -> pd.DataFrame:
+    """N4 copy-group features (rerank/copies.py) for pairs with category codes q, s."""
+    uq, qi = np.unique(q, return_inverse=True)
+    us, si = np.unique(s, return_inverse=True)
+    r = pd.read_parquet(rec_path, columns=["entity_id", "name_core", "addr_norm"],
+                        filters=filters)
+    text = pd.Series((r.name_core + " " + r.addr_norm).to_numpy(), index=r.entity_id.to_numpy())
+    del r
+    Qv = copies.vectors(text.reindex(q_cat.categories.to_numpy()[uq]).fillna("").to_numpy())
+    Sv = copies.vectors(text.reindex(s_cat.categories.to_numpy()[us]).fillna("").to_numpy())
+    del text
+    f = copies.copy_features(qi, si, p, Qv, Sv, rc.copy_min_p, rc.copy_cap)
+    for c in copies.COLS:
+        X[c] = f[c]
+    return X
+
+
 def _params(cfg: Config) -> dict:
     rc = cfg.rerank
     return {"objective": "binary", "learning_rate": rc.learning_rate,
@@ -223,6 +242,12 @@ def run_rerank(cfg: Config) -> None:
                 keys, raw = _read_val(st, cfg, raw_cols)
                 X, q = _frame(keys, raw, q_cat, s_cat)
                 y = keys.y.to_numpy()
+            if rc.copy_features:
+                with timed(st.log, "copy-group features"):
+                    X = add_copy_features(X, q, _codes(keys.s1_id, s_cat), keys.p.to_numpy(),
+                                          q_cat, s_cat,
+                                          st.input_path("normalize", "records_train"), rc)
+            with timed(st.log, "domain normalisation"):
                 if rc.domain_norm:
                     cty = pd.read_parquet(st.input_path("normalize", "records_train"),
                                           columns=["entity_id", "country"],
@@ -362,6 +387,10 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
             for c in raw_cols:
                 X[c] = raw[c].to_numpy(dtype=np.float32)
             del raw
+            if rc.copy_features:
+                X = add_copy_features(X, k.q.to_numpy(), k.s.to_numpy(), k.p.to_numpy(),
+                                      q_cat, s_cat, st.input_path("normalize", "records_test"),
+                                      rc, filters=[("country", "==", country)])
             if rc.domain_norm:  # this frame is one country of the test split
                 X = domain_normalize(X)
             p2 = np.zeros(len(X), dtype=np.float64)

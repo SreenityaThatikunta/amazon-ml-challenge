@@ -89,6 +89,9 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   min_data_in_leaf: 200
   num_boost_round: 2000
   early_stopping: 50
+  copy_features: false # N4: copy-group features: record vs the other records claiming the same S1 (E26/E28)
+  copy_min_p: 0.01     # claimants with p1 >= this are compared
+  copy_cap: 20         # at most this many claimants per S1 (highest p1 first)
   model_from_run: null # apply that run's fold models (same folds) instead of training, e.g. v3 on val_ts
   raw_features: [all]  # stage-1 features passed through: all (val F0.5 0.98895) or a list
                        # (the 25 of the first v2 file: 0.98748; region-held-out CV 0.98684 vs 0.98581)
