@@ -456,6 +456,16 @@ does stage 2 transfer to test?). Next: adversarial validation on stage-2 inputs
   Dev slice **0.99061** (main best 0.98859, improve/v2 0.98771). Next: full v3 run (~33–37 GB,
   4–7 h), then phase B (`val_ts`).
 
+
+### 2026-09-26 (plan v4)
+- improve/v2 **v2.2** (`rerank.domain_norm` on): val 0.98897 (unchanged), **LB 0.980** (+0.003). Merged into `v3`.
+  5 submissions/day; 2 used today.
+- S1 counts: US train 1,323,633 → test 663,106 (0.50); India 883,188 → 809,986 (0.92). Both have ~1 extra
+  junk record per S1 on test, so a test-shaped val needs S1 thinning *and* extra unmatched records.
+- New plan: **plan.md §0 (plan v4)**. Step 0 = 3 probes today (v2.2 France-empty, main v2 with v1 France,
+  stage-1-only/US-empty); then the full v3 run, the stage-1 shift fix, `data.reshape` val_ts with an LB-delta
+  gate, test-shaped and bigger stage 2, then France.
+
 ---
 
 ## Open questions

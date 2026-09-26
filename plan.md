@@ -1,127 +1,122 @@
 # Plan: Business Entity Resolution (Amazon ML Challenge 2026)
 
 **Goal:** beat the public leaderboard top of **0.989 macro F0.5** (as of 2026-09-26; was 0.986 on 09-25, 0.971 before).
-**Current best:** branch `improve/v2` → val 0.98895, **public LB 0.977**. `main` v2 → val 0.98906, LB **0.972** (v1 0.975). `Rudy_commit_1` → LB 0.961.
-**§0 below is the active plan and replaces the priority order in §4.**
+**Current best:** `improve/v2` v2.2 → val 0.98897, **public LB 0.980** (v2.1 0.977; main v1 0.975, main v2 0.972; `Rudy_commit_1` 0.961).
+**§0 below (plan v4) is the active plan and replaces the priority order in §4.**
 **Inputs:** [eda/FINDINGS.md](eda/FINDINGS.md), [docs/RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md).
 **Tracking:** every task, run, metric and decision is logged in [progress.md](progress.md).
 
 ---
 
-## 0. Plan v3: beat 0.989 (2026-09-26)
+## 0. Plan v4: from 0.980 to > 0.989 (2026-09-26)
 
-### 0.1 Where we stand (all three branches)
+Supersedes plan v3 (git history: `plan.md` at 54d96e9) and the priority order in §4.
+Work happens on branch **`v3`** = `improve/v2` v2.2 + main's features (E19) + `features.prune_test` (E22).
 
-| Branch | What it is | Val F0.5 | Public LB | Val → LB gap |
-|---|---|---|---|---|
-| `main` v1 (6120d59) | TF-IDF blocking → LightGBM → expected-F | 0.98211 | 0.975 | 0.007 |
-| `main` v2 (56b5ea3 + uncommitted E18) | + lookalike/relative features, M8 rescore, **synthetic-French unseen-country model** | 0.98906 | **0.972** | **0.017** |
-| `improve/v2` (f1875d2) | + normalisation fixes, filler-free name key, `hn_*` v2, brand flag, address IDF, stage-2 rerank (all 102 feats), small `candidate_pairs.tsv` (5.57/S1) | 0.98895 (0.98684 region-held-out) | **0.977** | 0.012 |
-| `Rudy_commit_1` | separate polars pipeline, blocking-key index, 2-stage LGBM | ? | 0.961 | ? |
+### 0.1 Evidence so far
 
-The same thing shows up on every branch: **val gains don't carry over to the LB.** v2 on both
-branches gained about +0.007 on val. `improve/v2` gained only +0.002 on the LB, and `main` v2 *lost*
-0.003. Getting val higher won't close the gap. The work now is to **measure on data shaped like
-test** and to **fix France**.
+| File | Val F0.5 | Public LB | What changed |
+|---|---|---|---|
+| main v1 | 0.98211 | 0.975 | baseline |
+| main v2 | 0.98906 | 0.972 | + rescore, lookalike features, **synthetic-French model** |
+| improve/v2 v2.1 | 0.98895 | 0.977 | + v2 features, stage-2 rerank |
+| improve/v2 **v2.2** | 0.98897 | **0.980** | + stage-2 **domain normalisation** (val: no change) |
+| Rudy_commit_1 | ? | 0.961 | separate pipeline |
 
-What we know about the test data (from `experiments/logs/val_vs_test_density.log`, and the
-adversarial validation in `improve/v2`'s progress.md):
-- Test has **~1 more junk record per S1** (records whose best candidate has p1 < .05: 1.9–2.1 per S1 on test, 1.15 on val), 5.5–5.8
-  records per S1 on test vs 4.7 on val, and the test US S1 pool is **half** the size of the train US pool. Adversarial AUC is
-  0.986 for US and 0.990 for India. The features that separate val from test are size/density features (`s_n_*`, `s_name_freq`, IDF).
-- **France**: ambiguous queries (p1 .5–.95) come to **0.372 per S1, vs 0.116 for US / 0.166 for India** (3×). That's where
-  France loses precision.
-- `main` v1 → v2 per country (`compare_submissions.py`): US +65k pairs / −4k, India +104k / −14k,
-  **France +8k / −21.5k** (the synthetic-French model made France *stricter*). For the v2 recall gains in US/India
-  to add up to a net −0.003, France must have dropped sharply: rough arithmetic puts France v2 at about 0.06 below v1.
-  **Synthetic-French training hurt on real test data even though the proxy liked it (+0.09).**
-- Back-of-envelope for `improve/v2`'s 0.977 (test mix US 38% / IN 47% / FR 15%): if US ≈ 0.987 and India ≈ 0.982
-  (region-held-out val), then **France ≈ 0.94**. France costs about 0.008 of LB, and the US/India val→test shift
-  costs about 0.004.
+What these five scores say:
+1. **The val/test density shift is where LB points are, and val can't see it.** v2.2 only rescaled 20
+   size-dependent stage-2 features per country and split: val +0.00002, LB **+0.003**. Val gains that ignore
+   the shift don't transfer (v2: val +0.007 → LB +0.002; main v2: val +0.007 → LB −0.003).
+2. **The shift is still in stage 1.** The stage-1 scorer is trained at train density and scores test with raw
+   `s_n_cands`, `s_n_top1`, `s_name_freq`, `q_n_cands`, the `k_idf_*` / `a_idf_*` IDF features and the
+   TF-IDF cosines/ranks (IDF fitted on each pool). Its p1 also decides which pairs reach stage 2 (p1 ≥ 0.001).
+3. **The test shape differs by country** (S1 counts in the data):
 
-### 0.2 Target budget (estimates, to be replaced by LB probes)
+   | | train S1 | test S1 | test/train | records per S1, val → test | records with p1 < .05 per S1, val → test |
+   |---|---|---|---|---|---|
+   | US | 1,323,633 | 663,106 | **0.50** | 4.67 → 5.76 | 1.14 → 2.12 |
+   | India | 883,188 | 809,986 | **0.92** | 4.68 → 5.82 | 1.15 → 2.14 |
+   | France | — | 259,452 | — | → 5.53 | → 1.90 |
 
-| Lever | Expected LB gain | Phase |
+   So US test = a half-size S1 pool; India test = nearly the same pool size with about 1 extra junk record per S1.
+   A test-shaped validation needs **two knobs**: an S1 thinning rate and extra unmatched records.
+4. **France is unmeasured.** It has 3× the ambiguous records per S1 (p1 .5–.95: 0.37 vs 0.12–0.17), and
+   synthetic-French training hurt on the LB. The probes are built (`output/probes/`) but not uploaded.
+5. **Budget:** 5 submissions a day (2 used on 2026-09-26). The gap to the top is **+0.009**; aim for ≥ 0.991.
+
+### 0.2 Levers and expected gains (to be replaced by measurements)
+
+| # | Lever | Evidence | Expected LB |
+|---|---|---|---|
+| L1 | v3 = v2.2 + main's lookalike/relative features + `k_name_noaddr` 100 | dev +0.003 over v2's dev | +0.000–0.002 |
+| L2 | Remove the shift from **stage 1** (domain-normalise or drop the density features) | same mechanism as v2.2's +0.003 | +0.001–0.003 |
+| L3 | **Test-shaped data**: validate *and* train on a val/train side reshaped to test density | fixes the cause, not just the symptom | +0.002–0.004 |
+| L4 | Stage 2 trained on far more data (train side as well as val, OOF p1; cheap now with pruning) | stage 2 is the strongest stage; now trained on 222k val S1 only | +0.001–0.002 |
+| L5 | France: per-country probes → pseudo-label training / France thresholds | France ≈ 0.94 est. (15% of S1) | +0.002–0.006 |
+| L6 | LLM select on the remaining ambiguous band | France-heavy band | +0.001–0.003 |
+| L7 | Seed/feature-set ensemble of stage 2; per-country expected-F `min_p` on the test-shaped val | small but reliable | +0.0005–0.001 |
+
+### 0.3 Step 0 (today, no compute): spend the remaining 3 submissions on probes
+| Probe | File | Answers |
 |---|---|---|
-| Consolidate `improve/v2` + the useful parts of `main`; drop the synthetic-France model | +0.001–0.002 | A |
-| Test-shaped validation + test-shaped training (closes the density shift) | +0.003–0.005 | B |
-| France: pseudo-label self-training + country-specific decisions | +0.003–0.006 | C |
-| LLM select matcher on the ambiguous band (France-heavy) | +0.002–0.004 | D |
-| Recall: empty-address / exact-name ties / Indic | +0.0005–0.001 | E |
-| **Total** | **0.977 → ~0.988–0.995** | |
+| P1 | v2.2 with France left empty (build on Windows: `make_probe.py empty <v2.2>.tsv France out.tsv`) | **France F0.5 of our best file**; how much of the 0.009 gap is France |
+| P2 | `output/probes/p_v2_with_v1_france.tsv` | did synthetic-French training cause main v2's drop? |
+| P3 | `probe_stage1` (prepared on Windows) or v2.2 with **US** left empty | stage-2 transfer on test, or US share |
 
-To beat 0.989 we need most of B and C, plus either D or E.
+Log each result in progress.md. From P1: F_FR ≈ (0.980 − LB_P1) / 0.1498 + 0.05.
+**Decision rule:** if F_FR ≥ 0.975, France isn't the bottleneck, so L2–L4 come first. If F_FR ≤ 0.96, L5 moves up to run in parallel with L2.
 
-### 0.3 Phase A: consolidate on the best branch (day 1, about 1 full run)
-Base = **`improve/v2`** (best LB, best `candidate_pairs.tsv`, which also counts toward the ranking). New branch `v3` from `origin/improve/v2`.
-
+### 0.4 Phase 1 (days 1–2): v3 on the LB, plus the stage-1 shift fix
 | ID | Task | Exit criterion |
 |---|---|---|
-| A1 | **LB probes** on existing files (cheap, about 4 uploads). P1: `improve/v2` v2.1 with every France S1 left empty → France F0.5 by subtraction. P2: v2.1 US/India + `main` v1 France. P3: v2.1 US/India + `main` v2 France. P4: `improve/v2` stage-1-only (already prepared in `D:\aml\submissions\probe_stage1`) | France F0.5 of v1 / v2 / v2.1 known; US+India LB share known; the 0.1 back-of-envelope replaced by measured numbers in progress.md |
-| A2 | Port from `main` into `v3`: lookalike + relative-margin features (`features/build.py`, E6 +0.0017 dev), all-pairs transliteration dictionary for test (E15), `candidates.k_name_noaddr=100` (E16), density-feature exclusion (uncommitted E18 diff: `s_n_plaus`, `DENSITY_FEATS`), `experiments/` scripts, parallel features (E12) | Unit tests green; dev val ≥ `improve/v2` dev |
-| A3 | **Don't port** the unseen-country / synthetic-French scorer (`scorer.unseen_extra_train`); France uses the main model unless P1–P3 say otherwise | Decision logged |
-| A4 | Commit `main`'s WIP (E18) on `main` first, so nothing is lost | Clean `git status` on both branches |
+| 1.1 | Full v3 run, two passes (`data.phase=train` → `test`, `features.prune_test` on), run `v3`. Mac, ~5–7 h; or the Windows machine (GPU top-k, ~3–4 h) | validator PASS; the re-ranker's kept-pair count equals the pruned test pairs (checks E22 on real data); **LB** (isolates L1) |
+| 1.2 | `scorer.domain_norm` for **stage 1**: the same count/IDF scaling as `rerank.domain_norm`, per country and split, applied before stage-1 training and scoring. Reuse `rerank.domain_normalize`, extended with `rank_*` and the TF-IDF cosines if the adversarial check flags them | unit test; adversarial AUC (val vs test, stage-1 inputs) drops; val not down |
+| 1.3 | E18 variant: `scorer.drop_features=[s_n_cands, s_n_top1]` instead of normalising | compared with 1.2 on the Step-2 val; keep the better one |
+| 1.4 | Test pass only for 1.2/1.3 (the test candidates are reused; features, scorer, rerank, decide and submit are rerun, ~2 h) | **LB** (isolates L2) |
 
-### 0.4 Phase B: a validation that predicts the LB (days 1–2), the key step
-Hypothesis **H-test**: test was built by keeping about half of each country's S1 pool while keeping *all* S2/S3
-records. The copies of dropped S1 become "unmatched" records that look like lookalikes of their twins. That accounts
-for the extra ~1 junk record per S1, the halved pool, the lower `s_name_freq`/IDF, and "records without a
-candidate are lookalikes".
-
+### 0.5 Phase 2 (days 2–3): a validation that sees the shift, then train on it
 | ID | Task | Exit criterion |
 |---|---|---|
-| B1 | Test H-test on test: among test records with p1 < .05, count S2↔S3 pairs that match *each other* strongly (copies of the same missing S1). Compare with val | Rate reported; H-test accepted or rejected |
-| B2 | **`val_ts` (test-shaped val):** drop a random ~50% of val S1 per country (tune the rate so the per-S1 counts in the density log match test); their S2/S3 stay in as unmatched records. Re-run candidates → decide on it with the *current* model | p1-band counts per S1, `s_n_cands`, and `s_name_freq` p90 within ~10% of test; **adversarial AUC val_ts vs test ≤ 0.75** (was 0.986); val_ts F0.5 lands close to the LB-implied US/India score from A1 |
-| B3 | Re-score `main` v1, `main` v2, and `improve/v2` v2.1 on val_ts | **Ranking matches the LB ranking** (v2.1 > v1 > main v2 on US/India). If it doesn't, revisit B2 before going further |
-| B4 | **Test-shaped training:** apply the same S1 subsampling to the train side before building stage-1 training pairs (several different 50% draws are free extra training data); stage 2 trained cross-fitted on val_ts; decision thresholds (expected-F `min_p`) chosen on val_ts | val_ts F0.5 up; old val not down by more than noise; **LB submission** |
-| B5 | Rerun `improve/v2`'s adversarial check on the B4 stage-2 inputs; drop or domain-normalise (`rerank.domain_norm`) only what is still separable | AUC and feature list logged |
+| 2.1 | **`data.reshape`** (in `split`, config-driven, deterministic hash): per country, (a) keep a fraction of S1 (US ~0.5, India ~0.92) and turn their S2/S3 copies into unmatched records (owner cleared), (b) optionally inject extra unmatched records by copying real unmatched records from other regions of the same country. Applies to the train and val sides; test untouched. Tune both knobs so the val side matches test on records/S1, p1 bands/S1, `s_n_cands` / `s_name_freq` quantiles | Shape table per country within ~10% of test; adversarial AUC val_ts vs test ≤ 0.75 (was 0.986) |
+| 2.2 | **Gate:** val_ts must reproduce the known LB deltas: v2.2 − v2.1 (`rerank.domain_norm` on vs off) ≈ +0.003, and v3 vs v2.2 with the sign of 1.1 | Both signs right, magnitudes within 2×. If it fails, fix 2.1 before trusting any val_ts number |
+| 2.3 | **Test-shaped training (L3):** stage 1 and stage 2 trained on the reshaped train/val sides; several reshaping seeds give extra training draws | val_ts up; **LB** |
+| 2.4 | **Bigger stage 2 (L4):** featurise 100% of train-side queries, keeping only p1 ≥ 0.001 pairs (the pruning trick), with honest OOF stage-1 p1 on the train side (`scorer.oof_folds`); train stage 2 on train + val groups | val_ts up; **LB** |
+| 2.5 | Decisions per country: `min_p` and the "none" prior chosen on val_ts per country (the p calibration moves with the density) | val_ts up |
 
-From here on, **every decision is made on val_ts (US/India) plus the LB probe for France.** Old val is kept only as a regression check.
+From here on **every decision is made on val_ts**; plain val is only a regression check.
 
-### 0.5 Phase C: France (days 2–3)
-Real France errors (T7.1) are confident false matches among S1 twins (13.3% of S1 share an exact address), legal-form
-conflicts, different street at the same number, short "truncated" numbers, and initials. The synthetic generator missed
-what matters (A1–A3), so **learn from real test France instead.**
-
+### 0.6 Phase 3 (days 3–5, driven by P1): France
 | ID | Task | Exit criterion |
 |---|---|---|
-| C1 | France error dump on the v3 test predictions: the 0.372/S1 ambiguous band by tag (T7.1 tags) | Tag shares logged; top 3 tags are the C2–C4 targets |
-| C2 | **Pseudo-label self-training (T7.4):** France records with p2 > 0.99, a unique owner, and margin > 0.9 become positives; their runner-ups and rejected twins become hard negatives. Add them to stage-1/stage-2 training at a weight tuned on the probe. Check on US/India first: pseudo-labelling val_ts from a model trained without it should improve val_ts | val_ts gain from the US/India pseudo-label rehearsal; France links/S1 and ambiguous-band rate move toward US/India; **LB probe** |
-| C3 | **Twin-aware decision:** when ≥ 2 S1 share an address (France 13%), decide jointly: each record goes to the twin whose name/legal form/initials fit best, or to none if it's a tie. The expected-F rule keeps its per-S1 subset selection | Unit tests; val_ts not down; France pairs changed counted |
-| C4 | France-only decision threshold: `min_p` and the "none" option for France set so the predicted empty-S1 rate and links/S1 match US/India on test (the generator is shared, EDA) | Probe LB up |
+| 3.1 | France error dump on the new test predictions: the p .5–.95 band by T7.1 tag (S1 twins at the same address, legal-form conflict, different street at the same number, short numbers, initials) | Top 3 tags with counts |
+| 3.2 | **Pseudo-label training:** confident France test pairs (p2 > 0.99, unique owner, clear margin) as positives; runner-ups / rejected twins as hard negatives; added to stage 1 and stage 2 training at a weight chosen on the P1-style probe. Rehearse on US/India val_ts first (pseudo-labels from a model that never saw them must raise val_ts) | Rehearsal gain on val_ts; **France probe up** |
+| 3.3 | Twin-aware decision: when ≥ 2 S1 share an address (13% of France S1), assign each record to the twin that fits its name, legal form and initials best, or to none if they tie | unit tests; val_ts not down; **LB** |
+| 3.4 | France thresholds: `min_p` / "none" prior for France set so that links/S1 and the empty rate match US/India on test (shared generator) | **LB** |
 
-### 0.6 Phase D: LLM select matcher on the band (Kaggle, days 3–5)
-Already scaffolded (T5.2–T5.5: `ber llm-export`, `kaggle/train_lora.py`, `kaggle/infer.py`, `ber llm-import`).
+### 0.7 Phase 4 (days 4–6, only if still < 0.991): LLM band + ensemble
+- 4.1 Band = records with p2 in [0.05, 0.95] after phases 1–3. Measure the queue size; it must fit ~30 Kaggle GPU-h a week
+  (Qwen3-1.7B, letter probabilities from one forward pass; the code is in `kaggle/`, `ber llm-export/import`).
+- 4.2 Train on val_ts OOF prompts + France pseudo-labels; blend weight chosen on val_ts; **LB**.
+- 4.3 Stage-2 ensemble (3 seeds × {domain-norm, test-shaped}) averaged before decide; **LB**.
 
-| ID | Task | Exit criterion |
-|---|---|---|
-| D1 | Band = queries with p2 in [0.05, 0.95] after B/C. Measure the test size (expected ~0.3–0.5 per S1 × 1.73M S1, France-heavy) and tokens per prompt | Queue size and GPU-hours estimated against ~30 h/week; if it's over budget, narrow the band or use Qwen3-0.6B |
-| D2 | Train data: val_ts OOF prompts (US/India) + C2 France pseudo-labels; Qwen3-1.7B LoRA | Selection accuracy on held-out val_ts band > stage-2 top-1 accuracy on the same band |
-| D3 | Infer on the test band; blend weight chosen on val_ts; decide | val_ts gain; **LB submission** |
+### 0.8 Machines and runs
+- **Mac:** v3 runs (`artifacts/v3`, ~15–20 GB with pruning; 138 GB free). Heavy stages one at a time.
+- **Windows laptop** (has the v2.2 artifacts + GPU top-k): probes P1/P3, and quick stage-2-only experiments
+  on v2.2 (e.g. stage-1 domain norm via a rescored test pass) while the Mac runs 1.1.
+- Every run and LB score goes into `experiments/README.md` (E-numbers) and progress.md.
 
-### 0.7 Phase E: recall leftovers (parallel, when a machine is idle)
-- E1: `k_name_noaddr` 30 → 100 (in A2), about +0.0005.
-- E2: extra candidate source for **exact core-name ties** with a number: `Rudy_commit_1`'s `NX` key (name token × house
-  number, with one digit dropped on the S1 side). `improve/v2` measured exact-name blocking at only +0.1% of val pairs, so do this only if val_ts shows otherwise.
-- E3: Gurmukhi/Devanagari transliteration, via the all-pairs dictionary (in A2).
-- `candidate_pairs.tsv` must stay small (it counts toward ranking): write the post-stage-1-filter set as `improve/v2` does.
-
-### 0.8 Submission discipline
-- Every LB upload is logged in progress.md with val, **val_ts**, and the LB score. Probes are labelled as probes.
-- Only ship a change that improves val_ts **and** doesn't hurt the France probe. A val-only gain isn't enough (that lesson cost 0.003).
-- Final pick: best LB file whose val_ts agrees. The code must reproduce it from a clean checkout (T6.3), with the zip and docs (T6.4).
-
-### 0.9 Order and gates
+### 0.9 Order, gates and submission budget (5/day)
 ```
-A1 probes ─┐
-A2–A4 port ┴─► B1–B3 val_ts (GATE: val_ts ranks the 3 files like the LB)
-                 └─► B4 test-shaped training ──► LB
-                       └─► C1–C4 France ──► LB
-                             └─► D1–D3 LLM band ──► LB (if D1 fits the GPU budget)
-E runs in parallel whenever a machine is free.
+Day 0  Step 0 probes P1–P3 (3 subs) ─────────────────────────────► France decision rule
+Day 1  1.1 full v3 run ► LB │ 1.2/1.3 code + tests │ 2.1 reshape code
+Day 2  1.4 stage-1 shift fix ► LB │ 2.1–2.2 val_ts + GATE
+Day 3  2.3 test-shaped training ► LB │ 2.4 bigger stage 2 ► LB │ 3.1 France dump
+Day 4  3.2–3.4 France ► LB (probe first)
+Day 5+ 4.x LLM band / ensemble if < 0.991; final pick = best LB file that val_ts agrees with,
+       reproducible from a clean checkout (T6.3) with docs + zip (T6.4)
 ```
-If the B3 gate fails (val_ts doesn't rank the files like the LB), switch to LB-probe-driven tuning: per-country file mixes and
-per-country thresholds, choosing the best file per country using A1-style probes.
+- Ship a change only if it improves val_ts (after the gate) **and** doesn't lower the France probe.
+- Keep ≥ 1 submission a day spare for a final re-submission.
 
 ---
 
