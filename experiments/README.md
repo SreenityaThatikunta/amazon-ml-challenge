@@ -276,3 +276,9 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   `test_prune_test_refuses_single_pass` (150 passed).
 - Old artifacts kept for now (user decision).
 
+
+### E23. Old artifacts deleted (user request)
+- Removed `artifacts/main/{features,candidates,normalize,scorer/scores_test,rescore,synth-france}`,
+  `artifacts/{frtrain,synthfr,dev}` (~43 GB). Kept `main/split` (read by every run via `data.split_run`),
+  main's scorer model + val scores, `main/decide`, `devv3`. Folder 48 GB -> 4.7 GB; disk 138 GB free.
+- The `main` pipeline and the France proxy can no longer run from these artifacts without rebuilding.
