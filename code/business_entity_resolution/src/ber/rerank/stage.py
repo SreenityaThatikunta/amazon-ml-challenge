@@ -297,13 +297,19 @@ def complete_groups(st: StageRun, cfg: Config, s1_ids: pd.Series, sides: list[st
     every group is complete (v2.4 finding: 16 % of the kept val pairs)."""
     s1 = st.read_input("split", "s1", run=cfg.data.split_run,
                        columns=["entity_id", "country", "geo", "side"])
-    loaded = (s1.side == "val").to_numpy()
-    if "hold" in sides:
-        hold = st.read_input("features_hold", "hold_regions")
-        loaded |= pd.MultiIndex.from_frame(s1[["country", "geo"]]).isin(
-            pd.MultiIndex.from_frame(hold[["country", "geo"]])).to_numpy()
-    flag = pd.Series(loaded, index=s1.entity_id.to_numpy())
+    hold = st.read_input("features_hold", "hold_regions") if "hold" in sides else None
+    flag = loaded_s1(s1, hold)
     return flag.reindex(s1_ids.astype(str).to_numpy()).fillna(False).to_numpy(dtype=bool)
+
+
+def loaded_s1(s1: pd.DataFrame, hold: pd.DataFrame | None) -> pd.Series:
+    """Per S1 (entity_id index): whether stage 2 loads its region (val side, or a hold
+    region). s1: entity_id, country, geo, side; hold: country, geo (or None)."""
+    loaded = (s1.side == "val").to_numpy()
+    if hold is not None and len(hold):
+        loaded = loaded | np.asarray(pd.MultiIndex.from_frame(s1[["country", "geo"]]).isin(
+            pd.MultiIndex.from_frame(hold[["country", "geo"]])))
+    return pd.Series(loaded, index=s1.entity_id.to_numpy())
 
 
 def _raw_columns(st: StageRun, wanted: list[str]) -> list[str]:

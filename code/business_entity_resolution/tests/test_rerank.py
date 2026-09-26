@@ -47,3 +47,13 @@ def test_domain_normalize_per_group_and_second_round_columns():
     out2 = domain_normalize(M.copy(), ["", "", G2 + "s_n"], groups)
     np.testing.assert_allclose(out2[:, 0], M[:, 0])
     np.testing.assert_allclose(out2[:, 2], out[:, 2], rtol=1e-6)
+
+
+def test_loaded_s1_val_side_and_hold_regions():
+    import pandas as pd
+    from ber.rerank.stage import loaded_s1
+    s1 = pd.DataFrame({"entity_id": ["a", "b", "c", "d"], "country": ["X", "X", "X", "Y"],
+                       "geo": ["AA", "BB", "CC", "AA"], "side": ["val", "train", "train", "train"]})
+    hold = pd.DataFrame({"country": ["X"], "geo": ["BB"], "n_s1": [1]})
+    assert loaded_s1(s1, hold).to_dict() == {"a": True, "b": True, "c": False, "d": False}
+    assert loaded_s1(s1, None).to_dict() == {"a": True, "b": False, "c": False, "d": False}
