@@ -404,7 +404,7 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
 - Caveat: cross-fitted on val_ts itself (same generator as test), so this measures learning the pattern, not
   region transfer.
 
-### E29. N3: train on test-shaped data (running)
+### E29. N3: train on test-shaped data (stopped)
 - `bash experiments/run_n3.sh` (log `logs/n3.log`, run `v4`, config `configs/train_ts.yaml`): reshape on
   train + val (US 0.19, India 0.20), v3's vocabularies, full train pass. Started ~20:15.
 
@@ -460,4 +460,15 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   copies and in distractors; French names are *all* generic words). No label-free trick recovers it.
 - Decision: no France-specific change from this; France gains must come from better general discrimination
   (N3/N4), not from re-weighting French swaps.
+
+### E32. Plan stopped; artifacts deleted (user request, 2026-09-26 ~20:50)
+- N3 (run `v4`) was stopped during its train-side US candidates; no N3 result.
+- `artifacts/` deleted entirely (72 GB: v3 40 GB, v4 18 GB, v3ts / v3vo 6 GB each, devv3, main incl. `main/split`,
+  forked runs). Folder 3.5 GB; disk 137 GB free.
+- Kept: `output/matching_results.tsv` + `output/candidate_pairs.tsv` (v3, public LB 0.9805) and
+  `output/archive/` (v1, main v2, v3). All code, configs, scripts and logs are in git.
+- To run anything again: `ber split -r main` (every run reads `data.split_run: main`), then the stages.
+  Rebuilding v3 = `bash experiments/run_v3_full.sh` (~4–5 h).
+- Open results at the stop: val_ts costs v3 −0.0016 and stage 2 retrained on val_ts recovers it (E28);
+  copy-group features +0.0003; France ambiguity mostly intrinsic (E31).
 

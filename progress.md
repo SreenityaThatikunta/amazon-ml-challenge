@@ -478,6 +478,9 @@ does stage 2 transfer to test?). Next: adversarial validation on stage-2 inputs
 - **Full v3 run done** (E25): val 0.98954, validator PASS, 5.91M links, candidate_pairs 5.90/S1;
   `output/matching_results.tsv` + `output/candidate_pairs.tsv` ready for upload. Public LB pending.
 
+- **2026-09-26 ~20:50: plan stopped by the user; `artifacts/` deleted (72 GB).** Findings up to then: E26–E31
+  in experiments/README.md. Best submission stays v3 (public 0.9805) in `output/`. N3 not finished.
+
 ---
 
 ## Open questions

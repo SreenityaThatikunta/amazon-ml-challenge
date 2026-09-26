@@ -35,3 +35,22 @@
 20:36:09 INFO  ber.candidates |   index name : 1072609 S1 x 13946 n-grams
 20:36:21 INFO  ber.candidates |   index addr : 1072609 S1 x 14116 n-grams
 20:36:40 INFO  ber.candidates |   index combo: 1072609 S1 x 18695 n-grams
+20:59:12 INFO  ber.candidates | train US: 6,186,873 queries x 1,072,609 S1 done in 1392.3s (peak RSS 7.48 GB)
+20:59:12 INFO  ber.candidates | metric region_neighbors_merged = {'India': {'OD': ['AR', 'OD'], 'TN': ['AN', 'AR', 'CG', 'CH', 'GA', 'PY', 'TN', 'UK'], 'AS': ['AS', 'BR', 'DL', 'GJ', 'TG', 'WB'], 'AP': ['AN', 'AP', 'AR', 'CG', 'CH', 'TG', 'UK'], 'SK': ['SK', 'TG'], 'GJ': ['AN', 'AR', 'AS', 'CH', 'GJ', 'JK', 'LA'], 'MH': ['AN', 'AR', 'CG', 'CH', 'GA', 'JK', 'LA', 'MH', 'UK'], 'RJ': ['AN', 'AR', 'CH', 'JH', 'LA', 'RJ'], 'TG': ['AP', 'AR', 'AS', 'CG', 'CH', 'GA', 'LA', 'SK', 'TG', 'UK', 'UP'], 'LD': ['KA', 'LD'], 'UK': ['AP', 'DL', 'KA', 'KL', 'MH', 'TG', 'TN', 'UK'], 'BR': ['AN', 'AR', 'AS', 'BR', 'GA'], 'JH': ['JH', 'MP', 'RJ'], 'KL': ['AN', 'AR', 'CG', 'CH', 'DD', 'KL', 'LA', 'TR', 'UK'], 'DD': ['DD', 'KL'], 'WB': ['AN', 'AR', 'AS', 'CH', 'LA', 'UP', 'WB'], 'KA': ['AN', 'AR', 'CG', 'JK', 'KA', 'LA', 'LD', 'UK'], 'AN': ['AN', 'AP', 'BR', 'DL', 'GJ', 'HR', 'KA', 'KL', 'MH', 'RJ', 'TN', 'WB'], 'PY': ['PY', 'TN'], 'MP': ['AR', 'JH', 'LA', 'MN', 'MP'], 'DL': ['AN', 'AR', 'AS', 'CG', 'CH', 'DL', 'LA', 'UK', 'UP'], 'UP': ['DL', 'HR', 'TG', 'UP', 'WB'], 'HR': ['AN', 'AR', 'CH', 'HR', 'LA', 'UP'], 'GA': ['BR', 'GA', 'MH', 'TG', 'TN'], 'CG': ['AP', 'CG', 'DL', 'KA', 'KL', 'MH', 'TG', 'TN'], 'LA': ['DL', 'GJ', 'HR', 'KA', 'KL', 'LA', 'MH', 'MP', 'RJ', 'TG', 'WB'], 'CH': ['AP', 'CH', 'DL', 'GJ', 'HR', 'KL', 'MH', 'RJ', 'TG', 'TN', 'WB'], 'AR': ['AP', 'AR', 'BR', 'DL', 'GJ', 'HR', 'KA', 'KL', 'MH', 'MP', 'OD', 'RJ', 'TG', 'TN', 'WB'], 'JK': ['GJ', 'JK', 'KA', 'MH'], 'TR': ['KL', 'TR'], 'MN': ['MN', 'MP']}, 'US': {'NV': ['IA', 'NV', 'OH', 'TX'], 'TX': ['NV', 'TX'], 'IA': ['IA', 'NV'], 'NY': ['FL', 'NY'], 'FL': ['FL', 'NY'], 'DE': ['DE', 'OH'], 'OH': ['DE', 'NV', 'OH']}}
+20:59:12 INFO  ber.candidates | recall report ...
+20:59:14 INFO  ber.candidates | metric pair_recall = 0.99497
+20:59:14 INFO  ber.candidates | metric pair_recall_by_segment = {'India 2 False train': [0.99428, 820161], 'India 2 False val': [0.99483, 88629], 'India 2 True train': [0.99602, 249194], 'India 2 True val': [0.99043, 26971], 'India 3 False train': [0.9893, 990336], 'India 3 False val': [0.99076, 107842], 'India 3 True train': [0.99589, 149388], 'India 3 True val': [0.9917, 16269], 'US 2 False train': [0.99664, 1608579], 'US 2 False val': [0.9967, 183952], 'US 3 False train': [0.99675, 1720020], 'US 3 False val': [0.99678, 196906]}
+20:59:15 INFO  ber.candidates | metric cluster_recall = 0.98281
+20:59:16 INFO  ber.candidates | metric recall_at_k = {1: {'name': 0.71525, 'addr': 0.81417, 'combo': 0.93665, 'union': 0.96861}, 3: {'name': 0.82477, 'addr': 0.8766, 'combo': 0.94464, 'union': 0.98124}, 5: {'name': 0.8659, 'addr': 0.89418, 'combo': 0.94691, 'union': 0.98493}, 10: {'name': 0.91176, 'addr': 0.90713, 'combo': 0.94924, 'union': 0.98846}}
+20:59:16 INFO  ber.candidates | metric candidates_per_query = {'mean': 27.0, 'p50': 25, 'p95': 29, 'max': 100, 'zero': 10}
+20:59:16 INFO  ber.candidates | metric candidate_pairs = 278650176
+20:59:16 INFO  ber.candidates | metric val_candidates_crossing_split = {'val_queries_with_train_candidate': 0.3488, 'val_candidates_on_train_side': 0.2135}
+20:59:16 INFO  ber.candidates | recall report done in 3.2s (peak RSS 7.48 GB)
+20:59:16 INFO  ber.candidates | === stage candidates ok in 2627.8s (peak RSS 7.48 GB)
+20:59:17 INFO  ber.features | === stage features | run v4 | config 0ce349f44d31 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/v4/features
+20:59:17 INFO  ber.features | metric workers = 8
+20:59:17 INFO  ber.features | metric vocab_from_run = {'run': 'v3', 'fillers': 69, 'brand_units': 47}
+20:59:17 WARNING ber.features | input normalize/records_train was built with config 477601ecbb69 (current 0ce349f44d31)
+20:59:17 INFO  ber.features | train: per-S1 candidate context ...
+/Library/Frameworks/Python.framework/Versions/3.12/lib/python3.12/multiprocessing/resource_tracker.py:224: UserWarning: resource_tracker: There appear to be 5 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
