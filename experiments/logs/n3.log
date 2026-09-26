@@ -1,2 +1,31 @@
 20:12:48 INFO  ber.normalize | === stage normalize | run v4 | config 477601ecbb69 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/v4/normalize
 20:12:49 INFO  ber.normalize | learn Indic->Latin dictionary + S1 vocabulary ...
+20:13:21 INFO  ber.normalize | wrote translit_dict.parquet: 1164 rows x 5 cols
+20:13:21 INFO  ber.normalize | metric translit.train_pairs = 497404
+20:13:21 INFO  ber.normalize | metric translit.dictionary_size = 1164
+20:13:21 INFO  ber.normalize | metric translit.vocab_skeletons = 26981
+20:13:24 INFO  ber.normalize | metric translit.val_coverage = {'aligned_tokens': 197391, 'in_dictionary': 0.838, 'exact_match': 0.9582, 'exact_match_dict_rules': 0.8577, 'exact_match_rules_only': 0.2345}
+20:13:29 INFO  ber.normalize | wrote translit_dict_all.parquet: 1318 rows x 5 cols
+20:13:29 INFO  ber.normalize | metric translit.dictionary_size_all_pairs = 1318
+20:13:29 INFO  ber.normalize | learn Indic->Latin dictionary + S1 vocabulary done in 39.9s (peak RSS 4.14 GB)
+20:13:32 INFO  ber.normalize | metric reshape_dropped_s1 = {'US': 251024, 'India': 176349}
+20:13:34 INFO  ber.normalize | metric reshape_orphaned_queries = 1480118
+20:13:36 INFO  ber.normalize | normalize train source1 ...
+20:13:54 INFO  ber.normalize | train source1: 1779448 records
+20:13:54 INFO  ber.normalize | normalize train source1 done in 17.4s (peak RSS 4.99 GB)
+20:13:54 INFO  ber.normalize | normalize train source2 ...
+20:14:40 INFO  ber.normalize | train source2: 5034616 records
+20:14:40 INFO  ber.normalize | normalize train source2 done in 46.1s (peak RSS 4.99 GB)
+20:14:40 INFO  ber.normalize | normalize train source3 ...
+20:15:26 INFO  ber.normalize | train source3: 5285603 records
+20:15:26 INFO  ber.normalize | normalize train source3 done in 46.3s (peak RSS 4.99 GB)
+20:15:26 INFO  ber.normalize | metric records_train = 12099667
+20:15:26 INFO  ber.normalize | test split skipped (slice=None, with_test=True)
+20:15:26 INFO  ber.normalize | === stage normalize ok in 157.7s (peak RSS 4.99 GB)
+20:15:28 INFO  ber.candidates | === stage candidates | run v4 | config 0ce349f44d31 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/v4/candidates
+20:15:28 WARNING ber.candidates | input normalize/records_train was built with config 477601ecbb69 (current 0ce349f44d31)
+20:15:35 INFO  ber.candidates | train India: 4,133,346 queries x 706,839 S1 ...
+20:15:35 INFO  ber.candidates |   top-k search on cpu
+20:15:38 INFO  ber.candidates |   index name : 706839 S1 x 15943 n-grams
+20:15:50 INFO  ber.candidates |   index addr : 706839 S1 x 25190 n-grams
+20:16:05 INFO  ber.candidates |   index combo: 706839 S1 x 28749 n-grams

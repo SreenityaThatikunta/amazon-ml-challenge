@@ -408,3 +408,29 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
 - `bash experiments/run_n3.sh` (log `logs/n3.log`, run `v4`, config `configs/train_ts.yaml`): reshape on
   train + val (US 0.19, India 0.20), v3's vocabularies, full train pass. Started ~20:15.
 
+### E30. France rehearsal: leave one country out (LOCO) on val_ts
+- Code: `rerank.fold_by=country` (stage 2 trained on the other country, applied to the held-out one),
+  `rerank.pseudo_rounds/pseudo_hi/pseudo_lo/pseudo_weight` (self-training on the held-out country's confident
+  predictions), test `test_pseudo_labels`. `bash experiments/run_loco.sh` (log `logs/loco.log`); runs fork
+  v3ts (v3's stage 1), copy features on.
+
+| val_ts, stage 2 | overall | US | India | India P / R | orphan links |
+|---|---|---|---|---|---|
+| in-domain (E28, `v3ts_rc`) | 0.98882 | 0.98994 | 0.98703 | 0.9966 / 0.9722 | 586 |
+| LOCO (`v3ts_loco`) | 0.98464 | 0.98760 | 0.97993 | 0.9950 / 0.9598 | 706 |
+| LOCO + 1 pseudo round (`v3ts_loco_pl`) | 0.98405 | 0.98666 | 0.97989 | 0.9954 / 0.9608 | 814 |
+
+- Pseudo-labels: 262k (India) / 444k (US) rows, **99.8% correct**, yet no gain (they repeat what the model
+  believes). **Dropped.**
+- `experiments/loco_calibration.py` (log `logs/loco_calibration.log`): the held-out country's p2 is well
+  calibrated (e.g. India LOCO bin 0.5–0.8: mean p 0.660, true rate 0.665); the best oracle logit shift
+  gains ≤ 0.00002. **Not a threshold problem**; the loss is ranking (India true pairs with p < 0.05: ~1,200 vs
+  ~340 in-domain).
+- `experiments/loco_misses.py India` (log `logs/loco_misses_india.log`): 1,178 true pairs lost (p_in ≥ 0.5,
+  p_loco < 0.2). Top separating stage-1 feature `q_indic_oov` (0.46 vs 0.005): nearly all are **Indic-script
+  names** (Gurmukhi/Devanagari) that a US-trained model never saw.
+- Reading for France (Latin script): the India number overstates it; the **US held-out loss (−0.0023)** is the
+  closer analogue. Unseen-country effects alone don't explain France ≈ 0.94. France-specific structure
+  (E3: S1 twins at the same address 13% vs 4.6%, generic "<City> <word> <legal form>" names, legal-form /
+  street / short-number lookalikes) remains the prime suspect.
+

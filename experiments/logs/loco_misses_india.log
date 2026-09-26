@@ -1,0 +1,51 @@
+India true pairs: 237351; lost by LOCO 1178; kept 231825; p1 (stage 1) median lost 0.080 kept 1.000
+
+stage-1 features, lost vs kept (mean, standardised diff), top 20:
+lost                  0       1  diff_std
+q_indic_oov       0.005   0.458     5.202
+n_sub             0.345   3.357     2.711
+k_n_unmatched_q   0.199   1.233     2.496
+cos_name          0.886   0.371    -2.316
+k_tsr            95.815  64.925    -2.207
+n_partial        95.634  72.463    -2.069
+n_jw              0.960   0.755    -2.001
+cos_name_rank     1.845   9.919     1.960
+n_first_eq        0.890   0.297    -1.876
+n_tsr            94.283  66.954    -1.845
+k_idf_prec        0.859   0.301    -1.819
+a_tsr_gap         0.242   4.270     1.801
+k_lev             1.668   8.089     1.795
+k_ratio          92.005  60.943    -1.774
+k_idf_rec         0.869   0.356    -1.774
+cos_combo         0.871   0.613    -1.762
+n_ratio          92.731  66.657    -1.694
+n_tsort          91.838  63.371    -1.683
+cos_name_gap      0.030   0.210     1.683
+k_n_unmatched_s   0.290   1.285     1.590
+
+examples (query | S1):
+p_in 1.00 p_loco 0.06 | ਨਿਊ ੴ ਇਨਫ੍ਰਾਸਟ੍ਰਕਚਰ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ / 940/241-A, PARKASH COLONY, BLOCK- 35, RAJGURU NAGAR, LUDHIANA, Punjab  ||  New Om Infrastructure Private Limited / 940/241-A, Parkash Colony, Block- 35, Rajguru Nagar, Ludhiana, Punjab
+p_in 0.99 p_loco 0.06 | Golden Solutions Limited Services / 82 H.no-1071, Gaziabad, UP  ||  Golden Solutions Private Limited / H.No-1071, Chhapraula, Tehsil Dadri, P.S-Badalpur, Gautam Budh Nagar, Gautam Buddha Nagar, Uttar Pradesh
+p_in 0.54 p_loco 0.20 | Tropical Resorts /   ||  Tropical Resorts Center / Plotno23/Mf-2 Swarooppark, Ghaziabad, Uttar Pradesh
+p_in 0.78 p_loco 0.00 | ਅਲਫ਼ਾ ਬੈਸਟ ਸੋਲਿਊਸ਼ਨਜ਼ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ / PB, Block C-524 First Floor, Scf No. 62, Urban Estate, Phase-1, Jalandhar -Ii, Jalandhar  ||  Alpha Best Solutions Private Limited / First Floor, Scf No. 62, Urban Estate, Phase-1, Jalandhar -Ii, Jalandhar, Punjab
+p_in 0.51 p_loco 0.00 | ਅਨੰਦ ਕੰਸਟ੍ਰਕਸ਼ਨਜ਼ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ / ##365/40-E, DAD DISTT LUDHIANA, Punjab  ||  Anand Constructions Private Limited / 365/40-E, Block-E, Shaheed Bhagat Singh Nagar, Pakhowal Road, Ludhiana, Ludhiana, Punjab
+p_in 0.89 p_loco 0.00 | ਸਿਟੀ ਇਨਫੋਟੈਕ ਪ੍ਰਾ. ਲਿ. / Village Durd, Patiala, PB  ||  City Infotech Pvt Ltd / Village Durd, Tehsil & District Patiala, Patiala, Punjab
+p_in 0.91 p_loco 0.09 | ਏਸ ਸਰਵਿਸਿਜ਼ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ / New Grain Market, Sco-19, Jalalabad, PB, Abohar  ||  Ace Services Private Limited / Sco-19, New Grain Market, Jalalabad, Firozpur, Punjab
+p_in 0.96 p_loco 0.02 | ਵਨ ਇੰਜੀਨੀਅਰਿੰਗ ਪ੍ਰਾ. ਲਿ. / Guru Gobind Singh Avenue, NULL, Jalandhar, PB, Flno-78 Ff Mig Flats  ||  One Engineering Pvt Ltd / Flno-98 Ff Mig Flats, Guru Gobind Singh Avenue, Jalandhar - I, Jalandhar, Punjab
+p_in 1.00 p_loco 0.12 | ਸਦਰਨ ਟ੍ਰੇਡਿੰਗ ਲਿਮਟਿਡ / C/orenubala 415, Dhuri, Sangrur, ਪੰਜਾਬ  ||  Southern Trading Limited / C/Orenubala 415, Wardno14, Arya Samaj Block, Dhuri, Sangrur, Punjab
+p_in 1.00 p_loco 0.04 | ਸ਼ਿਵਮ ਟੈਕਨਾਲੋਜੀ / #9/7, WATER WORKS ROAD, GOLDEN AVENUE, AMRITSAR, Punjab  ||  Shivam Technology / Amritsar, Punjab, Amritsar, Water Works Road, Golden Avenue, Shop No 9
+p_in 0.62 p_loco 0.12 | Noida Services / 002, Noida, Gautam Buddha Nagar, उत्तर प्रदेश  ||  Noida Services Limited / 002, Block A, 10Th Avenue, Gaur City, Greater Noida West, Gautam Buddha Nagar, Noida, Gautam Buddha Nagar, Uttar Pradesh
+p_in 0.98 p_loco 0.04 | ਸੁਪਰ ਇੰਜੀਨੀਅਰਿੰਗ / S.a.s. Nagar, H.no-c-352, Sector-78, Mohali, PB, S.a.s.nagar (Mohali)  ||  Super Engineering / H.No-352, Sector-78, Mohali, S.A.S.Nagar (Mohali), Rupnagar, Punjab
+p_in 0.99 p_loco 0.09 | ਨਾਰਥ ਟੈਕਨਾਲੋਜੀਜ਼ ਐਲਐਲਪੀ / HOSHIARPUR, Punjab, NO 60 C/O SAMINDER KAUR  ||  North Technologies LLP / C/O Saminder Kaur, H No 478, Ward No 9 Street Amardas, Vpo-Tanda, Hoshiarpur, Punjab
+p_in 0.76 p_loco 0.08 | stprivate.com / BLOCK G-464 C/O RAJESH MANI TRIPATHI, BHUJAULI COLONY, NEAR ZILA UDDYAN, DEORIA, Uttar Pradesh  ||  Tisha Solutions Private Limited / C/O Rajesh Mani Tripathi, Bhujauli Colony, Near Zila Uddyan, Deoria, Uttar Pradesh
+p_in 0.53 p_loco 0.18 | Mr Ariatavotavo / 15-125, GHAZIABAD, Uttar Pradesh  ||  Sultania & Co / 15-125, Vasundhra, Ghaziabad, Uttar Pradesh
+p_in 0.77 p_loco 0.18 | MO / H-11 Sector-11, Noida, Gautam Buddha Nagar, Uttar Pradesh  ||  Mhm Option Private Limited / H-11 Sector-11, Noida, Gautam Buddha Nagar, Uttar Pradesh
+p_in 0.99 p_loco 0.07 | ੴ ਟੈਕਨਾਲੋਜੀਜ਼ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ / 1ST FLOOR, HOUSE NO.41, DAKALA ROAD, PARTAP COLONY, PATIALA, ਪੰਜਾਬ  ||  Om Technologies Private Limited / 1St Floor, House No.41, Dakala Road, Partap Colony, Patiala, Punjab
+p_in 0.96 p_loco 0.19 | श्री एग्रो प्राइवेट लिमिटेड / NO. 00728 13, MAHARAJGANJ, GORAKHPUR, Uttar Pradesh  ||  Sree Agro Private Limited / 13, Jalkal Building Golghar, Gorakhpur, Uttar Pradesh
+p_in 0.69 p_loco 0.07 | स्काई पावर प्राइवेट लिमिटेड / Block E-438 F-2, Ghaziabad, उत्तर प्रदेश  ||  Sky Power Private Limited / F/F, Plot No - 9/9 Sector - 9, Judge Colony, Vaishali, Ghaziabad, F-2, Ghaziabad, Uttar Pradesh
+p_in 0.99 p_loco 0.00 | ਸ੍ਰੀ ਟੈਕਨਾਲੋਜੀਜ਼ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ / NO. 113  B-20, 678/1, SHOP NO.2, DYAL NAGAR GHUMAR MANDI, LUDHIANA, Punjab  ||  Sree Technologies Private Limited / B-20, 678/1, Shop No.2, Dyal Nagar Ghumar Mandi, Ludhiana, Punjab
+p_in 0.98 p_loco 0.01 | ਸਦਰਨ ਲੌਜਿਸਟਿਕਸ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ / H.NO 0010, GALI NO.3, TEHSILPURA, AMRITSAR -I, MAJITH MANDI, ਪੰਜਾਬ  ||  Southern Logistics Private Limited / Plot No.10, Gali No.3, Tehsilpura, Amritsar -I, Amritsar, Punjab
+p_in 0.83 p_loco 0.00 | ਆਲ ਫਾਈਨੈਂਸ Private Limited / H.no 683 C/o Rajan Mahajan, Near Indian Oil Petrol Pump, Village Haripur, Dinanagar, Gurdaspur, ਪੰਜਾਬ  ||  All Finance Private Limited / Near Indian Oil Petrol Pump, Village Haripur, Dinanagar, Punjab, Gurdaspur, C/O Rajan Mahajan, Gurdaspur
+p_in 0.81 p_loco 0.08 | ਫਾਰਚੂਨ ਕੰਸਲਟੈਂਟਸ / DOOR NO 98 GILL CHOWK OPP RISHI VAISNO DHABA, LUDHIANA, Punjab  ||  Fortune Consultants / Gill Chowk Opp Rishi Vaisno Dhaba, Ludhiana, Punjab
+p_in 0.88 p_loco 0.19 | 1st Builders Pvt [Ltd] / H No. 108-K, Gorakhpur, UP  ||  First Builders Pvt Ltd / H No. 108-K, Mohalla Bheriyagarh Vishnupuram, Post Basharatpur, Gorakhpur, Uttar Pradesh
+p_in 1.00 p_loco 0.02 | ਸਦਰਨ ਮਾਰਕੀਟਿੰਗ ਪ੍ਰਾਈਵੇਟ ਲਿਮਟਿਡ / PLOT NO.##53, ROPAR, Punjab  ||  Southern Marketing Private Limited / Punjab, Hoshiarpur, Ropar, Focal Point, Naya Nangal, Tehsil Nangal, Plot No.53
