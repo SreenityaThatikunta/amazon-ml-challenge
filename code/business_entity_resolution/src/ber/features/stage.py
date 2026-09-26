@@ -229,10 +229,37 @@ def _country_records(recs: pd.DataFrame, fillers, brand_units):
     return recs, kidx, aidx
 
 
+class TestPruner:
+    """``features.prune_test``: scores test feature chunks with the stage-1 model
+    of the train pass and keeps pairs with p1 >= ``rerank.min_p1``, the filter
+    stage 2 applies anyway. Query-context features are computed on the full
+    chunk before pruning, and the scorer later reads the same float32 values, so
+    downstream scores are unchanged."""
+
+    def __init__(self, model_path, min_p: float):
+        import lightgbm as lgb
+        self.model = lgb.Booster(model_file=str(model_path))
+        self.feats = self.model.feature_name()
+        self.min_p = min_p
+        self.n_in = self.n_out = 0
+
+    def __call__(self, out: pd.DataFrame) -> pd.DataFrame:
+        x = np.ascontiguousarray(out[self.feats].to_numpy(dtype=np.float32))
+        p = self.model.predict(x, num_iteration=self.model.best_iteration)
+        keep = out[p >= self.min_p].reset_index(drop=True)
+        self.n_in += len(out)
+        self.n_out += len(keep)
+        return keep
+
+
 def run_features(cfg: Config) -> None:
     """Candidate parts are grouped by country (``parts_<split>.json`` of the
     candidates stage), so only one country's records are in memory at a time."""
     fc = cfg.features
+    if fc.prune_test and cfg.run_test and cfg.run_train:
+        raise StageError("features.prune_test needs the stage-1 model before the test features: "
+                         "run the stages with --set data.phase=train, then --set data.phase=test "
+                         "(or set features.prune_test=false)")
     with StageRun(cfg, "features") as st:
         splits = (["train"] if cfg.run_train else []) + (["test"] if cfg.run_test else [])
         fillers = brand_units = None
@@ -251,6 +278,8 @@ def run_features(cfg: Config) -> None:
             for old in out_dir.glob("*.parquet"):
                 old.unlink()
             n_parts = n_rows = n_pos = n_sel_train = n_sel_val = 0
+            prune = (TestPruner(st.input_path("scorer", "model"), cfg.rerank.min_p1)
+                     if split == "test" and fc.prune_test else None)
             for country, recs in _by_country(rec_path, REC_COLS + extra):
                 with timed(st.log, f"{split} {country}: records + extras"):
                     recs, kidx, aidx = _country_records(recs, fillers, brand_units)
@@ -280,6 +309,10 @@ def run_features(cfg: Config) -> None:
                                 keys["side"] = d.q_side.to_numpy()
                                 n_pos += int(keys.y.sum())
                             out = compact(pd.concat([keys, feats], axis=1))
+                            if prune is not None:
+                                out = prune(out)
+                                if out.empty:
+                                    continue
                             out.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False,
                                            compression="zstd")
                             n_parts += 1
@@ -291,5 +324,8 @@ def run_features(cfg: Config) -> None:
                 st.metric("train_queries_selected", {"train": n_sel_train, "val": n_sel_val})
             st.register(f"features_{split}", out_dir, rows=n_rows, parts=n_parts)
             st.metric(f"{split}_pairs", n_rows)
+            if prune is not None:
+                st.metric("test_pairs_before_prune", prune.n_in)
+                st.metric("test_prune_min_p1", prune.min_p)
             if split == "train":
                 st.metric("train_positive_rate", round(n_pos / max(n_rows, 1), 4))

@@ -143,3 +143,31 @@ def test_unmatched_word_threshold_inclusive():
     assert _unmatched(["nagar"], ["naga", "urban"]) == 0      # similarity exactly 0.8 counts
     assert _unmatched(["chateau"], ["magasin"]) == 1
     assert _unmatched(["x"], []) == 1
+
+
+def test_test_pruner_keeps_high_p_rows_unchanged(tmp_path):
+    import lightgbm as lgb
+    from ber.features.stage import TestPruner
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=(400, 2)).astype(np.float32)
+    y = (x[:, 0] > 0).astype(int)
+    lgb.train({"objective": "binary", "verbose": -1}, lgb.Dataset(x, y, feature_name=["a", "b"]),
+              num_boost_round=5).save_model(str(tmp_path / "m.txt"))
+    out = pd.DataFrame({"q_id": [f"S2-{i}" for i in range(400)], "a": x[:, 0], "b": x[:, 1]})
+    prune = TestPruner(tmp_path / "m.txt", 0.5)
+    kept = prune(out)
+    p = prune.model.predict(x)
+    assert len(kept) == int((p >= 0.5).sum()) and 0 < len(kept) < 400
+    pd.testing.assert_frame_equal(kept, out[p >= 0.5].reset_index(drop=True))
+    assert (prune.n_in, prune.n_out) == (400, len(kept))
+
+
+def test_prune_test_refuses_single_pass():
+    from ber.artifacts import StageError
+    from ber.config import load_config
+    from ber.features.stage import run_features
+    cfg = load_config(overrides=["features.prune_test=true", "data.phase=all"])
+    if not (cfg.run_test and cfg.run_train):
+        pytest.skip("default config has no test split here")
+    with pytest.raises(StageError, match="data.phase=train"):
+        run_features(cfg)

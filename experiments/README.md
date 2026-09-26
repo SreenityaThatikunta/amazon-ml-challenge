@@ -262,3 +262,17 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   already written float32 + zstd (E18 code was in the working tree), so little was left to gain. What remains
   is mostly the `q_id` / `s1_id` string columns of 244M test pairs; dictionary-encoding them would be the
   next saving if disk gets tight (92 GB free).
+
+### E22. Smaller test side: `features.prune_test`
+- `folder` was 48 GB on disk (45 GB artifacts; main alone 43 GB). Per-column check on main's test features:
+  ids are only ~6% of a part; the size is 2.4e8 test pairs × ~100 float features, stored once as candidates
+  (11 GB) and once as features (19 GB).
+- `features.prune_test` (default on): the test features stage loads the stage-1 model of the train pass,
+  scores each chunk right after it is built (query context computed on the full chunk first) and writes only
+  pairs with p1 ≥ `rerank.min_p1` (0.001), the filter stage 2 applies anyway, i.e. ~1 pair per record
+  instead of ~25. Results are unchanged; full-run footprint ~35 GB → ~15–20 GB (test candidates still kept).
+- Needs two passes (`data.phase=train`, then `data.phase=test`); a single `phase=all` run with pruning on
+  stops before any work with a clear error. Tests: `test_test_pruner_keeps_high_p_rows_unchanged`,
+  `test_prune_test_refuses_single_pass` (150 passed).
+- Old artifacts kept for now (user decision).
+

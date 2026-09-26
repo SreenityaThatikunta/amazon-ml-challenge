@@ -32,6 +32,7 @@ Run them one at a time: heavy stages in parallel swap on a 16 GB machine
 
 ```bash
 B=.venv/bin/ber            # Windows: .venv\Scripts\ber.exe (set PYTHONUTF8=1)
+# single pass: only with --set features.prune_test=false (writes all ~2.4e8 test feature rows)
 $B split       --run v3    # geographic train/val split + dev slice            (~3 min)
 $B normalize   --run v3    # normalise 24M records, learn Indic dictionaries   (~7 min)
 $B candidates  --run v3    # region-blocked TF-IDF top-k + recall report       (~1.5 h GPU / ~4 h CPU, train+test)
@@ -42,8 +43,10 @@ $B decide      --run v3    # one owner per record + expected F0.5; val F0.5     
 $B submit      --run v3    # output/matching_results.tsv + candidate_pairs.tsv + official validator
 ```
 
-The train/val side and the test side can also run as two passes (the test pass reuses
-the model, region neighbourhoods and decision parameters of the train pass):
+With `features.prune_test: true` (the default) a full run **must** be two passes: the test
+features are scored by the stage-1 model as they are built and only pairs with p1 ≥
+`rerank.min_p1` are written (test features ~20 GB → < 1 GB, same results). The test pass reuses
+the model, region neighbourhoods and decision parameters of the train pass:
 
 ```bash
 for s in candidates features scorer rerank decide; do $B $s --run v3 --set data.phase=train; done
