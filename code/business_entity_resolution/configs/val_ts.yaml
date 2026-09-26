@@ -17,6 +17,7 @@ candidates:
 
 features:
   train_query_frac: 0.0   # val side only: the models come from v3
+  vocab_from_run: v3      # v3's fillers/brand syllables (learned with test records; E27)
 
 scorer:
   model_from_run: v3

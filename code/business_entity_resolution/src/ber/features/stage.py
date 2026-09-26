@@ -202,6 +202,15 @@ def _learn_vocabularies(st: StageRun, cfg: Config) -> tuple[list[str], list[str]
     """Filler words (both splits whenever test records exist, also in a train-only
     pass, so the train and test passes agree) and brand syllables (train)."""
     fc = cfg.features
+    if fc.vocab_from_run:  # same vocabularies as the run whose models are applied
+        src = st.input_path("features", "fillers", run=fc.vocab_from_run).parent
+        fillers = json.loads((src / "fillers.json").read_text(encoding="utf-8"))
+        brand_units = json.loads((src / "brand_units.json").read_text(encoding="utf-8"))
+        st.write_json(fillers, "fillers")
+        st.write_json(brand_units, "brand_units")
+        st.metric("vocab_from_run", {"run": fc.vocab_from_run, "fillers": len(fillers),
+                                     "brand_units": len(brand_units)})
+        return fillers, brand_units
     with timed(st.log, "learn filler words"):
         paths = [st.input_path("normalize", f"records_{sp}") for sp in ("train", "test")
                  if _has_output(st, "normalize", f"records_{sp}")]

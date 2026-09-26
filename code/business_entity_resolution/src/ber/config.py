@@ -108,6 +108,9 @@ class FeaturesConfig:
     filler_min_rate: float = 0.0005  # filler words: min share of S2/S3 names ...
     filler_min_ratio: float = 2.0    # ... and min ratio to their share of S1 names
     workers: int = 0               # processes for the per-pair Python features; 0 = cpu_count - 2
+    vocab_from_run: str | None = None  # reuse that run's fillers + brand syllables (they are
+                                       # learned from train + test records; a val-only rerun
+                                       # without test records learns fewer fillers, E27)
     prune_test: bool = False       # test: score each chunk with the stage-1 model and keep only
                                    # pairs with p1 >= rerank.min_p1 (needs data.phase=train, then test)
 
