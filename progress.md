@@ -119,6 +119,21 @@ more than further val gains. Checks so far (`D:\aml\analysis\shift.py`, `lowp_in
   same street, house number moved 5–20), not a recall hole.
 - Region-held-out CV says ~0.002 of the val score is stage 2 learning region-specific patterns.
 
+- **Adversarial validation** (`D:\aml\analysis\adversarial.py`; LightGBM telling val kept pairs
+  from test kept pairs on the 127 stage-2 inputs, 3-fold): AUC **0.986** (US), **0.990** (India),
+  **0.9997** (France vs US+India val). Top separating features are the *size/density-dependent*
+  ones: IDF of unmatched tokens (`k_idf_unmatched_q`, `a_idf_unmatched_*`), per-S1 counts
+  (`s_n`, `s_n_top1`, `s_n_cands`, `c_expected`) and `s_name_freq`. Cause: test US has **half
+  the S1 of train US** (663k vs 1.32M) and 23 % more S2/S3 records per S1. Even on near-certain
+  matches (p1 > 0.999) the 90th percentile of `s_name_freq` is 31 on test vs 61 on val (US) and
+  unmatched-token IDF is lower by 0.69 = log 2. Importance weights from this classifier are
+  degenerate (effective sample share 11 %), so reweighting is not usable as is.
+- Response (v2.2 candidate): **domain normalisation** of those features in stage 2
+  (`rerank.domain_norm`): count-like columns ÷ their mean and IDF-like columns ÷ their 99th
+  percentile, within each country and split, so a stage 2 trained on val reads test on the same
+  scale. Caveat: part of the difference is genuine (a common name really has fewer competitors
+  in a half-size pool), so only the leaderboard can tell which way is right.
+
 **LB probes prepared** (the only way to see test performance by part):
 `D:\aml\submissions\probe_france_empty\` (v2.1, every French S1 left empty → France's own
 F0.5 by subtraction) and `D:\aml\submissions\probe_stage1\` (v2 without stage 2, val 0.98337 →

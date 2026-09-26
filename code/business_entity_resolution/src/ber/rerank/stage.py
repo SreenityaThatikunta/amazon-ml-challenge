@@ -109,6 +109,38 @@ class _F32(dict):
         super().__setitem__(k, np.asarray(v, dtype=np.float32))
 
 
+# Features whose scale depends on the size / density of the data set they were computed
+# on (adversarial validation val vs test: AUC 0.986-0.9997; test US has half the S1 of
+# train US and 23 % more S2/S3 records per S1). With ``rerank.domain_norm`` they are
+# divided by their mean over the same country and split, so a model trained on val reads
+# test on the same scale.
+COUNT_COLS = ["s_n", "s_sum_other", "s_n_hi_other", "ss_sum_other", "ss_n_hi_other",
+              "c_sum_other", "c_n_hi_other", "c_expected", "cs_n_hi_other", "q_n",
+              "q_sum_other", "q_n_hi_other", "s_n_cands", "s_n_top1", "s_name_freq",
+              "q_n_cands"]
+IDF_COLS = ["k_idf_unmatched_q", "k_idf_unmatched_s", "a_idf_unmatched_q", "a_idf_unmatched_s"]
+
+
+def domain_normalize(X: pd.DataFrame, groups: np.ndarray | None = None) -> pd.DataFrame:
+    """Count-like columns / their mean, IDF-like columns / their 99th percentile of
+    non-zero values, within each group (country) of ``X`` (in place; returns X)."""
+    groups = np.zeros(len(X), dtype=np.int8) if groups is None else groups
+    for c in COUNT_COLS + IDF_COLS:
+        if c not in X:
+            continue
+        v = X[c].to_numpy(dtype=np.float32, copy=True)
+        for g in np.unique(groups):
+            m = groups == g
+            if c in COUNT_COLS:
+                ref = float(v[m].mean()) or 1.0
+            else:
+                nz = v[m][v[m] > 0]
+                ref = float(np.quantile(nz, 0.99)) if len(nz) else 1.0
+            v[m] = v[m] / ref
+        X[c] = v
+    return X
+
+
 def _codes(values: pd.Series, dtype: pd.CategoricalDtype) -> np.ndarray:
     c = pd.Categorical(values.astype(str), dtype=dtype).codes
     if (c < 0).any():
@@ -191,6 +223,13 @@ def run_rerank(cfg: Config) -> None:
                 keys, raw = _read_val(st, cfg, raw_cols)
                 X, q = _frame(keys, raw, q_cat, s_cat)
                 y = keys.y.to_numpy()
+                if rc.domain_norm:
+                    cty = pd.read_parquet(st.input_path("normalize", "records_train"),
+                                          columns=["entity_id", "country"],
+                                          filters=[("side", "==", "val")]
+                                          ).set_index("entity_id").country
+                    groups = pd.factorize(cty.reindex(keys.q_id.astype(str)).fillna(""))[0]
+                    X = domain_normalize(X, groups)
             st.metric("val_pairs", {"kept": len(keys), "positives": int(y.sum())})
 
             # folds grouped by the query's top S1 (keeps most S1 groups in one fold)
@@ -314,6 +353,8 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
             for c in raw_cols:
                 X[c] = raw[c].to_numpy(dtype=np.float32)
             del raw
+            if rc.domain_norm:  # this frame is one country of the test split
+                X = domain_normalize(X)
             p2 = np.zeros(len(X), dtype=np.float64)
             step = 2_000_000
             for a in range(0, len(X), step):
