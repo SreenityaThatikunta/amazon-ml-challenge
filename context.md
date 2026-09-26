@@ -180,19 +180,19 @@ comparison once hold sets differ): v2.4 0.99241 → v2.5 0.99270; unseen regions
 Done in the third session: more hold regions (0.4, owner rule) and "fix B" (train on
 complete groups) → v2.5, LB 0.981708. France's region-less records checked: fine.
 
-1. **Running (started 21:32, ~2.5 h, `D:\aml\logs\v25_experiments3.log`)**: stage 2 with a
-   3,500-round cap (most folds hit 2,000) and the second stage-2 round (`rerank.rounds 2`),
-   each with region folds (unseen-region) and folds by S1: `E3b_r3500`, `E3r2b_...`,
-   `E1b_r3500`, `E1r2b_...` in `v25\exp\`. Compare with `clean_eval.py` against E3b
-   (clean 0.99171) and E1b (0.99270). If one clearly helps both → v2.6 test pass
-   (`run_v25_test.sh v2.6_<name> --set ...`; the models of the chosen experiment must be the
-   last ones trained in `v25\rerank`).
-2. Candidate-set size: `rerank.min_p1` 0.003 (0.974 vs 1.069 pairs/record, −0.05 % of
-   retrieved true pairs; case `E1_minp003` in run_v25.sh needs `train_complete=true` added).
-3. D1 diagnostic (`D:\aml\analysis\d1_v22_complete_groups.py`, not run): documentation only.
-4. Stage-1 domain normalisation (small).
-5. Bigger, only if time: France pseudo-labelling; a transformer cross-encoder on the
-   uncertain band (downloads ~3.6 GB need the user's OK).
+Overnight 26→27 Sep (progress 6b–6f): 3,500-round cap no gain; second stage-2 round
+rejected (India −0.0011 on unseen regions); stronger regularisation flat/slightly worse;
+`min_p1` 0.003 costs −0.00005..−0.00008 (not adopted). **Candidate v2.6 =
+`rerank.norm_complete: true`** (S1-group count scales from complete-group pairs; measured
+9–10 % train/test scale mismatch removed; val-neutral by construction): file
+`D:\aml\submissions\v2.6_normcomplete\` (run `v25b` = v25's stage 1 via junctions; its
+stage-2 models in `v25b\rerank` and `v25b\exp\E1b_nc`).
+
+1. **Morning: the user uploads v2.6_normcomplete once as the LB check.** Adopt if LB ≥
+   0.981708 − 0.0002: then copy it to `output\`, set `norm_complete: true` in
+   `configs/default.yaml`, update docs, rebuild the zip, push. Else keep v2.5.
+2. Final packaging (section 9) well before the deadline; overnight runs must end by 05:30.
+3. No heavier runs (user: hold_frac 0.6 at 9–11 GB is too much for the laptop).
 
 ## 9. Before the deadline (leave ≥ 3 h)
 

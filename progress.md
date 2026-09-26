@@ -469,6 +469,17 @@ stage-1 counts, IDF columns: unchanged). Val cannot show this (val shares the tr
 scale; only the pooling of the two countries changes), so it is a candidate for an LB
 check, not a validated gain. Run v25b `E1b_nc` + test pass → `D:\aml\submissions\
 v2.6_normcomplete\`.
+Measured shift (rerank log, complete-only mean / all-pairs mean): c_expected, c_sum_other,
+s_n_hi_other ×1.093 (India) / ×1.100 (US), s_n ×1.048 / ×1.021. Val as expected neutral:
+0.98918 vs 0.98923, clean 0.99263 vs 0.99268, OOF AUC identical (0.998869), logloss
+0.03590 vs 0.03591 (run-to-run noise level). Test file (validator PASS, 2026-09-27 00:35):
+5,865,018 links (−0.3 %), links per S1 France 3.424 / India 3.368 / US 3.391 (v2.5 3.445 /
+3.380 / 3.399), S1 changed vs v2.5: France 3.2 %, India 1.7 %, US 1.1 %; the model is a bit
+stricter about already-claimed S1 (test's claims now read ~9 % larger relative to
+training, which is their true relation). Anchor: French generic swaps mean p2 0.344,
+de-biased ratio 6.58 → capped at 6 (v2.5: 5.40). candidate_pairs.tsv identical to v2.5's.
+Decision rule: upload once as the check; adopt if the LB does not drop (≥ v2.5 − 0.0002),
+since it removes a measured train/test mismatch and costs nothing on val; else keep v2.5.
 
 **7. France's region-less records are not a problem** (`D:\aml\analysis\fr_region.py`,
 `fr_region.txt`, v2.5 scores). In France, 34.9 % of the records with a kept pair have no
