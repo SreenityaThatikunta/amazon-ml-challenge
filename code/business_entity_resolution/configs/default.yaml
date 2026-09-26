@@ -54,6 +54,8 @@ features:             # stage 2 (T3.3)
   name_key: true          # v2: filler-free name keys + IDF-weighted token overlap (k_* features)
   filler_min_rate: 0.0005 # filler words (learned, no labels): >= this share of S2/S3 names ...
   filler_min_ratio: 2.0   # ... and >= this many times their share of S1 names
+  workers: 0              # processes for the per-pair Python features (name/address/lookalike);
+                          # 0 = cpu_count - 2. Key/IDF, context features and pruning stay in the main process
   prune_test: true        # test side: score each chunk with the stage-1 model as it is built and write
                           # only pairs with p1 >= rerank.min_p1 (~1 per record instead of ~25). Stage 2
                           # applies the same filter, so results are unchanged; test features ~20 GB -> <1 GB.

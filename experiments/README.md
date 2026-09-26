@@ -282,3 +282,19 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   `artifacts/{frtrain,synthfr,dev}` (~43 GB). Kept `main/split` (read by every run via `data.split_run`),
   main's scorer model + val scores, `main/decide`, `devv3`. Folder 48 GB -> 4.7 GB; disk 138 GB free.
 - The `main` pipeline and the France proxy can no longer run from these artifacts without rebuilding.
+
+### E24. Parallel per-pair features (`features.workers`)
+- Profile (dev chunk, serial): lookalike 35%, address + house numbers 35%, name 20%; key/IDF/context features
+  are vectorised. `build.row_features` (name + address + lookalike; no index, no query context) now runs
+  in `features.workers` processes (default cpu − 2 = 8) on row ranges; key/IDF, context, compaction and
+  pruning stay in the main process (no sparse index shipped to workers).
+- Dev features 287.7 s → **121.9 s** (2.4×; the rest is joins and pickling in the main process).
+- Serial (`workers=1`) vs parallel feature parts: **identical** (17/17 parts, all columns); test
+  `test_parallel_rows_match_serial`. Dev val F0.5 after rerunning scorer → decide: 0.99083 (was 0.99061):
+  that difference is LightGBM run-to-run noise, so **dev differences of ±0.0002 are noise**.
+
+### E25. Full v3 run (task 1.1, running)
+- `bash experiments/run_v3_full.sh` (log `logs/v3_full.log`, started ~08:30): normalize → train pass
+  (candidates, features, scorer, rerank, decide) → test pass (+ submit). main v2's output archived as
+  `output/archive/matching_results_main_v2_val098906_lb0972.tsv`.
+

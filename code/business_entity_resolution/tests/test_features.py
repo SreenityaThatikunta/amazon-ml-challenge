@@ -171,3 +171,23 @@ def test_prune_test_refuses_single_pass():
         pytest.skip("default config has no test split here")
     with pytest.raises(StageError, match="data.phase=train"):
         run_features(cfg)
+
+
+def test_parallel_rows_match_serial():
+    from concurrent.futures import ProcessPoolExecutor
+    from ber.features.stage import join_records, parallel_rows
+    recs = pd.DataFrame([_rec(f"S1-{i}", 1, f"name {i % 7}", f"{i} main st town", str(i))
+                         for i in range(40)] +
+                        [_rec(f"S2-{i}", 2, f"name {i % 5}", f"{i} main st town", str(i))
+                         for i in range(40)])
+    rec = record_extras(recs).set_index("entity_id")
+    q = [f"S2-{i}" for i in range(40) for _ in range(3)] * 200
+    s = [f"S1-{(i + j) % 40}" for i in range(40) for j in range(3)] * 200
+    cands = pd.DataFrame({"q_id": q, "s1_id": s, "cos_name": 0.5, "cos_addr": 0.5,
+                          "cos_combo": 0.5, "rank_name": 0, "rank_addr": 0, "rank_combo": 0})
+    ctx = pd.DataFrame({"s_n_cands": 1, "s_n_top1": 1}, index=sorted(set(s)))
+    d = join_records(cands, rec, ctx)
+    assert len(d) >= 20_000
+    with ProcessPoolExecutor(3) as pool:
+        par = build_features(d, rows=parallel_rows(pool, d, 3))
+    pd.testing.assert_frame_equal(build_features(d), par)

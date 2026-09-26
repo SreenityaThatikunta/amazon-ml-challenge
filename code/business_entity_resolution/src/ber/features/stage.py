@@ -11,6 +11,8 @@ the feature columns of :mod:`ber.features.build`.
 from __future__ import annotations
 
 import json
+import os
+from concurrent.futures import ProcessPoolExecutor
 from collections import Counter
 
 import numpy as np
@@ -21,7 +23,7 @@ from ..config import Config
 from ..eval.split import stable_unit
 from ..log import timed
 from .build import (KeyIndex, addr_words, address_key, build_features, house_number, initials,
-                    name_city)
+                    name_city, row_features)
 
 REC_COLS = ["entity_id", "source", "country", "name_core", "name_compact", "name_legal",
             "name_pre_core", "name_alt_core", "name_is_domain", "name_has_alias", "name_indic",
@@ -252,15 +254,40 @@ class TestPruner:
         return keep
 
 
+def parallel_rows(pool: ProcessPoolExecutor | None, d: pd.DataFrame, n: int):
+    """``row_features(d)`` split over ``n`` worker processes by row ranges (the
+    row features need no query context, so any split gives the same values)."""
+    if pool is None or n < 2 or len(d) < 20_000:
+        return row_features(d)
+    bounds = np.linspace(0, len(d), n + 1).astype(int)
+    pieces = [d.iloc[a:b] for a, b in zip(bounds[:-1], bounds[1:])]
+    res = list(pool.map(row_features, pieces))
+    return (pd.concat([r[0] for r in res], ignore_index=True),
+            pd.concat([r[1] for r in res], ignore_index=True))
+
+
 def run_features(cfg: Config) -> None:
     """Candidate parts are grouped by country (``parts_<split>.json`` of the
-    candidates stage), so only one country's records are in memory at a time."""
+    candidates stage), so only one country's records are in memory at a time.
+    The per-pair Python features run in ``features.workers`` processes."""
+    fc = cfg.features
+    workers = fc.workers or max(1, (os.cpu_count() or 4) - 2)
+    pool = ProcessPoolExecutor(workers) if workers > 1 else None
+    try:
+        _run_features(cfg, pool, workers)
+    finally:
+        if pool is not None:
+            pool.shutdown()
+
+
+def _run_features(cfg: Config, pool, workers: int) -> None:
     fc = cfg.features
     if fc.prune_test and cfg.run_test and cfg.run_train:
         raise StageError("features.prune_test needs the stage-1 model before the test features: "
                          "run the stages with --set data.phase=train, then --set data.phase=test "
                          "(or set features.prune_test=false)")
     with StageRun(cfg, "features") as st:
+        st.metric("workers", workers)
         splits = (["train"] if cfg.run_train else []) + (["test"] if cfg.run_test else [])
         fillers = brand_units = None
         if fc.name_key:
@@ -302,7 +329,8 @@ def run_features(cfg: Config) -> None:
                             continue
                         for chunk in _query_chunks(part, fc.chunk_rows):
                             d = join_records(chunk, rec, ctx)
-                            feats = build_features(d, kidx, aidx)
+                            feats = build_features(d, kidx, aidx,
+                                                   rows=parallel_rows(pool, d, workers))
                             keys = d[["q_id", "s1_id"]].copy()
                             if split == "train":
                                 keys["y"] = (d.s1_id == d.q_owner).astype(np.int8)

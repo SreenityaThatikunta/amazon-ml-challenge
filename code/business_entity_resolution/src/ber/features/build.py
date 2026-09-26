@@ -317,22 +317,30 @@ def context_features(d: pd.DataFrame, f: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def row_features(d: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The per-pair features computed in Python loops (name, address, lookalike):
+    no index and no query context, so any row split of ``d`` gives the same
+    values (``features.workers`` runs this in worker processes). Returns
+    (name + address features, lookalike features)."""
+    f = pd.concat([name_features(d), address_features(d)], axis=1)
+    return f, lookalike_features(d, f)
+
+
 def build_features(d: pd.DataFrame, kidx: KeyIndex | None = None,
-                   aidx: KeyIndex | None = None) -> pd.DataFrame:
+                   aidx: KeyIndex | None = None,
+                   rows: tuple[pd.DataFrame, pd.DataFrame] | None = None) -> pd.DataFrame:
     """All features for a frame of candidate pairs with q_/s_ record fields,
     stage-1 retrieval columns, and per-S1 context (s_n_cands, s_n_top1). With
     ``kidx`` / ``aidx`` (and q_/s_name_key, q_/s_kpos columns) also the v2 name-key
-    and address-word IDF features."""
+    and address-word IDF features. ``rows``: precomputed ``row_features(d)``."""
     retr = d[["cos_name", "cos_addr", "cos_combo", "rank_name", "rank_addr", "rank_combo",
               "s_n_cands", "s_n_top1"]].copy()
     retr["q_source"] = d.q_source.astype(np.int8)
-    nf = name_features(d)
-    af = address_features(d)
-    parts = [retr, nf, af]
+    nfaf, look = row_features(d) if rows is None else rows
+    parts = [retr, nfaf.set_index(d.index)]
     if kidx is not None and "q_name_key" in d:
         parts.append(key_features(d, kidx))
     if aidx is not None and "q_kpos" in d:
         parts.append(address_idf_features(d, aidx))
-    f = pd.concat(parts, axis=1)
-    f = pd.concat([f, lookalike_features(d, f)], axis=1)
+    f = pd.concat(parts + [look.set_index(d.index)], axis=1)
     return pd.concat([f, context_features(d, f)], axis=1)
