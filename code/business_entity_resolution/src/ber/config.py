@@ -132,6 +132,8 @@ class RerankConfig:
                                     # or hold region); the others are still scored
     rounds: int = 1                 # v2.5: 2 = a second stage-2 round whose group features are
                                     # recomputed from the first round's (out-of-fold) p2
+    norm_complete: bool = False     # domain_norm: S1-group counts take their training scale from
+                                    # complete-group pairs only (as every test group is complete)
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200

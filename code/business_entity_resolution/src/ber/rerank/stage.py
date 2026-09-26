@@ -122,16 +122,26 @@ COUNT_COLS = ["s_n", "s_sum_other", "s_n_hi_other", "ss_sum_other", "ss_n_hi_oth
               "q_sum_other", "q_n_hi_other", "s_n_cands", "s_n_top1", "s_name_freq",
               "q_n_cands"]
 IDF_COLS = ["k_idf_unmatched_q", "k_idf_unmatched_s", "a_idf_unmatched_q", "a_idf_unmatched_s"]
+# the counts over an S1's group: too small wherever the group is incomplete (training only)
+S1_GROUP_COUNT_COLS = ["s_n", "s_sum_other", "s_n_hi_other", "ss_sum_other", "ss_n_hi_other",
+                       "c_sum_other", "c_n_hi_other", "c_expected", "cs_n_hi_other"]
 # second-round group features (rerank.rounds = 2): the same columns computed from p2
 G2 = "g2_"
 
 
-def domain_normalize(M: np.ndarray, cols: list[str], groups: np.ndarray | None = None) -> np.ndarray:
+def domain_normalize(M: np.ndarray, cols: list[str], groups: np.ndarray | None = None,
+                     complete: np.ndarray | None = None) -> np.ndarray:
     """Count-like columns / their mean, IDF-like columns / their 99th percentile of
     non-zero values, within each group (country) of the rows of the float32 matrix
     ``M`` whose first columns are named ``cols`` (in place; returns M). Columns named
     "" (or beyond ``cols``) are left alone; second-round copies (``g2_`` prefix) are
-    normalised like their first-round column."""
+    normalised like their first-round column.
+
+    ``complete`` (training, ``rerank.norm_complete``): rows whose S1 group is complete;
+    the S1-group counts then take their scale from those rows only. The other rows'
+    groups are artificially small (their S1's own records are never loaded), which
+    lowers the mean by ~7-9 % and would put every training value on a larger scale
+    than test's, where every group is complete."""
     groups = np.zeros(len(M), dtype=np.int8) if groups is None else groups
     ug = np.unique(groups)
     for j, name in enumerate(cols):
@@ -141,10 +151,12 @@ def domain_normalize(M: np.ndarray, cols: list[str], groups: np.ndarray | None =
         v = np.ascontiguousarray(M[:, j])  # contiguous float32 copy of the column
         for g in ug:
             m = groups == g
+            r = m & complete if complete is not None and c in S1_GROUP_COUNT_COLS else m
             if c in COUNT_COLS:
-                ref = float(v[m].mean()) or 1.0
+                ref = float(v[r].mean()) if r.any() else 1.0
+                ref = ref or 1.0
             else:
-                nz = v[m][v[m] > 0]
+                nz = v[r][v[r] > 0]
                 ref = float(np.quantile(nz, 0.99)) if len(nz) else 1.0
             v[m] = v[m] / ref
         M[:, j] = v
@@ -386,14 +398,21 @@ def run_rerank(cfg: Config) -> None:
                 src = M[:, cols.index("q_source")].copy()
                 _fill_group(M, q, s, src, keys.p.to_numpy())
                 y = keys.y.to_numpy()
+                complete = complete_groups(st, cfg, keys.s1_id, sides)
+                norm_ref = complete if rc.norm_complete else None
                 groups = None
                 if rc.domain_norm:
                     cty = _query_countries(st, cfg, sides)
-                    groups = pd.factorize(cty.reindex(keys.q_id.astype(str)).fillna(""))[0]
-                    domain_normalize(M, cols, groups)
+                    groups, labels = pd.factorize(cty.reindex(keys.q_id.astype(str)).fillna(""))
+                    # how much the incomplete groups pull the S1-group count scales down
+                    st.metric("s1_count_mean_complete_over_all", {
+                        str(lab): {c: round(float(M[(groups == g) & complete, cols.index(c)].mean()
+                                                  / max(M[groups == g, cols.index(c)].mean(), 1e-9)), 4)
+                                   for c in ("s_n", "c_expected", "c_sum_other", "s_n_hi_other")}
+                        for g, lab in enumerate(labels) if ((groups == g) & complete).any()})
+                    domain_normalize(M, cols, groups, norm_ref)
             is_val = (keys.side == "val").to_numpy()
             trainable = keys.side.isin(rc.train_sides).to_numpy()
-            complete = complete_groups(st, cfg, keys.s1_id, sides)
             st.metric("pairs", {sd: {"kept": int((keys.side == sd).sum()),
                                      "positives": int(y[(keys.side == sd).to_numpy()].sum()),
                                      "incomplete_group": int((~complete[(keys.side == sd).to_numpy()]).sum()),
@@ -446,7 +465,7 @@ def run_rerank(cfg: Config) -> None:
                     n1 = len(cols)
                     _fill_group(M, q, s, src, oof, col0=n1)
                     if groups is not None:
-                        domain_normalize(M, [""] * n1 + g2cols, groups)
+                        domain_normalize(M, [""] * n1 + g2cols, groups, norm_ref)
                     st.metric("val_auc_p2_round1", round(float(roc_auc_score(y[is_val], oof[is_val])), 6))
                     p_r1 = oof
                     oof, imp = _cross_fit(st, cfg, M, cols + g2cols, y, folds, is_val, "_r2")

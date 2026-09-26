@@ -435,6 +435,41 @@ at 1859/2282/2295/2401 instead of ≤ 2000, but val 0.98819 vs 0.98822, clean 0.
 0.99170 (India −0.0001, US +0.00004): the 2,000 cap was not really binding (flat
 validation curve). Dropped; its by-S1 twin was not run.
 
+**6c. Second stage-2 round (`rerank.rounds 2`): rejected.** Unseen regions (E3r2b vs E3b,
+both on complete groups): val 0.98831 vs 0.98822 but **clean 0.99134 vs 0.99170** (US
++0.0001, **India −0.0011**, singletons +0.0007; affected +0.003). The fold holding Uttar
+Pradesh drops from AUC 0.9897 (round 1) to 0.9827 (round 2). Stacking shift: the round-2
+model learns from round-1 p2 of regions the round-1 models had seen, then meets the p2 of
+a region no round-1 model saw, which is how every test region looks. The code stays (off)
+for the record; its by-S1 twin was stopped to save time.
+
+**6d. Stronger stage-2 regularisation** (run `v25b` = v25's stage 1 via junctions;
+`min_data_in_leaf 2000, lambda_l2 10, feature_fraction 0.7`, new config keys
+`rerank.lambda_l2` / `rerank.feature_fraction`, defaults unchanged): unseen regions
+(E3b_reg vs E3b) val 0.98822 vs 0.98822, clean 0.99172 vs 0.99170 (US +0.00006, India
+−0.00005, singletons +0.0003); better calibrated (OOF logloss 0.0391 vs 0.0399, Uttar
+Pradesh fold AUC 0.9912 vs 0.9897) but no F0.5 change. By S1 (E1b_reg vs E1b): val
+0.98913 vs 0.98923, clean 0.99261 vs 0.99270, singletons 0.98799 vs 0.98921: slightly
+worse. Rejected; v2.5's stage-2 parameters stay.
+
+**6e. Smaller candidate set (`rerank.min_p1` 0.003): small cost, not adopted.** Kept val
+pairs 1,013,391 vs 1,112,888 (−9 %; 0.97 vs 1.07 per record), 397 fewer true pairs.
+Unseen regions (E3b_minp003): val 0.98818 vs 0.98822, clean 0.99163 vs 0.99170; by S1
+(E1b_minp003): val 0.98917 vs 0.98923, clean 0.99260 vs 0.99268 (India −0.00015,
+singletons −0.0003). The F0.5 leaderboard decides the ranking and 5.53 candidates per S1
+is already small, so 0.001 stays.
+
+**6f. Domain-normalisation scale from complete groups (`rerank.norm_complete`).** The
+S1-group counts (s_n, c_expected, c_sum_other, ...) are divided by their per-country mean
+over the training pairs, which include the ~9 % of pairs with artificially empty groups;
+that pulls the mean (and so the scale) down, so every training value sits on a larger
+scale than the same density gives at test, where every group is complete. With the option
+the S1-group counts take their scale from complete-group pairs only (query-side and
+stage-1 counts, IDF columns: unchanged). Val cannot show this (val shares the training
+scale; only the pooling of the two countries changes), so it is a candidate for an LB
+check, not a validated gain. Run v25b `E1b_nc` + test pass → `D:\aml\submissions\
+v2.6_normcomplete\`.
+
 **7. France's region-less records are not a problem** (`D:\aml\analysis\fr_region.py`,
 `fr_region.txt`, v2.5 scores). In France, 34.9 % of the records with a kept pair have no
 region; on their same-street, equal-key top pairs the house-number anchor gives a

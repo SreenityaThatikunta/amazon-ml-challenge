@@ -57,3 +57,16 @@ def test_loaded_s1_val_side_and_hold_regions():
     hold = pd.DataFrame({"country": ["X"], "geo": ["BB"], "n_s1": [1]})
     assert loaded_s1(s1, hold).to_dict() == {"a": True, "b": True, "c": False, "d": False}
     assert loaded_s1(s1, None).to_dict() == {"a": True, "b": False, "c": False, "d": False}
+
+
+def test_domain_normalize_s1_counts_scaled_on_complete_groups_only():
+    from ber.rerank.stage import domain_normalize
+    # rows 0-2 complete, row 3 an artificially empty S1 group (training only)
+    M = np.array([[4, 2], [6, 2], [8, 2], [0, 6]], dtype=np.float32)
+    cols = ["c_expected", "q_n"]          # an S1-group count and a query-side count
+    complete = np.array([True, True, True, False])
+    out = domain_normalize(M.copy(), cols, None, complete)
+    np.testing.assert_allclose(out[:, 0], [4 / 6, 1, 8 / 6, 0], rtol=1e-6)   # scale from rows 0-2
+    np.testing.assert_allclose(out[:, 1], [2 / 3, 2 / 3, 2 / 3, 2], rtol=1e-6)  # all rows
+    plain = domain_normalize(M.copy(), cols)
+    np.testing.assert_allclose(plain[:, 0], [4 / 4.5, 6 / 4.5, 8 / 4.5, 0], rtol=1e-6)
