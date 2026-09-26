@@ -372,4 +372,39 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
 - Fix: `features.vocab_from_run` (reuse a run's fillers + brand syllables), set to v3 in `val_ts.yaml`.
   Rerun features → decide for both runs: `STAGES="features scorer rerank decide" bash
   experiments/run_val_ts.sh` (log `logs/val_ts_v2.log`).
+- Rerun with v3's vocabularies (log `logs/val_ts_v2.log`):
+
+| Run (v3's models) | F0.5 | US | India | pair P | singletons | orphan copies linked |
+|---|---|---|---|---|---|---|
+| control `v3vo` (val, rebuilt val-only) | 0.98850 | 0.98932 | 0.98721 | 0.99568 | 0.98846 | — |
+| **val_ts `v3ts`** (19/20% of S1 dropped) | **0.98693** | 0.98797 | 0.98528 | 0.99395 | 0.97945 | 2,469 / 149,599 (1.65%) |
+
+  The test shape costs v3 **−0.0016**, mainly false links of copies of missing entities (0.4% of kept links)
+  and singletons that get a link.
+- Remaining control drift (0.98850 vs v3's 0.98954): candidates are identical (all 28,083,262 val pairs, every
+  cosine and rank; check run inline, ~12 min). What differs is `s_n_cands` / `s_n_top1`: in v3 they also count
+  train-side records that list val S1, which the val-only rebuild doesn't have. So those density features move the
+  val score by 0.001 by themselves (see E18). Comparisons inside the val-only setup are unaffected; N3 runs a
+  full pass.
+- Reading: if US/India on test score like val_ts (~0.987), the public 0.9805 implies **France ≈ 0.94**:
+  France ≈ 0.006 of the LB loss, the orphan effect ≈ 0.0015.
+
+### E28. N1b: stage 2 retrained on val_ts; N4 copy-group features
+- `bash experiments/run_n1b.sh` (log `logs/n1b.log`, ~10 min): runs `v3ts_r` / `v3ts_rc` fork v3ts's
+  normalize/candidates/features/scorer (`experiments/fork_run.py`), stage 2 cross-fitted on val_ts.
+
+| val_ts, v3's stage 1 | F0.5 | US | India | pair P US / IN | p2 AUC | orphan copies linked |
+|---|---|---|---|---|---|---|
+| v3's stage 2 (plain val) | 0.98693 | 0.98797 | 0.98528 | 0.9939 / 0.9941 | — | 2,469 |
+| **stage 2 retrained on val_ts** | **0.98856** | 0.98975 | 0.98667 | 0.9966 / 0.9965 | 0.999465 | 566 |
+| + copy-group features (N4) | 0.98882 | 0.98994 | 0.98703 | 0.9967 / 0.9966 | 0.999499 | 586 |
+
+- Training stage 2 on the test shape recovers the whole −0.0016 (orphan false links 2,469 → 566).
+- Copy-group features: +0.0003 (noise ±0.0002), 23 s to compute. Small, positive; keep as a candidate.
+- Caveat: cross-fitted on val_ts itself (same generator as test), so this measures learning the pattern, not
+  region transfer.
+
+### E29. N3: train on test-shaped data (running)
+- `bash experiments/run_n3.sh` (log `logs/n3.log`, run `v4`, config `configs/train_ts.yaml`): reshape on
+  train + val (US 0.19, India 0.20), v3's vocabularies, full train pass. Started ~20:15.
 
