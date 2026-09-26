@@ -211,6 +211,97 @@ def _country_records(recs: pd.DataFrame, fillers, brand_units):
     return recs, kidx, aidx
 
 
+def _read_country_records(path, country: str, columns: list[str],
+                          query_ids: set[str] | None = None) -> pd.DataFrame:
+    """One country's S1 records plus (if given) only the queries in ``query_ids``,
+    read with Arrow filters (the other queries never reach memory)."""
+    import pyarrow.dataset as ds
+    dset = ds.dataset(path, format="parquet")
+    f_c = ds.field("country") == country
+    s1 = dset.to_table(columns=columns, filter=f_c & (ds.field("source") == 1))
+    if query_ids is None:
+        return s1.to_pandas()
+    q = dset.to_table(columns=columns, filter=f_c & (ds.field("source") != 1)
+                      & ds.field("entity_id").isin(sorted(query_ids)))
+    import pyarrow as pa
+    return pa.concat_tables([s1, q]).to_pandas()
+
+
+def run_features_hold(cfg: Config) -> None:
+    """``ber features-hold`` (v2.4): features for every candidate pair of the
+    queries in the held-out train-side regions (``rerank.hold_frac``, see
+    :func:`ber.eval.split.hold_regions`), which stage 2 trains on next to val.
+
+    Identical to what ``ber features`` computes for these queries: the filler words
+    and brand syllables are read from its outputs, and every corpus statistic
+    (token IDF, name frequency, name vocabulary, per-S1 candidate counts) comes from
+    all S1 of the country and the full candidate set. Only the records needed are
+    loaded: every S1 of the country and the hold queries (about a third of the
+    memory of the full stage). Output ``features_hold/`` has side = "hold"."""
+    from ..eval.split import hold_regions
+    fc = cfg.features
+    with StageRun(cfg, "features_hold") as st:
+        regions = st.read_input("split", "regions", run=cfg.data.split_run)
+        hold = hold_regions(regions, cfg.rerank.hold_frac, cfg.seed)
+        if hold.empty:
+            raise ValueError("rerank.hold_frac selects no region: set it > 0")
+        st.write_parquet(hold, "hold_regions")
+        st.metric("hold_regions", {c: sorted(g.geo) for c, g in hold.groupby("country")})
+        qs = st.read_input("split", "queries", run=cfg.data.split_run,
+                           columns=["entity_id", "country", "geo", "side"])
+        hq = qs[(qs.side == "train").to_numpy()].merge(hold[["country", "geo"]],
+                                                        on=["country", "geo"])
+        st.write_parquet(hq[["entity_id", "country", "geo"]], "hold_queries")
+        del qs
+        fillers = brand_units = None
+        if fc.name_key:
+            with open(st.input_path("features", "fillers"), encoding="utf-8") as fh:
+                fillers = json.load(fh)
+            with open(st.input_path("features", "brand_units"), encoding="utf-8") as fh:
+                brand_units = json.load(fh)
+        rec_path = st.input_path("normalize", "records_train")
+        cand_dir = st.input_path("candidates", "candidates_train")
+        with timed(st.log, "train: per-S1 candidate context"):
+            ctx = s1_context(cand_dir)
+        with open(st.input_path("candidates", "parts_train"), encoding="utf-8") as fh:
+            parts_by_country = json.load(fh)
+        out_dir = st.path("features_hold")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for old in out_dir.glob("*.parquet"):
+            old.unlink()
+        n_parts = n_rows = n_pos = 0
+        for country, g in hq.groupby("country"):
+            ids = set(g.entity_id)
+            with timed(st.log, f"hold {country}: records + extras ({len(ids)} queries)"):
+                recs = _read_country_records(rec_path, country, REC_COLS + ["owner"], ids)
+                recs, kidx, aidx = _country_records(recs, fillers, brand_units)
+                rec = recs.set_index("entity_id")
+                del recs
+            with timed(st.log, f"hold {country}: features"):
+                for name in parts_by_country.get(country, []):
+                    part = pd.read_parquet(cand_dir / name).astype({"q_id": str, "s1_id": str})
+                    part = part[part.q_id.isin(ids)]
+                    if part.empty:
+                        continue
+                    for chunk in _query_chunks(part, fc.chunk_rows):
+                        d = join_records(chunk, rec, ctx)
+                        feats = build_features(d, kidx, aidx)
+                        keys = d[["q_id", "s1_id"]].copy()
+                        keys["y"] = (d.s1_id == d.q_owner).astype(np.int8)
+                        keys["side"] = "hold"
+                        n_pos += int(keys.y.sum())
+                        out = pd.concat([keys, feats], axis=1)
+                        out.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False)
+                        n_parts += 1
+                        n_rows += len(out)
+                        del d, feats, out
+            del rec, kidx, aidx
+        st.register("features_hold", out_dir, rows=n_rows, parts=n_parts)
+        st.metric("hold_pairs", n_rows)
+        st.metric("hold_queries", len(hq))
+        st.metric("hold_positive_rate", round(n_pos / max(n_rows, 1), 4))
+
+
 def run_features(cfg: Config) -> None:
     """Candidate parts are grouped by country (``parts_<split>.json`` of the
     candidates stage), so only one country's records are in memory at a time."""

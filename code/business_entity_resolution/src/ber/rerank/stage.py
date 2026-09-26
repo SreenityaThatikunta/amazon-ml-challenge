@@ -37,6 +37,9 @@ import os
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.compute as pc
+import pyarrow.parquet as pq
 from sklearn.metrics import log_loss, roc_auc_score
 
 from ..artifacts import StageRun
@@ -121,15 +124,19 @@ COUNT_COLS = ["s_n", "s_sum_other", "s_n_hi_other", "ss_sum_other", "ss_n_hi_oth
 IDF_COLS = ["k_idf_unmatched_q", "k_idf_unmatched_s", "a_idf_unmatched_q", "a_idf_unmatched_s"]
 
 
-def domain_normalize(X: pd.DataFrame, groups: np.ndarray | None = None) -> pd.DataFrame:
+def domain_normalize(M: np.ndarray, cols: list[str], groups: np.ndarray | None = None) -> np.ndarray:
     """Count-like columns / their mean, IDF-like columns / their 99th percentile of
-    non-zero values, within each group (country) of ``X`` (in place; returns X)."""
-    groups = np.zeros(len(X), dtype=np.int8) if groups is None else groups
+    non-zero values, within each group (country) of the rows of the float32 matrix
+    ``M`` whose columns are ``cols`` (in place; returns M)."""
+    idx = {c: j for j, c in enumerate(cols)}
+    groups = np.zeros(len(M), dtype=np.int8) if groups is None else groups
+    ug = np.unique(groups)
     for c in COUNT_COLS + IDF_COLS:
-        if c not in X:
+        j = idx.get(c)
+        if j is None:
             continue
-        v = X[c].to_numpy(dtype=np.float32, copy=True)
-        for g in np.unique(groups):
+        v = np.ascontiguousarray(M[:, j])  # contiguous float32 copy of the column
+        for g in ug:
             m = groups == g
             if c in COUNT_COLS:
                 ref = float(v[m].mean()) or 1.0
@@ -137,8 +144,8 @@ def domain_normalize(X: pd.DataFrame, groups: np.ndarray | None = None) -> pd.Da
                 nz = v[m][v[m] > 0]
                 ref = float(np.quantile(nz, 0.99)) if len(nz) else 1.0
             v[m] = v[m] / ref
-        X[c] = v
-    return X
+        M[:, j] = v
+    return M
 
 
 def _codes(values: pd.Series, dtype: pd.CategoricalDtype) -> np.ndarray:
@@ -148,15 +155,34 @@ def _codes(values: pd.Series, dtype: pd.CategoricalDtype) -> np.ndarray:
     return c.astype(np.int32)
 
 
-def _frame(keys: pd.DataFrame, raw: pd.DataFrame, q_cat, s_cat) -> tuple[pd.DataFrame, np.ndarray]:
-    """Stage-2 feature frame for pairs (keys: q_id, s1_id, p; raw: stage-1 features)."""
-    q = _codes(keys.q_id, q_cat)
-    s = _codes(keys.s1_id, s_cat)
-    src = raw.q_source.to_numpy()
-    X = group_features(q, s, src, keys.p.to_numpy())
-    for c in raw.columns:
-        X[c] = raw[c].to_numpy(dtype=np.float32)
-    return X, q
+def _arrow_codes(ids: pa.ChunkedArray) -> np.ndarray:
+    """Integer codes of string ids (Arrow dictionary encoding: no Python strings).
+    Only the grouping matters to the stage-2 features, not the code values."""
+    return pc.dictionary_encode(ids.combine_chunks()).indices.to_numpy().astype(np.int64)
+
+
+def group_columns() -> list[str]:
+    """Names (in order) of the columns :func:`group_features` returns."""
+    one = np.zeros(1, dtype=np.int64)
+    return list(group_features(one, one, one + 2, np.zeros(1)).columns)
+
+
+def _fill_group(M: np.ndarray, q: np.ndarray, s: np.ndarray, src: np.ndarray,
+                p: np.ndarray) -> None:
+    """Write the group features into the first columns of M (in place)."""
+    G = group_features(q, s, src, p)
+    for j, c in enumerate(G.columns):
+        M[:, j] = G[c].to_numpy()
+
+
+def _fill_raw(M: np.ndarray, row: int, col0: int, table: pa.Table, raw_cols: list[str],
+              keep: np.ndarray) -> int:
+    """Write the kept rows of an Arrow table's stage-1 feature columns into
+    M[row:, col0:] (numpy casts every type to float32); returns the rows written."""
+    n = int(keep.sum())
+    for j, c in enumerate(raw_cols):
+        M[row:row + n, col0 + j] = table.column(c).to_numpy()[keep]
+    return n
 
 
 def _params(cfg: Config) -> dict:
@@ -168,43 +194,98 @@ def _params(cfg: Config) -> dict:
             "num_threads": cfg.scorer.n_threads or max(1, (os.cpu_count() or 4) - 2)}
 
 
-def _read_val(st: StageRun, cfg: Config, raw_cols: list[str]):
-    """Val pairs with p1 >= min_p1: keys (q_id, s1_id, y, p) and raw stage-1 features,
-    row-aligned. scores_val was written by streaming the features_train parts
-    in order (val side only), so the two line up row by row (checked part by
-    part); only the kept rows of each part are held in memory."""
-    sv = st.read_input("scorer", "scores_val")
-    # candidate-set size vs recall for other filter levels (the organisers rank smaller
-    # candidate sets higher): pairs per val query and share of true pairs kept
-    n_q = max(sv.q_id.nunique(), 1)
-    st.metric("filter_tradeoff", {t: {"pairs_per_query": round(float((sv.p >= t).sum()) / n_q, 3),
-                                      "true_pairs_kept": round(float(sv.y[sv.p >= t].sum())
-                                                               / max(float(sv.y.sum()), 1), 5)}
-                                  for t in (0.0, 0.0003, 0.001, 0.003, 0.01, 0.03)})
-    keep_all = (sv.p >= cfg.rerank.min_p1).to_numpy()
-    sv_q = sv.q_id.astype(str).to_numpy()
-    parts, off = [], 0
-    for f in sorted(st.input_path("features", "features_train").glob("*.parquet")):
-        d = pd.read_parquet(f, columns=["q_id", "side"] + raw_cols)
-        d = d[(d.side == "val").to_numpy()]
-        n = len(d)
-        if n == 0:
-            continue
-        if off + n > len(sv) or not (d.q_id.astype(str).to_numpy() == sv_q[off:off + n]).all():
-            raise RuntimeError(f"scores_val and features_train val rows are not aligned ({f.name})")
-        parts.append(d.loc[keep_all[off:off + n], raw_cols])
-        off += n
-    if off != len(sv):
-        raise RuntimeError("scores_val has rows beyond the val features")
-    raw = pd.concat(parts, ignore_index=True)
-    return sv[keep_all].reset_index(drop=True), raw
+# (stage 2) where each side's pairs come from: (scores stage, output), (features stage, output)
+def _read_pairs(st: StageRun, cfg: Config, raw_cols: list[str], sides: list[str]):
+    """Pairs with p1 >= min_p1 of the given sides (val, and hold if
+    ``rerank.hold_frac`` > 0) as (keys: q_id, s1_id, y, p, side; M: float32 matrix
+    with the stage-1 features in the columns after the group features, which are
+    still empty; cols). Only the kept rows are materialised, straight into M.
+
+    val: ``scores_val`` was written by streaming the val rows of the features_train
+    parts in order, so the two line up row by row (checked part by part on the
+    Arrow ids). hold: ``scores_hold/`` has one part per features_hold part, under
+    the same file name (checked the same way)."""
+    min_p1 = cfg.rerank.min_p1
+    sv = hold_parts = None
+    n_keep = 0
+    if "val" in sides:
+        sv = pq.read_table(st.input_path("scorer", "scores_val"), columns=["q_id", "s1_id", "y", "p"])
+        n_keep += int((sv.column("p").to_numpy() >= min_p1).sum())
+    if "hold" in sides:
+        hold_parts = sorted(st.input_path("scorer", "scores_hold").glob("*.parquet"))
+        n_keep += sum(int((pq.read_table(f, columns=["p"]).column("p").to_numpy() >= min_p1).sum())
+                      for f in hold_parts)
+    gcols = group_columns()
+    cols = gcols + raw_cols
+    M = np.empty((n_keep, len(cols)), dtype=np.float32)
+    row, keys = 0, []
+    if sv is not None:
+        p, y = sv.column("p").to_numpy(), sv.column("y").to_numpy()
+        # candidate-set size vs recall for other filter levels (the organisers rank
+        # smaller candidate sets higher): pairs per val query, share of true pairs kept
+        n_q = max(pc.count_distinct(sv.column("q_id")).as_py(), 1)
+        n_pos = max(float(y.sum()), 1)
+        st.metric("filter_tradeoff", {
+            t: {"pairs_per_query": round(float((p >= t).sum()) / n_q, 3),
+                "true_pairs_kept": round(float(y[p >= t].sum()) / n_pos, 5)}
+            for t in (0.0, 0.0003, 0.001, 0.003, 0.01, 0.03)})
+        keep_all = p >= min_p1
+        sv_q = sv.column("q_id")
+        off = 0
+        for f in sorted(st.input_path("features", "features_train").glob("*.parquet")):
+            d = pq.read_table(f, columns=["q_id", "side"] + raw_cols)
+            d = d.filter(pc.equal(d.column("side"), "val"))
+            n = d.num_rows
+            if n == 0:
+                continue
+            if off + n > len(p) or not pc.all(pc.equal(d.column("q_id"),
+                                                       sv_q.slice(off, n))).as_py():
+                raise RuntimeError(f"scores_val and features_train val rows are not aligned ({f.name})")
+            row += _fill_raw(M, row, len(gcols), d, raw_cols, keep_all[off:off + n])
+            off += n
+            del d
+        if off != len(p):
+            raise RuntimeError("scores_val has rows beyond the val features")
+        km = pa.array(keep_all)
+        keys.append(pd.DataFrame({"q_id": pc.filter(sv_q, km).to_pandas(),
+                                  "s1_id": pc.filter(sv.column("s1_id"), km).to_pandas(),
+                                  "y": y[keep_all], "p": p[keep_all], "side": "val"}))
+        del sv, sv_q, p, y
+    if hold_parts is not None:
+        ft_dir = st.input_path("features_hold", "features_hold")
+        for f in hold_parts:
+            sc = pq.read_table(f, columns=["q_id", "s1_id", "y", "p"])
+            ft = pq.read_table(ft_dir / f.name, columns=["q_id"] + raw_cols)
+            if ft.num_rows != sc.num_rows or not pc.all(
+                    pc.equal(ft.column("q_id"), sc.column("q_id"))).as_py():
+                raise RuntimeError(f"scores_hold/features_hold part {f.name} not aligned")
+            p = sc.column("p").to_numpy()
+            keep = p >= min_p1
+            row += _fill_raw(M, row, len(gcols), ft, raw_cols, keep)
+            km = pa.array(keep)
+            keys.append(pd.DataFrame({"q_id": pc.filter(sc.column("q_id"), km).to_pandas(),
+                                      "s1_id": pc.filter(sc.column("s1_id"), km).to_pandas(),
+                                      "y": sc.column("y").to_numpy()[keep], "p": p[keep],
+                                      "side": "hold"}))
+            del sc, ft
+    return pd.concat(keys, ignore_index=True), M, cols
+
+
+def _query_countries(st: StageRun, cfg: Config, sides: list[str]) -> pd.Series:
+    """Country of every val (and hold) query, indexed by entity_id."""
+    out = [pd.read_parquet(st.input_path("normalize", "records_train"),
+                           columns=["entity_id", "country"],
+                           filters=[("side", "==", "val")]).set_index("entity_id").country]
+    if "hold" in sides:
+        out.append(st.read_input("features_hold", "hold_queries",
+                                 columns=["entity_id", "country"]).set_index("entity_id").country)
+    return pd.concat(out)
 
 
 def _raw_columns(st: StageRun, wanted: list[str]) -> list[str]:
     """Stage-1 features passed to stage 2; ["all"] = every stage-1 feature."""
     if list(wanted) != ["all"]:
         return list(wanted)
-    import pyarrow.parquet as pq
     first = sorted(st.input_path("features", "features_train").glob("*.parquet"))[0]
     return [c for c in pq.ParquetFile(first).schema_arrow.names
             if c not in ("q_id", "s1_id", "y", "side")]
@@ -214,23 +295,29 @@ def run_rerank(cfg: Config) -> None:
     rc = cfg.rerank
     with StageRun(cfg, "rerank") as st:
         raw_cols = _raw_columns(st, rc.raw_features)
-        recs = pd.read_parquet(st.input_path("normalize", "records_train"),
-                               columns=["entity_id", "source"])
         if cfg.run_train:
-            q_cat = pd.CategoricalDtype(recs.entity_id[recs.source != 1].to_numpy())
-            s_cat = pd.CategoricalDtype(recs.entity_id[recs.source == 1].to_numpy())
-            with timed(st.log, "load val pairs"):
-                keys, raw = _read_val(st, cfg, raw_cols)
-                X, q = _frame(keys, raw, q_cat, s_cat)
+            # every side is loaded whenever it exists (group features and domain scales
+            # then see the same pairs whatever stage 2 trains on); train_sides picks the
+            # training rows
+            sides = ["val", "hold"] if rc.hold_frac > 0 else ["val"]
+            if not set(rc.train_sides) <= set(sides) or not rc.train_sides:
+                raise ValueError(f"rerank.train_sides {rc.train_sides} must be a non-empty "
+                                 f"subset of the loaded sides {sides} (hold needs hold_frac > 0)")
+            with timed(st.log, f"load pairs ({'+'.join(sides)})"):
+                keys, M, cols = _read_pairs(st, cfg, raw_cols, sides)
+                q = pd.factorize(keys.q_id)[0]
+                s = pd.factorize(keys.s1_id)[0]
+                _fill_group(M, q, s, M[:, cols.index("q_source")], keys.p.to_numpy())
                 y = keys.y.to_numpy()
                 if rc.domain_norm:
-                    cty = pd.read_parquet(st.input_path("normalize", "records_train"),
-                                          columns=["entity_id", "country"],
-                                          filters=[("side", "==", "val")]
-                                          ).set_index("entity_id").country
+                    cty = _query_countries(st, cfg, sides)
                     groups = pd.factorize(cty.reindex(keys.q_id.astype(str)).fillna(""))[0]
-                    X = domain_normalize(X, groups)
-            st.metric("val_pairs", {"kept": len(keys), "positives": int(y.sum())})
+                    domain_normalize(M, cols, groups)
+            is_val = (keys.side == "val").to_numpy()
+            trainable = keys.side.isin(rc.train_sides).to_numpy()
+            st.metric("pairs", {sd: {"kept": int((keys.side == sd).sum()),
+                                     "positives": int(y[(keys.side == sd).to_numpy()].sum())}
+                                for sd in sides})
 
             # folds grouped by the query's top S1 (keeps most S1 groups in one fold)
             top = keys.assign(q=q).sort_values(["q", "p"], ascending=[True, False]
@@ -242,10 +329,10 @@ def run_rerank(cfg: Config) -> None:
             if rc.fold_by == "region":  # robustness check: whole regions held out per fold
                 reg = pd.read_parquet(st.input_path("normalize", "records_train"),
                                       columns=["entity_id", "region"],
-                                      filters=[("source", "==", 1), ("side", "==", "val")]
-                                      ).set_index("entity_id").region
+                                      filters=[("source", "==", 1)]).set_index("entity_id").region
                 top_reg = pd.Series(reg.reindex(top.s1_id.astype(str)).fillna("").to_numpy(),
                                     index=top.q.to_numpy())
+                del reg
                 sizes = top_reg.value_counts()
                 # largest first, each region to the currently smallest fold (balanced sizes)
                 load, fold_of = [0] * rc.folds, {}
@@ -256,8 +343,8 @@ def run_rerank(cfg: Config) -> None:
                 fold = np.array([fold_of[r] for r in top_reg.reindex(q).to_numpy()])
                 st.metric("fold_regions", {k: sorted(r for r, f in fold_of.items() if f == k)
                                            for k in range(rc.folds)})
-            oof = np.zeros(len(X), dtype=np.float64)
-            imp = np.zeros(X.shape[1])
+            oof = np.zeros(len(M), dtype=np.float64)
+            imp = np.zeros(M.shape[1])
             w = None
             if rc.weights_file:  # e.g. adversarial-validation weights (val rows made test-shaped)
                 wf = pd.read_parquet(rc.weights_file)
@@ -266,41 +353,50 @@ def run_rerank(cfg: Config) -> None:
                      .w.fillna(1.0).to_numpy(dtype=np.float64))
                 st.metric("train_weights", {"file": rc.weights_file,
                                             "q": np.quantile(w, [0.01, 0.5, 0.99]).round(3).tolist()})
-            with timed(st.log, f"cross-fit {rc.folds} folds"):
+            with timed(st.log, f"cross-fit {rc.folds} folds (train on {'+'.join(rc.train_sides)})"):
                 for k in range(rc.folds):
-                    tr, te = fold != k, fold == k
+                    tr, te = (fold != k) & trainable, fold == k
                     # early stopping on 10% of the training groups (never the held-out fold)
                     es = tr & (u * 10 % 1 < 0.1)
                     fit = tr & ~es
-                    dtr = lgb.Dataset(X[fit], y[fit], free_raw_data=True,
+                    dtr = lgb.Dataset(M[fit], y[fit], feature_name=cols, free_raw_data=True,
                                       weight=None if w is None else w[fit])
-                    des = lgb.Dataset(X[es], y[es], reference=dtr,
+                    des = lgb.Dataset(M[es], y[es], reference=dtr,
                                       weight=None if w is None else w[es])
                     m = lgb.train(_params(cfg), dtr, num_boost_round=rc.num_boost_round,
                                   valid_sets=[des], valid_names=["es"],
                                   callbacks=[lgb.early_stopping(rc.early_stopping, verbose=False)])
-                    oof[te] = m.predict(X[te], num_iteration=m.best_iteration)
+                    del dtr, des
+                    oof[te] = m.predict(M[te], num_iteration=m.best_iteration)
                     imp += m.feature_importance("gain")
                     m.save_model(str(st.path(f"model_fold{k}.txt")))
-                    st.log.info("fold %d: best iteration %d, held-out AUC %.6f", k,
-                                m.best_iteration, roc_auc_score(y[te], oof[te]))
+                    tv = te & is_val
+                    st.log.info("fold %d: best iteration %d, held-out val AUC %.6f", k,
+                                m.best_iteration, roc_auc_score(y[tv], oof[tv]))
             st.register("models", st.dir)
-            st.metric("val_auc_p1", round(float(roc_auc_score(y, keys.p)), 6))
-            st.metric("val_auc_p2_oof", round(float(roc_auc_score(y, oof)), 6))
-            st.metric("val_logloss_p1", round(float(log_loss(y, keys.p.clip(1e-7, 1 - 1e-7))), 6))
-            st.metric("val_logloss_p2_oof", round(float(log_loss(y, oof.clip(1e-7, 1 - 1e-7))), 6))
-            imp_df = pd.DataFrame({"feature": X.columns, "gain": imp}).sort_values(
+            yv, pv, ov = y[is_val], keys.p.to_numpy()[is_val], oof[is_val]
+            st.metric("val_auc_p1", round(float(roc_auc_score(yv, pv)), 6))
+            st.metric("val_auc_p2_oof", round(float(roc_auc_score(yv, ov)), 6))
+            st.metric("val_logloss_p1", round(float(log_loss(yv, np.clip(pv, 1e-7, 1 - 1e-7))), 6))
+            st.metric("val_logloss_p2_oof", round(float(log_loss(yv, np.clip(ov, 1e-7, 1 - 1e-7))), 6))
+            if "hold" in sides:
+                hm = ~is_val
+                st.metric("hold_auc_p1", round(float(roc_auc_score(y[hm], keys.p.to_numpy()[hm])), 6))
+                st.metric("hold_auc_p2_oof", round(float(roc_auc_score(y[hm], oof[hm])), 6))
+            imp_df = pd.DataFrame({"feature": cols, "gain": imp}).sort_values(
                 "gain", ascending=False)
             st.write_parquet(imp_df, "importance")
             st.log.info("stage-2 features by gain:\n%s", imp_df.to_string(index=False))
             out = keys[["q_id", "s1_id", "y"]].assign(p=oof.astype(np.float32),
                                                       p1=keys.p.to_numpy())
-            for c in SEGMENT_COLS:  # kept for the prior-shift correction in decide
-                if c in X:
-                    out[c] = X[c].to_numpy()
-            st.write_parquet(out, "scores_val")
-            del out
-            del X, raw, keys
+            for c in SEGMENT_COLS:  # kept for the prior-shift corrections in decide
+                if c in cols:
+                    out[c] = M[:, cols.index(c)]
+            del M
+            st.write_parquet(out[is_val].reset_index(drop=True), "scores_val")
+            if "hold" in sides:
+                st.write_parquet(out[~is_val].reset_index(drop=True), "scores_hold")
+            del out, keys
 
         if cfg.run_test:
             _score_test(st, cfg, raw_cols)
@@ -309,22 +405,27 @@ def run_rerank(cfg: Config) -> None:
 def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
     """Test pairs with p1 >= min_p1, one country at a time (S1 and query groups
     never cross countries, and the stage-1 score parts are written country by
-    country), scored by the mean of the fold models."""
+    country), scored by the mean of the fold models. Kept rows are counted first
+    and written straight into one float32 matrix per country; ids stay in Arrow."""
     rc = cfg.rerank
     rt = pd.read_parquet(st.input_path("normalize", "records_test"),
-                         columns=["entity_id", "source", "country"])
-    q_cat = pd.CategoricalDtype(rt.entity_id[rt.source != 1].to_numpy())
-    s_cat = pd.CategoricalDtype(rt.entity_id[rt.source == 1].to_numpy())
-    s1_country = rt[rt.source == 1].set_index("entity_id").country
+                         columns=["entity_id", "country"], filters=[("source", "==", 1)])
+    s1_country = rt.set_index("entity_id").country
+    del rt
     models = [lgb.Booster(model_file=str(st.path(f"model_fold{k}.txt")))
               for k in range(rc.folds)]
+    gcols = group_columns()
+    cols = gcols + raw_cols
+    if models[0].feature_name() != cols:
+        raise RuntimeError("the stage-2 models were trained on other features than "
+                           "rerank.raw_features gives now")
     sc_dir = st.input_path("scorer", "scores_test")
     ft_dir = st.input_path("features", "features_test")
     by_country: dict[str, list] = {}
     for f in sorted(sc_dir.glob("*.parquet")):
-        first = pd.read_parquet(f, columns=["s1_id"]).s1_id.iloc[:1].astype(str)
-        if len(first):
-            by_country.setdefault(s1_country[first.iloc[0]], []).append(f)
+        first = pq.read_table(f, columns=["s1_id"]).column("s1_id").slice(0, 1).to_pylist()
+        if first:
+            by_country.setdefault(s1_country[first[0]], []).append(f)
     out_dir = st.path("scores_test")
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("*.parquet"):
@@ -332,42 +433,43 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
     n_total = 0
     for country, files in sorted(by_country.items()):
         with timed(st.log, f"test {country}: {len(files)} parts"):
-            ks, rs = [], []
+            n = sum(int((pq.read_table(f, columns=["p"]).column("p").to_numpy()
+                         >= rc.min_p1).sum()) for f in files)
+            M = np.empty((n, len(cols)), dtype=np.float32)
+            qs, ss, ps = [], [], []
+            row = 0
             for f in files:
-                sc = pd.read_parquet(f)
-                ft = pd.read_parquet(ft_dir / f.name, columns=["q_id"] + raw_cols)
-                if len(ft) != len(sc) or not (ft.q_id.astype(str).to_numpy()
-                                              == sc.q_id.astype(str).to_numpy()).all():
+                sc = pq.read_table(f, columns=["q_id", "s1_id", "p"])
+                ft = pq.read_table(ft_dir / f.name, columns=["q_id"] + raw_cols)
+                if ft.num_rows != sc.num_rows or not pc.all(
+                        pc.equal(ft.column("q_id"), sc.column("q_id"))).as_py():
                     raise RuntimeError(f"scores/features part {f.name} not aligned")
-                keep = (sc.p >= rc.min_p1).to_numpy()
-                sc = sc[keep]
-                ks.append(pd.DataFrame({"q": _codes(sc.q_id, q_cat),
-                                        "s": _codes(sc.s1_id, s_cat), "p": sc.p.to_numpy()}))
-                rs.append(ft.loc[keep, raw_cols].reset_index(drop=True))
+                keep = sc.column("p").to_numpy() >= rc.min_p1
+                row += _fill_raw(M, row, len(gcols), ft, raw_cols, keep)
+                km = pa.array(keep)
+                qs.extend(pc.filter(sc.column("q_id"), km).chunks)
+                ss.extend(pc.filter(sc.column("s1_id"), km).chunks)
+                ps.append(sc.column("p").to_numpy()[keep])
                 del sc, ft
-            k = pd.concat(ks, ignore_index=True)
-            raw = pd.concat(rs, ignore_index=True)
-            del ks, rs
-            X = group_features(k.q.to_numpy(), k.s.to_numpy(), raw.q_source.to_numpy(),
-                               k.p.to_numpy())
-            for c in raw_cols:
-                X[c] = raw[c].to_numpy(dtype=np.float32)
-            del raw
-            if rc.domain_norm:  # this frame is one country of the test split
-                X = domain_normalize(X)
-            p2 = np.zeros(len(X), dtype=np.float64)
-            step = 2_000_000
-            for a in range(0, len(X), step):
-                xa = X.iloc[a:a + step]
-                p2[a:a + step] = np.mean([m.predict(xa, num_iteration=m.best_iteration)
+            q_ids = pa.chunked_array(qs, type=pa.large_string())
+            s_ids = pa.chunked_array(ss, type=pa.large_string())
+            p1 = np.concatenate(ps)
+            del qs, ss, ps
+            _fill_group(M, _arrow_codes(q_ids), _arrow_codes(s_ids),
+                        M[:, cols.index("q_source")], p1)
+            if rc.domain_norm:  # this matrix is one country of the test split
+                domain_normalize(M, cols)
+            p2 = np.zeros(n, dtype=np.float64)
+            step = 500_000
+            for a in range(0, n, step):
+                p2[a:a + step] = np.mean([m.predict(M[a:a + step], num_iteration=m.best_iteration)
                                           for m in models], axis=0)
-            seg = {c: X[c].to_numpy() for c in SEGMENT_COLS if c in X}
-            del X
-            out = pd.DataFrame({"q_id": q_cat.categories.to_numpy()[k.q.to_numpy()],
-                                "s1_id": s_cat.categories.to_numpy()[k.s.to_numpy()],
-                                "p": p2.astype(np.float32), "p1": k.p.to_numpy(), **seg})
-            out.to_parquet(out_dir / f"part-{country}.parquet", index=False)
-            n_total += len(out)
-            st.metric(f"test_pairs_kept.{country}", len(out))
-            del out, k, p2
+            seg = {c: M[:, cols.index(c)].copy() for c in SEGMENT_COLS if c in cols}
+            del M
+            out = pa.table({"q_id": q_ids, "s1_id": s_ids, "p": p2.astype(np.float32),
+                            "p1": p1, **seg})
+            pq.write_table(out, out_dir / f"part-{country}.parquet")
+            n_total += n
+            st.metric(f"test_pairs_kept.{country}", n)
+            del out, q_ids, s_ids, p1, p2, seg
     st.register("scores_test", out_dir, rows=n_total)

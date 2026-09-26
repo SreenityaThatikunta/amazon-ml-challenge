@@ -230,6 +230,19 @@ assigned pair on the same street (address token-set ≥ 80):
 
   The correction recovers 96–99 % of the loss and stays off when the error is small.
 
+**Limits (`anchor_legal.py`).** The anchor assumption is kind-specific. Along another
+axis, legal-form conflicts at the same street with an equal name key, the val bias is
+large and unstable (odds ratio 1.03 in the US but 13.8 in India, where the model's 1.1 %
+is right: 2.2 % true), because India's legal-form decoys keep their house number. So the
+correction is only used for name-change kinds, whose val biases are moderate and similar
+across countries (typo 1.26/1.54, generic 1.11/1.99 with n = 256 in the US, other
+1.84/1.69). France's generic swaps stay beyond 2× even with the worst of these (6.48 /
+1.99 = 3.3), so the direction of the correction is robust; its size (3.3–5.5×) is not.
+The residual risk: French decoys created as "another business at the same address"
+that keep the house number would look like true copies to the anchor; nothing in the
+data points to them (no clustering at shared addresses), but only the leaderboard can
+rule them out.
+
 **6. Effect on test (run `v23` = v2.2's stages via junctions + anchor decide).** Only
 France's generic swaps are corrected (π_anchor 0.815 vs mean p 0.404 → r 6.48 / bias 1.17 =
 **5.53**); every other country × kind stays within 0.87–1.81 (US generic swaps 1.81, below
@@ -238,6 +251,24 @@ France's generic swaps are corrected (π_anchor 0.815 vs mean p 0.404 → r 6.48
 linked; candidate_pairs.tsv unchanged (9,649,852). Expected LB effect is small (≈ +0.0006
 to +0.0008 if ≥ 90 % of the new links are right, ≈ 0 at 70 %): a 3-decimal leaderboard may
 not show it.
+
+### Memory: stage 2 and the scorer without the big in-RAM copies (2026-09-26)
+
+The laptop has ~4–5 GB free while the user works (Windows' page file is on D:, 18.6 GB,
+and peaked at 11.3 GB during the earlier runs, i.e. stages swapped heavily). The GPU
+does not help here: the pip LightGBM has no GPU build (checked) and the memory goes to
+data preparation, not model training. Changes (logic unchanged):
+- `rerank`: stage-1 scores and features read as Arrow tables; ids compared in Arrow (no
+  25.6 M Python strings); the category dtypes over all 12.5 M train / 11.7 M test records
+  replaced by integer codes of the kept pairs only (the group features only need the
+  grouping); kept rows written straight into one preallocated float32 matrix (no
+  per-part frames, no concat copy); LightGBM gets that matrix directly.
+- `scorer`: two passes (sample masks from the ids, then rows straight into
+  preallocated matrices; no concatenation copy).
+- Check (run `v2m` = v2.2 re-run with the new code): identical fold models (best
+  iterations 742/1001/1131/857) and **bit-identical** p2 for all 1,118,624 val pairs
+  and all 9,649,852 test pairs (max |Δp| = 0.0). Peak RSS: train pass **3.5 GB (was 7.8)**,
+  test pass **5.0 GB (was 8.25)**.
 
 **LB probes prepared** (the only way to see test performance by part):
 `D:\aml\submissions\probe_france_empty\` (v2.1, every French S1 left empty → France's own

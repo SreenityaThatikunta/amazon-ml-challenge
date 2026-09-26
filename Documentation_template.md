@@ -55,6 +55,13 @@ v2 checks in `progress.md`):
 - **Test differs from train:** France is new, and test has ~5.7 S2/S3 records per S1
   vs 4.7 in train (≈ 40 % unmatched vs 26 %). Our first leaderboard score (0.975) was
   ≈ 0.007 below its validation score (0.982).
+- **France has a name noise US/India don't:** at the same address and house number, the
+  *generic* word of a name is swapped (`Ski College SARL` → `Ski Comite SARL`,
+  `BYH Club SAS` → `BYH Loisirs SAS`) or replaced by `& Fils` / `(France)`. Such
+  generic-word swaps are 6.6 % of French same-street pairs but 0.1 % (US) and 1.5 % (India),
+  where they are mostly decoys; the model, which never saw the pattern, gives the French
+  ones p ≈ 0.4. Their house-number pattern (below) says ~80 % are true copies (likely the
+  French form of the "DBA/trade name" noise in the problem statement).
 
 ### 2.2 Solution Strategy
 
@@ -154,8 +161,28 @@ of the 4 fold models. No pretrained model, far below the 8 B parameter limit.
 **Threshold selection method:** one owner per record (its highest p2), then per S1 the
 prefix of its records (sorted by p2) that maximises the expected F0.5
 (≈ 1.25·Σp / (0.25·Σp_all + k), vs P(no match) = Π(1 − p) for the empty prediction), after
-dropping p2 < min_p. min_p = 0.2 chosen on validation; the curve is flat (within 0.0001
+dropping p2 < min_p. min_p = 0.3 chosen on validation; the curve is flat (within 0.0001
 for 0.02–0.5). Exact duplicate records share one owner.
+
+**Prior correction per name-change kind (`decide.prior_shift = anchor`,
+`src/ber/decide/anchor.py`).** A model trained on US/India cannot know how often an
+unseen kind of name change is a true copy in a new country. We estimate it from the
+unlabelled test data with an *anchor*: given the match status, the house-number
+relation of a record and its S1 (equal / shifted / missing / ...) does not depend on how
+the name was changed (on validation the true copies' profile is the same for exact
+names, typos, generic-word swaps and other changes; decoys are mostly *shifted*). So for
+each country and name-change kind (exact key, one rare word swapped = typo, one generic
+word swapped, other), the kind's house-number histogram is a mixture of the true-copy and
+decoy profiles (both measured on the exact-name kind, with p2 as soft labels), which gives
+its share of true copies π by least squares. If odds(π) / odds(mean p2 of the kind),
+de-biased by the same ratio measured on validation (where the model is calibrated), is
+beyond 2× and the kind has ≥ 2,000 pairs, the kind's p2 are rescaled by that odds ratio
+(capped at 6). On validation nothing is corrected (F0.5 unchanged). Checks on
+validation: no correction fires under eight simulated label shifts where the model stays
+calibrated; when one kind's scores are replaced by house-number-only scores with a wrong
+prior (France's situation), the correction recovers 96–99 % of the lost F0.5. On test
+it fires only for **France's generic-word swaps** (π = 0.81 vs mean p2 0.40, odds × 5.5):
+16,217 more French links, nothing else changes.
 
 ---
 

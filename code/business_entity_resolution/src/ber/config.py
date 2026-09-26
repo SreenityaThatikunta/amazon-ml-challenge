@@ -121,6 +121,10 @@ class RerankConfig:
     fold_by: str = "s1"             # "s1" (groups by the record's top S1) | "region" (check)
     weights_file: str | None = None  # parquet (q_id, s1_id, w): training weights for val pairs
     domain_norm: bool = True        # size-dependent features / their per-country-split scale
+    hold_frac: float = 0.0          # v2.4: share of each country's S1 in extra held-out train regions
+                                    # (ber features-hold; stage 1 trains without them)
+    train_sides: list[str] = field(default_factory=lambda: ["val"])  # stage-2 training pairs:
+                                    # val and/or hold; a side not trained on is scored by the fold mean
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200

@@ -79,6 +79,24 @@ def assign_regions(s1: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def hold_regions(regions: pd.DataFrame, frac: float, seed: int) -> pd.DataFrame:
+    """Whole train-side regions set aside for stage 2 (v2.4, ``rerank.hold_frac``):
+    per country, shuffled regions are added until ~``frac`` of the country's S1 is
+    covered (same greedy rule as the val split, own seed). Stage 1 then trains
+    without them, so their stage-1 scores are out-of-sample like val's and test's,
+    and stage 2 learns from val + these regions (more regions, less region-specific
+    patterns). Returns rows (country, geo, n_s1) of ``regions``."""
+    rng = np.random.default_rng(seed + 11)
+    out = []
+    for country in sorted(regions.country.unique()):
+        r = regions[regions.country == country]
+        sizes = r[r.side == "train"].set_index("geo").n_s1
+        chosen = choose_regions(sizes, frac * r.n_s1.sum(), rng) if frac > 0 else []
+        out.append(r[r.geo.isin(chosen)][["country", "geo", "n_s1"]])
+    return pd.concat(out, ignore_index=True) if out else pd.DataFrame(
+        columns=["country", "geo", "n_s1"])
+
+
 def _hash_fill(df: pd.DataFrame, mask: pd.Series, regions: pd.DataFrame, cfg: Config) -> None:
     """Side/dev by stable hash for rows in ``mask`` (no usable region), in the
     proportions each country actually got from the region split."""

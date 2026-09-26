@@ -61,6 +61,11 @@ def cmd_features(cfg: Config, args: argparse.Namespace) -> None:
     run_features(cfg)
 
 
+def cmd_features_hold(cfg: Config, args: argparse.Namespace) -> None:
+    from .features.stage import run_features_hold
+    run_features_hold(cfg)
+
+
 def cmd_scorer(cfg: Config, args: argparse.Namespace) -> None:
     from .scorer.gbm import run_scorer
     run_scorer(cfg)
@@ -114,6 +119,8 @@ COMMANDS: dict[str, Command] = {
     "normalize": Command(cmd_normalize, "stage 0: normalise train + test records"),
     "candidates": Command(cmd_candidates, "stage 1: TF-IDF top-k candidates + recall"),
     "features": Command(cmd_features, "stage 2: pair + context features"),
+    "features-hold": Command(cmd_features_hold,
+                             "v2.4: features of the held-out train regions (rerank.hold_frac)"),
     "scorer": Command(cmd_scorer, "stage 2: train/apply LightGBM scorer"),
     "rerank": Command(cmd_rerank, "stage 2b: re-rank with S1/query group context (cross-fitted)"),
     "llm-export": Command(cmd_llm_export, "stage 3: route uncertain queries, export prompts"),

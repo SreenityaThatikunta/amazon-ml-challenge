@@ -76,6 +76,11 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   fold_by: s1         # s1 (folds grouped by the record's top S1) | region (whole regions per fold: robustness check)
   weights_file: null  # parquet (q_id, s1_id, w) of training weights for the val pairs (adversarial reweighting)
   domain_norm: true   # divide size/density-dependent features by their per-country, per-split scale (LB 0.977 -> 0.980)
+  hold_frac: 0.0      # v2.4: > 0 sets aside whole train-side regions (~this share of each country's S1)
+                      # for stage 2: `ber features-hold` featurises all their queries, the scorer
+                      # trains without them and scores them (scores_hold), stage 2 can train on them
+  train_sides: [val]  # stage-2 training pairs: [val] | [val, hold] | [hold] (hold only: val is then
+                      # scored by the fold mean, i.e. a pure unseen-region check)
   learning_rate: 0.05
   num_leaves: 63
   min_data_in_leaf: 200

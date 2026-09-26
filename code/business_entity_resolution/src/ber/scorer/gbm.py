@@ -67,33 +67,54 @@ def _matrix(df: pd.DataFrame, feats: list[str]) -> np.ndarray:
     return np.ascontiguousarray(df[feats].to_numpy(dtype=np.float32))
 
 
-def load_sampled(path, cfg: Config, log, feats: list[str], keep_s1: bool = False) -> dict:
+def load_sampled(path, cfg: Config, log, feats: list[str], keep_s1: bool = False,
+                 exclude: set[str] | None = None) -> dict:
     """Stream feature parts; keep a query-level sample of train-side rows and of
     val-side rows (the latter for early stopping) as float32 matrices, so memory
-    stays bounded (~4 bytes per feature per sampled row)."""
+    stays bounded (~4 bytes per feature per sampled row). Two passes: the sample
+    masks first (ids only), then the rows go straight into preallocated matrices
+    (no concatenation copy). Queries in ``exclude`` (the held-out regions of
+    ``rerank.hold_frac``) never enter the training sample."""
     sc = cfg.scorer
-    acc: dict[str, list] = {k: [] for k in ("Xtr", "ytr", "qtr", "str", "Xes", "yes")}
-    for f in sorted(path.glob("*.parquet")):
-        d = pd.read_parquet(f)
+    files = sorted(path.glob("*.parquet"))
+    masks = []
+    for f in files:
+        d = pd.read_parquet(f, columns=["q_id", "side"])
         q = d.q_id.astype(str)
         u = stable_unit(q, cfg.seed + 4)
         t = ((d.side == "train").to_numpy() & (u < sc.train_query_frac))
+        if exclude:
+            t &= ~q.isin(exclude).to_numpy()
         e = ((d.side == "val").to_numpy() & (u < sc.es_query_frac))
+        masks.append((t, e))
+        del d, q
+    n_t = int(sum(t.sum() for t, _ in masks))
+    n_e = int(sum(e.sum() for _, e in masks))
+    out = {"Xtr": np.empty((n_t, len(feats)), np.float32), "ytr": np.empty(n_t, np.int8),
+           "Xes": np.empty((n_e, len(feats)), np.float32), "yes": np.empty(n_e, np.int8)}
+    qtr, s1tr = [], []
+    it = ie = 0
+    for f, (t, e) in zip(files, masks):
+        if not (t.any() or e.any()):
+            continue
+        d = pd.read_parquet(f)
         if t.any():
-            acc["Xtr"].append(_matrix(d[t], feats))
-            acc["ytr"].append(d.y.to_numpy()[t])
-            acc["qtr"].append(q.to_numpy()[t])
+            k = int(t.sum())
+            out["Xtr"][it:it + k] = d.loc[t, feats].to_numpy(dtype=np.float32)
+            out["ytr"][it:it + k] = d.y.to_numpy()[t]
+            qtr.append(d.q_id.astype(str).to_numpy()[t])
             if keep_s1:
-                acc["str"].append(d.s1_id.astype(str).to_numpy()[t])
+                s1tr.append(d.s1_id.astype(str).to_numpy()[t])
+            it += k
         if e.any():
-            acc["Xes"].append(_matrix(d[e], feats))
-            acc["yes"].append(d.y.to_numpy()[e])
+            k = int(e.sum())
+            out["Xes"][ie:ie + k] = d.loc[e, feats].to_numpy(dtype=np.float32)
+            out["yes"][ie:ie + k] = d.y.to_numpy()[e]
+            ie += k
         del d
-    n = len(feats)
-    out = {k: (np.concatenate(v) if v else (np.empty((0, n), np.float32) if k[0] == "X"
-                                             else np.empty(0)))
-           for k, v in acc.items()}
-    log.info("sampled %d train rows, %d early-stopping rows", len(out["ytr"]), len(out["yes"]))
+    out["qtr"] = np.concatenate(qtr) if qtr else np.empty(0, dtype=object)
+    out["str"] = np.concatenate(s1tr) if s1tr else np.empty(0, dtype=object)
+    log.info("sampled %d train rows, %d early-stopping rows", n_t, n_e)
     return out
 
 
@@ -111,22 +132,38 @@ def predict_side(model: lgb.Booster, path, side: str, feats: list[str]) -> pd.Da
     return pd.concat(out, ignore_index=True)
 
 
-def score_test(st: StageRun, model: lgb.Booster, feats: list[str]) -> None:
-    """Score every test pair, one feature part at a time."""
-    out_dir = st.path("scores_test")
+def score_parts(st: StageRun, model: lgb.Booster, src, name: str, feats: list[str],
+                with_y: bool = False) -> None:
+    """Score every pair of a directory of feature parts, one part at a time; output
+    ``name/`` has one part per input part, under the same file name (the rerank
+    stage pairs them up by name), with q_id, s1_id[, y], p."""
+    out_dir = st.path(name)
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("*.parquet"):
         old.unlink()
-    n = 0
+    n = n_pos = 0
+    ys, ps = [], []
+    for f in sorted(src.glob("*.parquet")):
+        t = pd.read_parquet(f)
+        pt = model.predict(_matrix(t, feats), num_iteration=model.best_iteration)
+        keys = ["q_id", "s1_id"] + (["y"] if with_y else [])
+        t[keys].assign(p=pt.astype(np.float32)).to_parquet(out_dir / f.name, index=False)
+        n += len(t)
+        if with_y:
+            ys.append(t.y.to_numpy())
+            ps.append(pt.astype(np.float32))
+            n_pos += int(t.y.sum())
+        del t
+    st.register(name, out_dir, rows=n)
+    if with_y and n:
+        st.metric(f"{name}_auc", round(float(roc_auc_score(np.concatenate(ys),
+                                                           np.concatenate(ps))), 6))
+
+
+def score_test(st: StageRun, model: lgb.Booster, feats: list[str]) -> None:
+    """Score every test pair, one feature part at a time."""
     with timed(st.log, "score test"):
-        src = st.input_path("features", "features_test")
-        for i, f in enumerate(sorted(src.glob("*.parquet"))):
-            t = pd.read_parquet(f)
-            pt = model.predict(_matrix(t, feats), num_iteration=model.best_iteration)
-            t[["q_id", "s1_id"]].assign(p=pt.astype(np.float32)).to_parquet(
-                out_dir / f"part-{i:05d}.parquet", index=False)
-            n += len(t)
-    st.register("scores_test", out_dir, rows=n)
+        score_parts(st, model, st.input_path("features", "features_test"), "scores_test", feats)
 
 
 def run_scorer(cfg: Config) -> None:
@@ -150,8 +187,13 @@ def run_scorer(cfg: Config) -> None:
             st.write_parquet(sv, "scores_val")
             return
         oof = cfg.scorer.oof_folds > 1
+        hold_ids = None
+        if cfg.rerank.hold_frac > 0:  # v2.4: held-out regions stay out of stage 1
+            hold_ids = set(st.read_input("features_hold", "hold_queries",
+                                         columns=["entity_id"]).entity_id.astype(str))
+            st.metric("hold_queries_excluded", len(hold_ids))
         with timed(st.log, "load sampled train features"):
-            S = load_sampled(feat_dir, cfg, st.log, feats, keep_s1=oof)
+            S = load_sampled(feat_dir, cfg, st.log, feats, keep_s1=oof, exclude=hold_ids)
         st.metric("rows", {"train": len(S["ytr"]), "val": len(S["yes"]),
                            "train_pos": int(S["ytr"].sum()), "val_pos": int(S["yes"].sum())})
         st.metric("n_features", len(feats))
@@ -191,6 +233,11 @@ def run_scorer(cfg: Config) -> None:
         st.metric("val_auc", round(float(roc_auc_score(sv.y, sv.p)), 6))
         st.metric("val_logloss", round(float(log_loss(sv.y, sv.p)), 6))
         st.write_parquet(sv, "scores_val")
+        del sv
+        if hold_ids is not None:  # held-out regions: out-of-sample p1 for stage 2
+            with timed(st.log, "score all hold pairs"):
+                score_parts(st, model, st.input_path("features_hold", "features_hold"),
+                            "scores_hold", feats, with_y=True)
 
         if cfg.run_test:
             score_test(st, model, feats)
