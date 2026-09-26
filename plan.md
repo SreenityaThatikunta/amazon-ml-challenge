@@ -1,6 +1,6 @@
 # Plan: Business Entity Resolution (Amazon ML Challenge 2026)
 
-**Goal:** beat the public leaderboard top of **0.989 macro F0.5** (as of 2026-09-26; was 0.986 on 09-25, 0.971 before).
+**Goal:** beat the leaderboard top of **0.990 macro F0.5** (public, 2026-09-26; was 0.989, 0.986, 0.971). The public LB scores a **subset** of test; the **final ranking uses the remaining test data**, so we win on the hidden part, not on the public number.
 **Current best:** `improve/v2` v2.2 → val 0.98897, **public LB 0.980** (v2.1 0.977; main v1 0.975, main v2 0.972; `Rudy_commit_1` 0.961).
 **§0 below (plan v4) is the active plan and replaces the priority order in §4.**
 **Inputs:** [eda/FINDINGS.md](eda/FINDINGS.md), [docs/RESEARCH_NOTES.md](docs/RESEARCH_NOTES.md).
@@ -42,7 +42,21 @@ What these five scores say:
    A test-shaped validation needs **two knobs**: an S1 thinning rate and extra unmatched records.
 4. **France is unmeasured.** It has 3× the ambiguous records per S1 (p1 .5–.95: 0.37 vs 0.12–0.17), and
    synthetic-French training hurt on the LB. The probes are built (`output/probes/`) but not uploaded.
-5. **Budget:** 5 submissions a day (2 used on 2026-09-26). The gap to the top is **+0.009**; aim for ≥ 0.991.
+5. **Budget:** 5 submissions a day; the user can't spend them on probes, so Step 0 below is dropped and
+   France is judged from the test predictions (0.6) and the full-submission LB deltas only.
+   The top is now **0.990**: the gap from 0.980 is **+0.010**; aim for ≥ 0.992.
+6. **Public LB = a subset of test; the final ranking = the rest.** Consequences:
+   - A public-LB delta is one noisy measurement of the hidden score. If the subset is random, sampling noise
+     is small (per-S1 F has SD ≈ 0.08, so SE ≈ 0.0002 at ~100k+ S1), and deltas ≥ 0.002 are real. If the
+     split isn't random (e.g. by country or region), the public mix can differ from the hidden mix. So we
+     **never tune to the public LB**: thresholds, weights and blends are chosen on val_ts, and the public LB
+     only confirms direction.
+   - Favour changes that are **robust by construction** (fix the density shift, more and test-shaped
+     training data) over narrow tweaks that happen to move the public score.
+   - Anything computed from test itself (domain normalisation scales, pseudo-labels, test-density
+     statistics) uses the **whole** test set, never the public part, because the hidden part is scored on the same file.
+   - **Final pick:** the file with the best val_ts among those that don't lose on the public LB, with the public
+     gain consistent with val_ts. Don't pick a file whose public gain val_ts can't explain.
 
 ### 0.2 Levers and expected gains (to be replaced by measurements)
 
@@ -56,7 +70,7 @@ What these five scores say:
 | L6 | LLM select on the remaining ambiguous band | France-heavy band | +0.001–0.003 |
 | L7 | Seed/feature-set ensemble of stage 2; per-country expected-F `min_p` on the test-shaped val | small but reliable | +0.0005–0.001 |
 
-### 0.3 Step 0 (today, no compute): spend the remaining 3 submissions on probes
+### 0.3 Step 0: probes (dropped: no submissions to spare; kept for reference)
 | Probe | File | Answers |
 |---|---|---|
 | P1 | v2.2 with France left empty (build on Windows: `make_probe.py empty <v2.2>.tsv France out.tsv`) | **France F0.5 of our best file**; how much of the 0.009 gap is France |

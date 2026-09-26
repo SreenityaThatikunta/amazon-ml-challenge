@@ -466,6 +466,15 @@ does stage 2 transfer to test?). Next: adversarial validation on stage-2 inputs
   stage-1-only/US-empty); then the full v3 run, the stage-1 shift fix, `data.reshape` val_ts with an LB-delta
   gate, test-shaped and bigger stage 2, then France.
 
+
+### 2026-09-26 (LB top 0.990; public/private split)
+- LB top is now **0.990**. The user reports that the public LB scores only a subset of test; the **final ranking
+  uses the remaining test data**. The user can't spend submissions on probes.
+- plan.md §0 updated: don't tune to the public LB; choose parameters on val_ts; final pick = best val_ts that
+  doesn't lose on public. Step 0 probes dropped.
+- Full v3 train pass: **val F0.5 0.98954** (US 0.99069, India 0.98775; candidate pair recall 99.40% vs v2's
+  99.05%; P 0.9973 / R 0.9769). Test pass running (E25).
+
 ---
 
 ## Open questions
