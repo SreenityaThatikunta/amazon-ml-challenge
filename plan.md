@@ -58,7 +58,25 @@ What these five scores say:
    - **Final pick:** the file with the best val_ts among those that don't lose on the public LB, with the public
      gain consistent with val_ts. Don't pick a file whose public gain val_ts can't explain.
 
-### 0.2 Levers and expected gains (to be replaced by measurements)
+### 0.1b Update after v3 (public LB 0.9805) and the H-test (E26): **this section sets the order now**
+- v3 = v2.2 + main's features + `k_name_noaddr` 100 + test dictionary: val +0.0006 → public +0.0005.
+  The ~0.009 val → LB gap is untouched and equals the distance to the top.
+- **Cause found (E26):** about 60–66% of test's no-match records are S2/S3 copies of entities whose S1
+  **isn't in the test pool**. They come in near-identical copy groups (half have a twin at cosine ≥ 0.8 vs 7% on
+  val). Val and train contain almost none of these, so (a) val can't measure the errors they cause, and
+  (b) the models never learned to reject a copy group whose own S1 is missing but whose lookalike twin
+  is present. Those are false positives, which F0.5 punishes most.
+
+**New order (replaces Phase 1.2–2.5 ordering; tasks keep their IDs):**
+
+| Step | Task | Exit criterion |
+|---|---|---|
+| N1 | **val_ts by S1 dropping** (`data.reshape`, task 2.1 simplified): drop a hashed fraction of val-side S1 per country and turn their copies into unmatched records; rate tuned so orphans per record go 0.25 → 0.375 (both countries). Re-run candidates → decide on the val side only, **with v3's current models** | val_ts F0.5 near the public LB (~0.98); twin table of E26 reproduced on val_ts; new error type counted: FPs on dropped-S1 copies |
+| N2 | **Gate** (task 2.2): on val_ts, `rerank.domain_norm` on − off ≈ +0.003 (v2.2 − v2.1), v3 − v2.2-config ≈ +0.0005 | signs right, sizes within 2× |
+| N3 | **Train on it** (task 2.3): the same S1 dropping on the train side too, so stage 1 and stage 2 see copy-of-missing-entity negatives; several drop seeds as extra draws | val_ts up; public LB up |
+| N4 | **Copy-group (query–query) features:** per record, nearest other S2/S3 record (same country/block): cosine, whether that sibling's best S1 is this pair's S1, sibling p1 on this S1, size of the tight copy group and how many of its members point to this S1; "copy group agrees on no S1" flag. No labels needed, so they're computed the same way on test | val_ts up (they should target exactly N1's new FP type); public LB up |
+| N5 | Stage-1 density fix (tasks 1.2/1.3: domain norm or E18 drop), judged on val_ts | val_ts up |
+| N6 | France (Phase 3), judged on test statistics + public LB; bigger stage 2 (2.4); LLM band (Phase 4) | as before |
 
 | # | Lever | Evidence | Expected LB |
 |---|---|---|---|
