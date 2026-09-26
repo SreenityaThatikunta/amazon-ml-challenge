@@ -355,3 +355,21 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   have a near-identical sibling among the other records (S2↔S3) that points to no S1, or to a different S1:
   a **query–query consistency feature** can detect this on test with no labels.
 
+### E27. N1: test-shaped val (val_ts), part 1: the control run drifted
+- Code: `reshape` config + `eval/reshape.py` (drop a stable-hash share of S1 per country on the chosen sides,
+  keep their S2/S3 copies as unmatched, `owner_dropped` keeps the old owner); `candidates.query_sides`
+  (candidates only for val records, full S1 index); `rerank.model_from_run` (another run's fold models,
+  same fold assignment); decide metric `val_orphan_copies`; `configs/val_ts.yaml`;
+  `experiments/run_val_ts.sh` (control run `v3vo` with no reshape, then `v3ts`). Test
+  `test_reshape_drops_s1_and_orphans_copies`.
+- Drop rates US 0.19 / India 0.20: records per S1 4.67 → 5.76 (US) and 4.68 → 5.82 (India), as on test.
+  Dropped 25,855 US + 17,296 India val S1; 149,599 val records orphaned.
+- First attempt (log `logs/val_ts.log`): control `v3vo` gave **0.98734**, not v3's 0.98954 (US 0.98817,
+  India 0.98602; precision down). Cause: `features` learns filler words from train **and test** records, and
+  the val-only rerun had no test records, so it learned 50 fillers instead of v3's 69 (missing: enterprises,
+  group, industries, trading, partners, holding, ...), which changes the `k_*` name-key features the models
+  were trained on. The v3ts run was stopped at its features stage.
+- Fix: `features.vocab_from_run` (reuse a run's fillers + brand syllables), set to v3 in `val_ts.yaml`.
+  Rerun features → decide for both runs: `STAGES="features scorer rerank decide" bash
+  experiments/run_val_ts.sh` (log `logs/val_ts_v2.log`).
+

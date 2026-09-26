@@ -1,0 +1,8 @@
+19:26:27 INFO  ber.features | === stage features | run v3vo | config aed133b2a211 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/v3vo/features
+19:26:27 INFO  ber.features | metric workers = 8
+19:26:27 INFO  ber.features | metric vocab_from_run = {'run': 'v3', 'fillers': 69, 'brand_units': 47}
+19:26:27 WARNING ber.features | input normalize/records_train was built with config b2e76432db73 (current aed133b2a211)
+19:26:27 WARNING ber.features | input candidates/candidates_train was built with config b2e76432db73 (current aed133b2a211)
+19:26:27 INFO  ber.features | train: per-S1 candidate context ...
+19:26:45 INFO  ber.features | train: per-S1 candidate context done in 18.4s (peak RSS 2.70 GB)
+19:26:45 WARNING ber.features | input candidates/parts_train was built with config b2e76432db73 (current aed133b2a211)

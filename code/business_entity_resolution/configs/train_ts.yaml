@@ -1,0 +1,16 @@
+# N3 (plan.md §0.1b): train on test-shaped data. The same S1 dropping as val_ts on the train
+# side too, so stage 1 sees copies of missing entities as negatives; stage 2 is cross-fitted on
+# the reshaped val side, whose F0.5 is then the val_ts score. Train pass only (run v4).
+extends: default.yaml
+
+run_id: v4
+
+data:
+  phase: train
+
+reshape:
+  drop_s1: {US: 0.19, India: 0.20}
+  sides: [train, val]
+
+features:
+  vocab_from_run: v3      # same fillers/brand syllables as v3 (learned with test records)
