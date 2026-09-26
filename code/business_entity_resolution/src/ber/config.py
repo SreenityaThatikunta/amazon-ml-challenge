@@ -109,6 +109,9 @@ class ScorerConfig:
     unseen_extra_train: list[str] = field(default_factory=list)  # runs added to a 2nd model for
                                                                  # countries absent from train
     unseen_base_frac: float = 0.5   # share of the main model's real pairs in the unseen model
+    drop_features: list[str] = field(default_factory=lambda: ["s_n_cands", "s_n_top1"])
+                                    # not used by the model: per-S1 record counts shift between
+                                    # val and test (test has ~60% more records per S1)
 
 
 @dataclass

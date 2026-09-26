@@ -69,14 +69,31 @@ def run_submit(cfg: Config) -> None:
             _validate(st, cfg, out)
 
 
+def _global_codes(col, index: pd.Index) -> np.ndarray:
+    """Codes into ``index`` for a (possibly dictionary-encoded) arrow id column.
+    Dictionary columns map their small dictionary once and take the indices, instead
+    of hashing every row (244M string ids took >35 min that way)."""
+    import pyarrow as pa
+    out = []
+    for chunk in col.chunks:
+        if pa.types.is_dictionary(chunk.type):
+            lut = index.get_indexer(chunk.dictionary.to_pandas().astype(str))
+            out.append(lut[chunk.indices.to_numpy(zero_copy_only=False)])
+        else:
+            out.append(index.get_indexer(chunk.to_pandas().astype(str)))
+    return np.concatenate(out) if out else np.empty(0, dtype=np.int64)
+
+
 def _write_candidates(st, out, s1_ids, q_ids, s1_cat, q_cat,
                       match_s: np.ndarray, match_q: np.ndarray) -> None:
+    import pyarrow.parquet as pq
     with timed(st.log, "candidate_pairs.tsv"):
+        s_index, q_index = pd.Index(s1_cat.categories), pd.Index(q_cat.categories)
         sc, qc = [], []
         for f in sorted(st.input_path("candidates", "candidates_test").glob("*.parquet")):
-            p = pd.read_parquet(f, columns=["q_id", "s1_id"])
-            sc.append(pd.Categorical(p.s1_id.astype(str), dtype=s1_cat).codes)
-            qc.append(pd.Categorical(p.q_id.astype(str), dtype=q_cat).codes)
+            t = pq.read_table(f, columns=["q_id", "s1_id"])
+            sc.append(_global_codes(t.column("s1_id"), s_index))
+            qc.append(_global_codes(t.column("q_id"), q_index))
         sc_all, qc_all = np.concatenate(sc), np.concatenate(qc)
         if (sc_all < 0).any() or (qc_all < 0).any():
             raise ValueError("candidates reference ids that are not in the test set")

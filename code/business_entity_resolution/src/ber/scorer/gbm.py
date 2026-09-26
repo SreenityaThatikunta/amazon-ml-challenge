@@ -40,13 +40,13 @@ KEY_COLS = ["q_id", "s1_id", "y", "side"]
 CATEGORICAL = ["hn_rel", "q_source"]
 
 
-def feature_columns(df: pd.DataFrame) -> list[str]:
-    return [c for c in df.columns if c not in KEY_COLS]
+def feature_columns(df: pd.DataFrame, drop: list[str] | tuple = ()) -> list[str]:
+    return [c for c in df.columns if c not in KEY_COLS and c not in drop]
 
 
 def train_model(tr: pd.DataFrame, va: pd.DataFrame, cfg: Config, log) -> lgb.Booster:
     sc = cfg.scorer
-    feats = feature_columns(tr)
+    feats = feature_columns(tr, sc.drop_features)
     params = {
         "objective": "binary", "learning_rate": sc.learning_rate, "num_leaves": sc.num_leaves,
         "min_data_in_leaf": sc.min_data_in_leaf, "feature_fraction": sc.feature_fraction,
@@ -172,7 +172,8 @@ def run_scorer(cfg: Config) -> None:
         st.metric("rows", {"train": len(tr), "val": len(va),
                            "train_pos": int(tr.y.sum()) if len(tr) else 0,
                            "val_pos": int(va.y.sum()) if len(va) else 0})
-        feats = feature_columns(tr if len(tr) else va)
+        feats = feature_columns(tr if len(tr) else va, cfg.scorer.drop_features)
+        st.metric("n_features", len(feats))
         s1c_train = s1_countries(st, "train")
         if cfg.scorer.model_from_run:  # apply an existing model (e.g. France proxy)
             scorer = load_scorer(st, cfg.scorer.model_from_run, s1c_train)

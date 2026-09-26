@@ -85,6 +85,19 @@ def join_records(chunk: pd.DataFrame, rec: pd.DataFrame, ctx: pd.DataFrame) -> p
     return pd.concat([chunk.reset_index(drop=True), qf, sf, c], axis=1)
 
 
+def compact(df: pd.DataFrame) -> pd.DataFrame:
+    """float64 -> float32 and int64/uint32 -> int32 before writing (the models cast
+    every feature to float32 anyway); with zstd this halves the features on disk
+    (29 GB -> ~13 GB at full scale)."""
+    for c in df.columns:
+        t = df[c].dtype
+        if t == np.float64:
+            df[c] = df[c].astype(np.float32)
+        elif t in (np.int64, np.uint32):
+            df[c] = df[c].astype(np.int32)
+    return df
+
+
 def _sub_chunks(chunk: pd.DataFrame, n: int) -> list[pd.DataFrame]:
     """Split a chunk into ~n pieces at query boundaries (context features need
     every candidate of a query in the same piece)."""
@@ -154,8 +167,9 @@ def _run_features(cfg: Config, pool, workers: int) -> None:
                             keys["y"] = (d.s1_id == d.q_owner).astype(np.int8)
                             keys["side"] = d.q_side.to_numpy()
                             n_pos += int(keys.y.sum())
-                        out = pd.concat([keys, feats], axis=1)
-                        out.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False)
+                        out = compact(pd.concat([keys, feats], axis=1))
+                        out.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False,
+                                       compression="zstd")
                         n_parts += 1
                         n_rows += len(out)
                     st.log.debug("features %s: %d rows so far", f.name, n_rows)

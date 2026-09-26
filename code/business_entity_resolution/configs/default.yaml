@@ -67,6 +67,8 @@ scorer:               # stage 2 (T3.4): LightGBM pair scorer
   unseen_extra_train: [] # runs whose labelled pairs train a 2nd model, used for S1 countries absent
                          # from train (France); e.g. [frtrain]
   unseen_base_frac: 0.5  # share of the main model's real pairs also used by the unseen model
+  drop_features: [s_n_cands, s_n_top1]  # per-S1 record counts: test has ~60% more records per S1
+                         # than train/val, so these shift (E18); the model does not use them
 
 rescore:               # M8: second-stage scorer with cluster context (ber rescore)
   k: 3                 # top-k stage-1 candidates per query that get rescored

@@ -44,6 +44,12 @@ from ..log import timed
 
 STAGE1_FEATS = ["n_core_eq", "n_ratio", "hn_rel", "a_tsr", "l_quality", "cos_combo"]  # default
 MAX_MEMBERS = 8  # cluster members compared per S1 (highest p first)
+PLAUSIBLE = 0.05  # members below this p are not counted at all
+# Stage-1 features that count records per S1 over the whole candidate set. Test has
+# ~60% more S2/S3 records per S1 than train/val (nearly all obvious non-matches), so
+# these counts shift (s_n_cands 364 -> 576, s_n_top1 5.7 -> 9.1) while val cannot
+# show it; v2 with them scored LB 0.972 < v1 0.975 (experiments/README.md, E18).
+DENSITY_FEATS = ("s_n_cands", "s_n_top1")
 
 
 # ---------------------------------------------------------------- features
@@ -70,7 +76,7 @@ def cluster_features(pairs: pd.DataFrame, conf: float) -> pd.DataFrame:
     own["conf"] = own.p >= conf
     g = own.groupby("s1_id")
     stats = pd.DataFrame({
-        "s_n_assigned": g.size(),
+        "s_n_plaus": (own.p >= PLAUSIBLE).groupby(own.s1_id).sum(),
         "s_n_conf": g.conf.sum(),
         "s_sum_conf": own.p.where(own.conf, 0.0).groupby(own.s1_id).sum(),
         "s_n_conf_s2": (own.conf & (own.src == 2)).groupby(own.s1_id).sum(),
@@ -86,14 +92,18 @@ def cluster_features(pairs: pd.DataFrame, conf: float) -> pd.DataFrame:
     same = np.where(src == 2, f.s_n_conf_s2.to_numpy(), f.s_n_conf_s3.to_numpy())
     out["c_same_src"] = same - self_
     out["c_cap_room"] = np.where(src == 2, 5, 6) - out.c_same_src
-    out["s_n_assigned"] = f.s_n_assigned.to_numpy() - (pairs["rank"] == 0).to_numpy()
+    # plausible members only (p >= PLAUSIBLE): counting every assigned record would
+    # track the density of junk records, which differs between val and test
+    out["s_n_plaus"] = f.s_n_plaus.to_numpy() - ((pairs["rank"] == 0) &
+                                                  (pairs.p >= PLAUSIBLE)).to_numpy()
     # how many queries assigned to this S1 score strictly above this pair: sort
     # members and pairs together by (S1, -p), pairs first on ties, and count the
     # members seen so far within the S1
-    codes, uniq = pd.factorize(pd.concat([own.s1_id, pairs.s1_id], ignore_index=True))
-    n_own = len(own)
+    plaus = own[own.p >= PLAUSIBLE]
+    codes, uniq = pd.factorize(pd.concat([plaus.s1_id, pairs.s1_id], ignore_index=True))
+    n_own = len(plaus)
     is_member = np.r_[np.ones(n_own, dtype=np.int32), np.zeros(len(pairs), dtype=np.int32)]
-    pp = np.r_[own.p.to_numpy(), pairs.p.to_numpy()]
+    pp = np.r_[plaus.p.to_numpy(), pairs.p.to_numpy()]
     order = np.lexsort((is_member, -pp, codes))
     c_sorted, m_sorted = codes[order], is_member[order]
     cum = np.cumsum(m_sorted)
@@ -249,7 +259,7 @@ def run_rescore(cfg: Config) -> None:
             import pyarrow.parquet as pq
             first = next(st.input_path("features", "features_train").glob("*.parquet"))
             feats1 = [c for c in pq.read_schema(first).names
-                      if c not in ("q_id", "s1_id", "y", "side")]
+                      if c not in ("q_id", "s1_id", "y", "side") + DENSITY_FEATS]
         st.metric("stage1_feats", len(feats1))
         with timed(st.log, "val: top-k"):
             pv = load_top_k(st, "train", rc.k, feats1)

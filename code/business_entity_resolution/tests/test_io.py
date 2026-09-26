@@ -37,3 +37,14 @@ def test_matches_not_in_candidates():
     cs, cq = np.array([0, 0, 1, 2]), np.array([0, 3, 1, 2])
     assert _matches_not_in_candidates(cs, cq, np.array([0, 1]), np.array([3, 1]), 4) == 0
     assert _matches_not_in_candidates(cs, cq, np.array([0, 1]), np.array([1, 1]), 4) == 1
+
+
+def test_global_codes_dictionary_and_plain():
+    import numpy as np
+    import pandas as pd
+    import pyarrow as pa
+    from ber.submit import _global_codes
+    index = pd.Index(["S2-1", "S2-2", "S3-9"])
+    d = pa.chunked_array([pa.array(["S3-9", "S2-1", "S3-9", "S2-7"]).dictionary_encode()])
+    assert _global_codes(d, index).tolist() == [2, 0, 2, -1]
+    assert _global_codes(pa.chunked_array([pa.array(["S2-2"])]), index).tolist() == [1]

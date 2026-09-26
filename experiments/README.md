@@ -200,6 +200,19 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   `test_predict_parts_matches_direct`).
 - Total dev gain of the v2 stack over v1: **0.97655 → 0.98859 (+0.0120)**.
 
+### E18. v2 on the LB: 0.972 (< v1 0.975); density shift
+- `main` v2 (val 0.98906) scored **LB 0.972**, below v1's 0.975.
+- `experiments/logs/val_vs_test_density.log`: test has ~1 extra record per S1 with p1 < .05 (1.9–2.1 vs
+  1.15 on val) and ~60% more records per S1 overall, so per-S1 count features shift (`s_n_cands` 364 → 576,
+  `s_n_top1` 5.7 → 9.1) in a way val can't show.
+- Code (uncommitted WIP, committed 2026-09-26): `scorer.drop_features=[s_n_cands, s_n_top1]`; rescore
+  skips them (`DENSITY_FEATS`) and counts only plausible cluster members (`s_n_plaus`, p ≥ 0.05) instead of
+  every assigned record; features are written as float32/int32 with zstd (29 GB → ~13 GB,
+  `experiments/compact_features.py` rewrites existing parts); `submit` maps dictionary-encoded ids once
+  (`_global_codes`, test `test_global_codes_dictionary_and_plain`).
+- Not yet validated by a run. `compare_submissions.py` v1 → v2 also shows France losing pairs
+  (+8.4k / −21.5k), so the synthetic-France unseen model may account for part of the drop (plan.md §0).
+
 ### Next: v3 upstream rebuild (after the v2 LB check)
 - normalize (all-pairs dictionary for test) → candidates (k_name_noaddr=100) → features → scorer
   (+ unseen model) → rescore → decide → submit. About 4 h, heavy stages one at a time.
