@@ -135,6 +135,8 @@ class RerankConfig:
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200
+    lambda_l2: float = 1.0
+    feature_fraction: float = 0.9
     num_boost_round: int = 2000
     early_stopping: int = 50
     raw_features: list[str] = field(default_factory=lambda: ["all"])  # or a feature list

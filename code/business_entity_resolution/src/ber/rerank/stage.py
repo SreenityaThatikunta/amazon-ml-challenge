@@ -192,8 +192,8 @@ def _params(cfg: Config) -> dict:
     rc = cfg.rerank
     return {"objective": "binary", "learning_rate": rc.learning_rate,
             "num_leaves": rc.num_leaves, "min_data_in_leaf": rc.min_data_in_leaf,
-            "feature_fraction": 0.9, "bagging_fraction": 0.8, "bagging_freq": 1,
-            "lambda_l2": 1.0, "seed": cfg.seed, "verbose": -1,
+            "feature_fraction": rc.feature_fraction, "bagging_fraction": 0.8, "bagging_freq": 1,
+            "lambda_l2": rc.lambda_l2, "seed": cfg.seed, "verbose": -1,
             "num_threads": cfg.scorer.n_threads or max(1, (os.cpu_count() or 4) - 2)}
 
 

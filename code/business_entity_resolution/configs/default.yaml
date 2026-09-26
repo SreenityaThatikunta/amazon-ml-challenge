@@ -91,6 +91,8 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   learning_rate: 0.05
   num_leaves: 63
   min_data_in_leaf: 200
+  lambda_l2: 1.0
+  feature_fraction: 0.9
   num_boost_round: 2000
   early_stopping: 50
   raw_features: [all]  # stage-1 features passed through: all (val F0.5 0.98895) or a list

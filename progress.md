@@ -430,6 +430,11 @@ more than val showed (+0.00012 full val, +0.0003 clean, +0.00046 unseen-region c
 expected if test (every region unseen, every group complete) gains most from these
 changes. Uploads 2026-09-26: v2.1, v2.2, v2.4, v2.5 (4 of 5).
 
+**6b. Stage-2 capacity: no gain.** E3b with a 3,500-round cap (`E3b_r3500`): folds stopped
+at 1859/2282/2295/2401 instead of ≤ 2000, but val 0.98819 vs 0.98822, clean 0.99168 vs
+0.99170 (India −0.0001, US +0.00004): the 2,000 cap was not really binding (flat
+validation curve). Dropped; its by-S1 twin was not run.
+
 **7. France's region-less records are not a problem** (`D:\aml\analysis\fr_region.py`,
 `fr_region.txt`, v2.5 scores). In France, 34.9 % of the records with a kept pair have no
 region; on their same-street, equal-key top pairs the house-number anchor gives a
