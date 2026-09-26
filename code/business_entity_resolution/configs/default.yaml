@@ -81,7 +81,7 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   folds: 4            # trained on the val side, cross-fitted: out-of-fold p2 for every val pair
   fold_by: s1         # s1 (folds grouped by the record's top S1) | region (whole regions per fold: robustness check)
   weights_file: null  # parquet (q_id, s1_id, w) of training weights for the val pairs (adversarial reweighting)
-  domain_norm: false  # divide size/density-dependent features by their per-country, per-split scale
+  domain_norm: true   # divide size/density-dependent features by their per-country, per-split scale (LB 0.977 -> 0.980)
   learning_rate: 0.05
   num_leaves: 63
   min_data_in_leaf: 200

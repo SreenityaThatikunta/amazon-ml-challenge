@@ -126,7 +126,7 @@ class RerankConfig:
     folds: int = 4                  # cross-fitting folds on the val side
     fold_by: str = "s1"             # "s1" (groups by the record's top S1) | "region" (check)
     weights_file: str | None = None  # parquet (q_id, s1_id, w): training weights for val pairs
-    domain_norm: bool = False       # size-dependent features / their per-country-split scale
+    domain_norm: bool = True        # size-dependent features / their per-country-split scale
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200

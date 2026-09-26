@@ -94,7 +94,11 @@ claims (`c_expected`, `c_best_other`, `c_sum_other`), i.e. exactly the group con
 | File | Val F0.5 | Public LB | Gap |
 |---|---|---|---|
 | main (6120d59) | 0.98211 | 0.975 | 0.007 |
-| v2.1 (stage 2 on all features) | 0.98895 (0.98684 with whole regions held out) | **0.977** | 0.012 (0.010) |
+| v2.1 (stage 2 on all features) | 0.98895 (0.98684 with whole regions held out) | 0.977 | 0.012 (0.010) |
+| **v2.2 (+ domain normalisation of size-dependent stage-2 features)** | 0.98897 | **0.980** | 0.009 |
+
+v2.2 is now the default (`rerank.domain_norm: true`) and the file in `output/` (2026-09-26 08:14).
+Submissions: 5 per team per day (2 used on 2026-09-26: v2.1, v2.2).
 
 Val gained +0.0068 but the leaderboard only +0.002, so what test does differently matters
 more than further val gains. Checks so far (`D:\aml\analysis\shift.py`, `lowp_inspect.txt`,
@@ -133,6 +137,11 @@ more than further val gains. Checks so far (`D:\aml\analysis\shift.py`, `lowp_in
   percentile, within each country and split, so a stage 2 trained on val reads test on the same
   scale. Caveat: part of the difference is genuine (a common name really has fewer competitors
   in a half-size pool), so only the leaderboard can tell which way is right.
+
+  Result: val 0.98897 (neutral, as expected on one domain); test file
+  `D:ml\submissions2.2_domainnorm\` (validator PASS, 5,912,771 links, 3.413 per S1) differs
+  from v2.1 on 4.1 % of S1 (France 6.4 %, India 4.0 %, US 3.3 %). The stage-1-only probe
+  differs from v2.1 on 9.4 % of S1.
 
 **LB probes prepared** (the only way to see test performance by part):
 `D:\aml\submissions\probe_france_empty\` (v2.1, every French S1 left empty → France's own
