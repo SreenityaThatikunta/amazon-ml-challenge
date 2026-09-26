@@ -43,7 +43,7 @@ candidates:           # stage 1 (T2.x): char n-gram TF-IDF top-k per country
   n_threads: 0        # 0 = cpu_count - 2
   block_by_region: true   # search only S1 in the query region's neighbourhood (no region: whole country)
   region_min_share: 0.001 # neighbourhood = owner regions with >= this share of a region's true matches
-  k_name_noaddr: 30       # name candidates for queries with an empty address
+  k_name_noaddr: 100      # name candidates for queries with an empty address (E16: 30 -> 100, recall)
   device: auto            # top-k search: cpu | gpu (optional CuPy, MIT; ~10-30x faster) | auto
   gpu_mem_gb: 1.5         # GPU memory for one chunk's dense similarity block
   gpu_min_s1: 50000       # smaller blocks search on the CPU (GPU wins only on large blocks)

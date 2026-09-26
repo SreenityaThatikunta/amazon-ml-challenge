@@ -442,6 +442,11 @@ does stage 2 transfer to test?). Next: adversarial validation on stage-2 inputs
   Base = `improve/v2`; LB probes for France; test-shaped validation (`val_ts`: subsample val S1 ~50%, keep all
   S2/S3); test-shaped training; France pseudo-labels + twin-aware decisions; then the LLM on the band.
 
+- **v3 phase A (branch `v3`):** merged main into improve/v2 (E19; tests 147 pass), `k_name_noaddr` 100,
+  LB probe builder + 2 probes (E20, `output/probes/`), main's features compacted (E21, only −1.3 GB).
+  Dev slice **0.99061** (main best 0.98859, improve/v2 0.98771). Next: full v3 run (~33–37 GB,
+  4–7 h), then phase B (`val_ts`).
+
 ---
 
 ## Open questions

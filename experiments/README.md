@@ -217,3 +217,48 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
 - normalize (all-pairs dictionary for test) → candidates (k_name_noaddr=100) → features → scorer
   (+ unseen model) → rescore → decide → submit. About 4 h, heavy stages one at a time.
 
+## 2026-09-26 (v3, branch `v3` = `improve/v2` + main)
+
+### E19. v3 merge
+- Branch `v3` from `origin/improve/v2` (LB 0.977), merged `main` (ba2b4f6). Kept improve/v2's scorer,
+  rerank, decide and small `candidate_pairs.tsv`; added main's lookalike/relative features, `ber rescore`
+  (alternative stage 2), E18 code (off by default), compact zstd feature parts, all-pairs test dictionary.
+  Not ported: the unseen-country/synthetic-French scorer, the features process pool.
+- `candidates.k_name_noaddr` 30 → 100 (E16).
+- Tests: 147 passed, 1 skipped.
+- Dev smoke run: `bash experiments/run_dev_v3.sh` (run `devv3`, log `logs/dev_v3.log`, ~9 min, peak 4.7 GB):
+  all stages ok; candidate pair recall 0.99785; scorer 120 features, val AUC 0.999949; rerank p2 OOF AUC
+  0.999035 (p1 0.995572); **dev val F0.5 0.99061** (US 0.99283, India 0.98838; pair P 0.99671 / R 0.98179;
+  singletons 0.98464), expected-F min_p 0.6.
+
+| Dev slice | Val F0.5 |
+|---|---|
+| main v1 (B0) | 0.97655 |
+| improve/v2 dev2 (rerank, 25 stage-1 feats) | 0.98771 |
+| main v2 (rescore, all feats, E17) | 0.98859 |
+| **v3 (rerank, all 120 feats incl. lookalike)** | **0.99061** |
+
+  Not a clean ablation (improve/v2's dev2 used 25 stage-1 features in stage 2), and dev val did not predict
+  the LB before, so this only says that the merge works and nothing regressed.
+
+### E20. LB probes (plan.md §0, A1)
+- `experiments/make_probe.py` (`empty` / `swap` one country). Test S1 weights: India 0.4675, US 0.3827,
+  France 0.1498. With France emptied: F_France ≈ (LB(base) − LB(probe)) / 0.1498 + s_FR (true singleton
+  share, ~0.05).
+- Built locally (validator PASS), in `output/probes/`:
+
+| File | Base | Edit | Answers |
+|---|---|---|---|
+| `p_v1_france_empty.tsv` | main v1 (LB 0.975) | France empty | France F0.5 of v1 |
+| `p_v2_with_v1_france.tsv` | main v2 (LB 0.972) | France from v1 | did France cause v1 → v2 −0.003? |
+
+- To build on the Windows machine (improve/v2 v2.1 file): `make_probe.py empty v2.1.tsv France ...` (France
+  F0.5 of v2.1) and `make_probe.py swap v2.1.tsv France ... main_v1.tsv`.
+
+### E21. Compact main's features
+- `.venv/bin/python experiments/compact_features.py artifacts/main/features/features_{train,test}`
+  (log `logs/compact_main_features.log`).
+- Result: train 5.6 → 5.6 GB, test 20.3 → 19.0 GB (features total 25 → 24 GB). The v2 feature run had
+  already written float32 + zstd (E18 code was in the working tree), so little was left to gain. What remains
+  is mostly the `q_id` / `s1_id` string columns of 244M test pairs; dictionary-encoding them would be the
+  next saving if disk gets tight (92 GB free).
