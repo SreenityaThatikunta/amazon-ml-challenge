@@ -136,7 +136,11 @@ class DecideConfig:
     min_p: float | None = None      # expected_f: drop p below this; None = best on val sweep
     empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
     tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
-    prior_shift: str = "none"       # "none" | "segment_em" (test: EM prior correction per segment)
+    prior_shift: str = "none"       # "none" | "segment_em" (EM per lookalike segment) |
+                                    # "anchor" (per name-change kind, from the hn_rel mixture)
+    anchor_min_ratio: float = 2.0   # anchor: correct a kind only if its de-biased odds ratio is beyond this
+    anchor_min_pairs: int = 2000    # anchor: ... and it has at least this many same-street pairs
+    anchor_max_ratio: float = 6.0   # anchor: cap on the applied odds ratio
     scores_stage: str = "rerank"    # "scorer" (stage 1 only), "rerank" (stage 2) or "llm-import"
     sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
                                                         0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])

@@ -56,3 +56,49 @@ def test_prior_shift_em_recovers_prior_and_rescales_segment():
     test = pd.DataFrame({"p": p[keep], **seg})
     adj, rep = adjust(test, segment_priors(val), min_pairs=10)
     assert list(rep) == ["4|0|1"] and (adj.p <= test.p + 1e-6).all()
+
+
+def test_anchor_name_kinds():
+    from collections import Counter
+    from ber.decide.anchor import name_kinds
+    s1 = ["ski college"] * 50 + ["ski comite"] * 50 + ["lepicure club", "zyx"] + ["club x"] * 100
+    df = Counter(t for n in s1 for t in set(n.split()))
+    q = ["college ski", "ski colege", "ski comite", "ski comite holding", "other name", "ski college"]
+    s = ["ski college", "ski college", "ski college", "ski college", "ski college", "lepicure club"]
+    k = name_kinds(q, s, df, len(s1), frozenset({"holding"}))
+    # order-free key; typo = rare swap; generic swap (both words common); filler ignored; other
+    assert k.tolist() == [0, 1, 2, 2, 3, 3]
+
+
+def test_anchor_detects_and_corrects_prior_of_one_kind():
+    from ber.decide.anchor import correct, kind_ratios, pooled_bias
+    rng = np.random.default_rng(1)
+    h1 = np.array([0.07, 0.76, 0.04, 0.04, 0.03, 0.06])   # true copies: mostly equal number
+    h0 = np.array([0.00, 0.10, 0.00, 0.05, 0.70, 0.15])   # decoys: mostly shifted
+
+    def sample(n, pi_true, pi_model, kind):
+        y = rng.random(n) < pi_true
+        hn = np.where(y, rng.choice(6, n, p=h1), rng.choice(6, n, p=h0))
+        p = pi_model * h1[hn] / (pi_model * h1[hn] + (1 - pi_model) * h0[hn])  # calibrated at pi_model
+        return pd.DataFrame({"q_id": [f"{kind}{i}" for i in range(n)], "s1_id": "X", "p": p,
+                             "hn_rel": hn.astype(float), "a_tsr": 100.0, "kind": kind, "y": y})
+
+    # val: model calibrated in both kinds -> ratios ~1, bias ~1
+    val = pd.concat([sample(40000, 0.85, 0.85, 0), sample(8000, 0.4, 0.4, 2)], ignore_index=True)
+    rv = kind_ratios(val.kind.to_numpy(), val.hn_rel.to_numpy(), val.p.to_numpy())
+    assert abs(rv["generic_swap"]["r"] - 1) < 0.25 and abs(rv["equal_key"]["r"] - 1) < 1e-6
+    bias = pooled_bias({"A": rv})
+    # test: generic swaps are 85 % true copies, the model still assumes 40 %
+    test = pd.concat([sample(40000, 0.85, 0.85, 0), sample(8000, 0.85, 0.4, 2)], ignore_index=True)
+    adj, rep = correct(test, test.kind.to_numpy(), bias, min_ratio=2.0, min_pairs=1000)
+    g = rep["generic_swap"]
+    assert abs(g["pi_anchor"] - 0.85) < 0.05 and g["r_applied"] > 2
+    assert rep["equal_key"]["r_applied"] == 1.0
+    m = (test.kind == 2).to_numpy()
+    assert (adj.p.to_numpy()[~m] == test.p.to_numpy(np.float32)[~m]).all()
+    # corrected p is better calibrated for the shifted kind
+    assert abs(adj.p[m].mean() - test.y[m].mean()) < abs(test.p[m].mean() - test.y[m].mean())
+    # a pair on another street is never touched
+    far = test.assign(a_tsr=50.0)
+    adj2, _ = correct(far, far.kind.to_numpy(), bias, min_ratio=2.0, min_pairs=1000)
+    assert np.allclose(adj2.p, far.p.astype(np.float32))

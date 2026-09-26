@@ -23,8 +23,11 @@ from ..config import Config
 from ..eval.metrics import per_entity, summarize
 from ..eval.split import slice_mask
 from ..log import timed
+from . import anchor
 from .expected_f import select
 from .prior_shift import SEG_COLS, adjust, segment_priors
+
+ANCHOR_COLS = ("hn_rel", "a_tsr")  # stage-2 score columns the anchor correction needs
 
 
 def one_owner(scores: pd.DataFrame) -> pd.DataFrame:
@@ -80,6 +83,61 @@ def decide(assigned: pd.DataFrame, method: str, threshold: float, min_p: float,
     raise ValueError(f"unknown decide.method {method!r}")
 
 
+def _fillers(st: StageRun) -> frozenset[str]:
+    with open(st.input_path("features", "fillers"), encoding="utf-8") as f:
+        return frozenset(json.load(f))
+
+
+def _kinds(a: pd.DataFrame, recs: pd.DataFrame, fillers: frozenset[str]) -> np.ndarray:
+    """Name-change kind of each assigned pair; ``recs`` = one country's S1 (all of
+    them: the token frequencies) and the queries (entity_id, source, name_core)."""
+    core = recs.set_index("entity_id").name_core
+    s1c = recs.name_core[(recs.source == 1).to_numpy()]
+    return anchor.name_kinds(core.reindex(a.q_id).fillna("").to_numpy(),
+                             core.reindex(a.s1_id).fillna("").to_numpy(),
+                             anchor.s1_token_df(s1c), len(s1c), fillers)
+
+
+def _anchor_val(st: StageRun, cfg: Config, assigned: pd.DataFrame, qc: pd.Series,
+                chosen: dict) -> pd.DataFrame:
+    """Val side of the anchor correction: per-country kind ratios (the model is
+    calibrated on val, so they measure the estimator's bias), pooled into the bias
+    factors that the test pass divides out. With ``prior_shift=anchor`` the correction
+    is also applied to val (a no-op unless a kind's ratio moves away from the pooled
+    bias by more than min_ratio)."""
+    dc = cfg.decide
+    fillers = _fillers(st)
+    rec_path = st.input_path("normalize", "records_train")
+    per_country, kinds = {}, {}
+    country = qc.reindex(assigned.q_id).to_numpy()
+    for c in sorted(pd.unique(country[pd.notna(country)])):
+        m = country == c
+        a = assigned[m]
+        recs = pd.read_parquet(rec_path, columns=["entity_id", "source", "name_core", "side"],
+                               filters=[("country", "==", c)])
+        recs = recs[(recs.source == 1).to_numpy() | (recs.side == "val").to_numpy()]
+        k = _kinds(a, recs, fillers)
+        street = a.a_tsr.to_numpy() >= anchor.SAME_STREET
+        per_country[str(c)] = anchor.kind_ratios(k[street], a.hn_rel.fillna(0).to_numpy()[street],
+                                                 a.p.to_numpy()[street])
+        kinds[str(c)] = (m, k)
+        del recs
+    bias = anchor.pooled_bias(per_country)
+    chosen["anchor"] = {"val": per_country, "bias": bias}
+    st.metric("anchor_val", per_country)
+    st.metric("anchor_bias", bias)
+    if dc.prior_shift != "anchor":
+        return assigned
+    out, reports = assigned.copy(), {}
+    for c, (m, k) in kinds.items():
+        adj, reports[c] = anchor.correct(assigned[m], k, bias, dc.anchor_min_ratio,
+                                         dc.anchor_min_pairs, dc.anchor_max_ratio)
+        out.loc[m, "p"] = adj.p.to_numpy()
+    st.metric("anchor_val_applied", {c: {k: v["r_applied"] for k, v in r.items()}
+                                     for c, r in reports.items()})
+    return out
+
+
 def _as_lists(kept: pd.DataFrame) -> dict[str, list[str]]:
     return kept.groupby("s1_id").q_id.apply(list).to_dict()
 
@@ -112,6 +170,14 @@ def _decide_val(st: StageRun, cfg: Config) -> dict:
     scores = st.read_input(dc.scores_stage, "scores_val").astype({"q_id": str, "s1_id": str})
     assigned = one_owner(scores)
     st.metric("val_one_owner_precision_at_1", round(float(assigned.y.mean()), 5))
+    chosen_extra: dict = {}
+    if all(c in assigned for c in ANCHOR_COLS):  # anchor bias factors (see decide/anchor.py)
+        with timed(st.log, "anchor: val kind ratios"):
+            assigned = _anchor_val(st, cfg, assigned,
+                                   recs.set_index("entity_id").country, chosen_extra)
+    elif dc.prior_shift == "anchor":
+        raise ValueError("decide.prior_shift=anchor needs hn_rel/a_tsr in the scores "
+                         "(decide.scores_stage=rerank)")
     if dc.tie_duplicates:
         q_keys = dup_keys_streamed(rec_path, filters=[("side", "==", "val")])
         before = assigned.s1_id.copy()
@@ -137,6 +203,7 @@ def _decide_val(st: StageRun, cfg: Config) -> dict:
               "threshold": best_t if dc.threshold is None else dc.threshold,
               "min_p": best_m if dc.min_p is None else dc.min_p}
     st.metric("chosen", chosen)
+    chosen.update(chosen_extra)
     if all(c in scores for c in SEG_COLS):  # val priors per lookalike segment (prior shift)
         cty = recs.set_index("entity_id").country
         sc_c = scores.assign(country=cty.reindex(scores.q_id).to_numpy())
@@ -171,26 +238,41 @@ def run_decide(cfg: Config) -> None:
                 # stream: every scores part holds complete queries, so the best row
                 # per query can be taken part by part (~10M rows kept, not ~250M)
                 src = st.input_path(dc.scores_stage, "scores_test")
-                if dc.prior_shift not in ("none", "segment_em"):
+                if dc.prior_shift not in ("none", "segment_em", "anchor"):
                     raise ValueError(f"unknown decide.prior_shift {dc.prior_shift!r}")
                 s1_country = None
-                if dc.prior_shift == "segment_em":
-                    if "segment_priors" not in chosen:
-                        raise ValueError("decide.prior_shift=segment_em needs segment priors: "
-                                         "re-run the train pass after `ber rerank`")
-                    rt = pd.read_parquet(st.input_path("normalize", "records_test"),
-                                         columns=["entity_id", "country"],
+                rec_test = st.input_path("normalize", "records_test")
+                if dc.prior_shift == "segment_em" and "segment_priors" not in chosen:
+                    raise ValueError("decide.prior_shift=segment_em needs segment priors: "
+                                     "re-run the train pass after `ber rerank`")
+                if dc.prior_shift == "anchor" and "anchor" not in chosen:
+                    raise ValueError("decide.prior_shift=anchor needs the val bias factors: "
+                                     "re-run the train pass of `ber decide` on rerank scores")
+                if dc.prior_shift != "none":
+                    rt = pd.read_parquet(rec_test, columns=["entity_id", "country"],
                                          filters=[("source", "==", 1)])
                     s1_country = rt.set_index("entity_id").country
+                fillers = _fillers(st) if dc.prior_shift == "anchor" else None
                 parts, reports = [], {}
                 for f in sorted(src.glob("*.parquet")):
                     d = pd.read_parquet(f).astype({"q_id": str, "s1_id": str})
-                    if s1_country is not None and len(d):
-                        c = str(s1_country[d.s1_id.iloc[0]])
+                    c = str(s1_country[d.s1_id.iloc[0]]) if s1_country is not None and len(d) else ""
+                    if dc.prior_shift == "segment_em" and len(d):
                         pri = chosen["segment_priors"].get(c, chosen["segment_priors"]["pooled"])
                         d, rep = adjust(d, pri)
                         reports[f"{c}:{f.name}"] = rep
-                    parts.append(one_owner(d))
+                    a = one_owner(d)
+                    del d
+                    if dc.prior_shift == "anchor" and len(a):
+                        # one score part = one country (rerank writes part-<country>)
+                        recs = pd.read_parquet(rec_test, columns=["entity_id", "source", "name_core"],
+                                               filters=[("country", "==", c)])
+                        k = _kinds(a, recs, fillers)
+                        del recs
+                        a, reports[f"{c}:{f.name}"] = anchor.correct(
+                            a, k, chosen["anchor"]["bias"], dc.anchor_min_ratio,
+                            dc.anchor_min_pairs, dc.anchor_max_ratio)
+                    parts.append(a)
                 if reports:
                     st.write_json(reports, "prior_shift_test")
                     st.metric("prior_shift_test", reports)

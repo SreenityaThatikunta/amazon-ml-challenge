@@ -91,7 +91,13 @@ decide:               # stage 4 (T3.5/T4.1)
   empty_prior: 1.0    # expected_f: multiplier on P(no true match) for the "no match" option
   tie_duplicates: true  # exact duplicate S2/S3 records (same source/name/address) share one owner
   prior_shift: none     # none | segment_em: rescale test p per lookalike segment by the EM-estimated
-                        # test/val prior odds ratio (test has ~2x the shifted-house-number lookalikes)
+                        # test/val prior odds ratio (test has ~2x the shifted-house-number lookalikes) |
+                        # anchor: per name-change kind (exact / typo / generic-word swap / other), the
+                        # share of true copies from the house-number mixture vs the model's mean p,
+                        # de-biased on val (decide/anchor.py; France's generic-word swaps)
+  anchor_min_ratio: 2.0   # anchor: correct a kind only if its de-biased odds ratio is beyond 2x (or 1/2x)
+  anchor_min_pairs: 2000  # anchor: ... and it has at least this many same-street pairs
+  anchor_max_ratio: 6.0   # anchor: cap on the applied odds ratio
   scores_stage: rerank  # scorer (stage 1 only) | rerank (stage 2) | llm-import (after the LLM round trip)
   sweep: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8]
 

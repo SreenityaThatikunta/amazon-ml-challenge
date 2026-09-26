@@ -31,6 +31,8 @@ final ranking** (smaller candidate set per S1 = ranked higher).
 | 11 | Exact expected F0.5 (`decide.method = expected_f_exact`) | `decide/expected_f.py` | The ratio-of-expectations approximation is biased on the tiny groups here (1–6 candidates per S1). Exact expectation via Poisson-binomial distributions (brute-force checked in tests). Both variants are reported by `ber decide`. |
 | 12 | Ablation switch `scorer.drop_features` | `scorer/gbm.py` | Train the scorer without a feature group (`k_*`, names) to measure what each change buys. |
 | 13 | Optional GPU top-k (`candidates.device = auto`) | `candidates/tfidf.py`, `requirements-gpu.txt` | Stage 1 is the slowest step on the laptop (train India alone: 101 min). With CuPy (MIT) the S1 block is uploaded once as CSR, query chunks are densified on the GPU, one cuSPARSE product gives all similarities, and 10 arg-max passes give the top-10 (a full sort was slower than the CPU). Only blocks with ≥ 50k S1 go to the GPU: on small blocks the CPU kernel is as fast. Checked against the CPU path: identical k-th similarities (≤ 3e-7); only ties are broken differently. Large synthetic block: 27.9 s CPU → 2.6 s GPU. Falls back to CPU when CuPy/CUDA is missing. |
+| 14 | Domain normalisation in stage 2 (`rerank.domain_norm`, v2.2) | `rerank/stage.py` | See "Leaderboard vs validation" below: size/density-dependent stage-2 inputs divided by their per-country, per-split scale (LB 0.977 → 0.980). |
+| 15 | **Anchor-based prior correction per name-change kind** (`decide.prior_shift = anchor`, v2.3) | `decide/anchor.py`, `decide/stage.py` | France swaps the generic word of a name at the same address ("Ski College" → "Ski Comite"), a pattern absent from US/India; the model is uninformed there (p ≈ 0.4). The share of true copies per kind is estimated without labels from the house-number relation (independent of the name change given the match status), de-biased on val, and the kind's odds are corrected when they are off by > 2×. Only France's generic swaps qualify (×5.5). Details: "v2.3" below. |
 
 ### Evidence behind the changes (raw-data checks, 2026-09-25)
 - **Name noise per country (test S2/S3 vs S1, % of names):** US/India carry `(ID: …)` 0.26–0.32 %, phone numbers 0.26–0.32 %, `#nnnnn` 0.26–0.32 %; France none of those but quotes (0.05 %), `et` for `&` (0.27 %) and far more accents (17 %). Injected honorifics in India only (8 %).
@@ -96,6 +98,7 @@ claims (`c_expected`, `c_best_other`, `c_sum_other`), i.e. exactly the group con
 | main (6120d59) | 0.98211 | 0.975 | 0.007 |
 | v2.1 (stage 2 on all features) | 0.98895 (0.98684 with whole regions held out) | 0.977 | 0.012 (0.010) |
 | **v2.2 (+ domain normalisation of size-dependent stage-2 features)** | 0.98897 | **0.980** | 0.009 |
+| v2.3 (+ anchor prior correction: France's generic-word swaps) | 0.98897 | (not yet submitted) | |
 
 v2.2 is now the default (`rerank.domain_norm: true`) and the file in `output/` (2026-09-26 08:14).
 Submissions: 5 per team per day (2 used on 2026-09-26: v2.1, v2.2).
@@ -142,6 +145,99 @@ more than further val gains. Checks so far (`D:\aml\analysis\shift.py`, `lowp_in
   `D:ml\submissions2.2_domainnorm\` (validator PASS, 5,912,771 links, 3.413 per S1) differs
   from v2.1 on 4.1 % of S1 (France 6.4 %, India 4.0 %, US 3.3 %). The stage-1-only probe
   differs from v2.1 on 9.4 % of S1.
+
+### v2.3 (2026-09-26): France's generic-word swaps, anchor-based prior correction
+
+Session goal (team decision): a well-generalising, defensible approach over squeezing the
+public score. Scripts and outputs: `D:\aml\analysis\{selfest,swap_check,fr_swaps,fr_hn_mix,
+anchor_proto,anchor_sim,anchor_sim2}.py/.txt`.
+
+**1. Where the model itself is unsure on test.** Expected F0.5 of the chosen predictions
+under the model's own p2 (exact Poisson-binomial), per country:
+
+| | val actual | val expected | test expected |
+|---|---|---|---|
+| US | 0.99046 | 0.99542 | 0.99366 |
+| India | 0.98662 | 0.99400 | 0.99072 |
+| France | – | – | **0.98697** |
+
+The model knows test is harder, and France hardest. Subtracting val's optimism gives ≈ 0.985
+for test, so ≈ 0.005 of the LB gap is not visible to the model at all. France has 6.0 % of
+its records in the uncertain band p2 ∈ [0.2, 0.9) vs 2.7 % (US) and 4.0 % (India).
+
+**2. France's uncertain records are one pattern:** same address, equal house number, and a
+name whose *generic* word differs: `Ski College SARL` → `Ski Comite SARL`, `BYH Club SAS` →
+`BYH Loisirs SAS`, `Dessin Club` → `Dessin & Fils`, `Bio College SAS` → `Bio SAS France`.
+Counting one-token swaps on filler-free name keys where both tokens are in ≥ 0.1 % of the
+country's S1 names ("generic swap"), among each record's top pair on the same street:
+
+| | generic swaps | model's view |
+|---|---|---|
+| val US | 77–256 (0.1 %), mostly decoys (y 0.29) | calibrated |
+| val India | 2,573 (1.5 %), y 0.55 | calibrated |
+| **test France** | **71,767 (6.6 %)** | p2 mean 0.40; 18.3k of the 52k equal-number ones linked |
+
+The model has never seen this pattern (US/India swaps are almost all rare words, i.e.
+typos) and answers with its US/India prior. Generic words are *not* added by the noise
+(their S2/S3 rate is 0.86× their S1 rate for every one of them), but "& Fils" (1.55×) and
+"France" (1.21×) are; the T-swaps (generic ↔ generic) are symmetric (club→école 308,
+école→club 285), i.e. random replacement.
+
+**3. Are they true copies? Evidence without labels.**
+- *House-number relation is independent of the name change given the match status*
+  (val: the true copies' hn_rel profile is the same for equal names, typos, generic swaps
+  and other changes, ~76 % equal / 2 % shifted in the US; decoys are 56–82 % shifted). In
+  France the generic swaps' profile (73.6 % equal, 16.0 % shifted) matches the exact-name
+  copies' (74.8 %, 13.3 %), while US test generic swaps look like decoys (23 % / 54 %).
+  A two-component mixture gives ~80 % true copies (0.78–0.82 whichever decoy profile is
+  assumed); French decoys would need ≥ 58 % equal house numbers for a 50/50 split, far above
+  any decoy type in US/India (0.5–25 %).
+- *Not "sibling" businesses:* the deduplicated French S1 file does contain same-address
+  siblings (1,071 pairs like `Nantes Club SARL` / `Nantes Foyer SAS`, vs 10 in the US), but
+  the swaps' top S1 sits at a shared address 13.3 % of the time, exactly the base rate of
+  French S1 (13.3 %) and of exact-name copies (13.2 %): no clustering at sibling addresses.
+- The problem statement lists "DBA/trade names" as name noise; this looks like the French
+  form of it.
+
+**4. Method (`ber/decide/anchor.py`, `decide.prior_shift = anchor`).** Per country and
+name-change kind k ∈ {equal key, rare swap (typo), generic swap, other}, over each query's
+assigned pair on the same street (address token-set ≥ 80):
+- hn_rel histogram h_k = π_k h1 + (1 − π_k) h0 → π_k by least squares; h1, h0 from the
+  exact-name kind with the model's p as soft labels (on val within 0.002 of the true
+  profiles);
+- r_k = odds(π_k) / odds(mean p over k) = how far the model's prior for the kind is off;
+- the estimator is biased for the non-exact kinds (edited-name decoys keep their house
+  number more often than same-name decoys), so the val ratios (model calibrated there, r
+  should be 1) are pooled into bias factors b = {typo 1.44, generic 1.17, other 1.74} and
+  divided out;
+- a kind is corrected only when the de-biased ratio is beyond 2× (either way; the largest
+  single-country val deviation from the pooled bias is 1.7×) and it has ≥ 2,000 pairs:
+  p' = r p / (r p + 1 − p), r ≤ 6.
+
+**5. Validation on labelled val (`anchor_sim.py`, `anchor_sim2.py`).**
+- Val itself: no kind corrected, val F0.5 **0.98897** (unchanged, by construction).
+- No false alarms under label shift where the model stays calibrated: removing 90 % of the
+  decoys or 60 % of the true copies of a kind (US/India × typo/other, 8 scenarios): de-biased
+  ratios 0.83–1.17, nothing corrected.
+- Detection + recovery where the model is uninformed with a wrong prior (France's
+  situation): replacing p in one kind by q(hn_rel) computed with prior 0.4:
+
+| kind (true share) | real p | wrong-prior q | + anchor | right prior (oracle) |
+|---|---|---|---|---|
+| US typo swaps (0.81) | 0.98896 | 0.97600 | **0.98413** | 0.98429 |
+| India other (0.86) | 0.98896 | 0.97020 | **0.98082** | 0.98123 |
+| US other, prior 0.95 (0.90) | 0.98896 | 0.98389 | 0.98389 (r 0.66, below threshold) | 0.98410 |
+
+  The correction recovers 96–99 % of the loss and stays off when the error is small.
+
+**6. Effect on test (run `v23` = v2.2's stages via junctions + anchor decide).** Only
+France's generic swaps are corrected (π_anchor 0.815 vs mean p 0.404 → r 6.48 / bias 1.17 =
+**5.53**); every other country × kind stays within 0.87–1.81 (US generic swaps 1.81, below
+2). File `D:\aml\submissions\v2.3_anchor\`: validator PASS, 5,928,875 links (+16,217 /
+−113 vs v2.2), all in France: 15,705 French S1 changed (6.05 %), 746 went from empty to
+linked; candidate_pairs.tsv unchanged (9,649,852). Expected LB effect is small (≈ +0.0006
+to +0.0008 if ≥ 90 % of the new links are right, ≈ 0 at 70 %): a 3-decimal leaderboard may
+not show it.
 
 **LB probes prepared** (the only way to see test performance by part):
 `D:\aml\submissions\probe_france_empty\` (v2.1, every French S1 left empty → France's own
