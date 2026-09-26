@@ -99,7 +99,8 @@ claims (`c_expected`, `c_best_other`, `c_sum_other`), i.e. exactly the group con
 | v2.1 (stage 2 on all features) | 0.98895 (0.98684 with whole regions held out) | 0.977 | 0.012 (0.010) |
 | **v2.2 (+ domain normalisation of size-dependent stage-2 features)** | 0.98897 | **0.980** | 0.009 |
 | v2.3 (+ anchor prior correction: France's generic-word swaps) | 0.98897 | not submitted (decision below) | |
-| **v2.4 (stage 2 on val + 20 % held-out train regions, stage 1 without them, + v2.3's anchor correction)** | 0.98911 (unseen-region CV 0.98776) | **0.980973** | 0.008 |
+| v2.4 (stage 2 on val + 20 % held-out train regions, stage 1 without them, + v2.3's anchor correction) | 0.98911 (unseen-region CV 0.98776) | 0.980973 | 0.008 |
+| **v2.5 (40 % held-out regions by owner, stage 2 on complete groups only)** | 0.98923 (unseen-region CV 0.98822) | **0.981708** | 0.0075 |
 
 Submission policy (2026-09-26, with the user): we assumed the public board shows 3
 decimals (it shows 6, as the v2.4 score 0.980973 revealed), so a v2.3 upload looked
@@ -423,7 +424,11 @@ record, 99.974 % of the retrieved true pairs). Anchor: again only France's gener
 (π 0.805 vs mean p2 0.392, de-biased odds ratio 5.40, applied); every US/India kind
 0.91–1.74. Links per S1 France 3.445 / India 3.380 / US 3.399 (v2.4 3.420 / 3.397 /
 3.420); S1 changed vs v2.4: France 10.0 %, India 5.0 %, US 3.8 %. Default config, README
-and methodology updated, zip rebuilt (CRC OK), pushed (8a81125). LB: to be uploaded.
+and methodology updated, zip rebuilt (CRC OK), pushed (8a81125). **Public LB 0.981708**
+(2026-09-26 ~21:40, uploaded by the user as the regression check): +0.000735 over v2.4,
+more than val showed (+0.00012 full val, +0.0003 clean, +0.00046 unseen-region clean), as
+expected if test (every region unseen, every group complete) gains most from these
+changes. Uploads 2026-09-26: v2.1, v2.2, v2.4, v2.5 (4 of 5).
 
 **7. France's region-less records are not a problem** (`D:\aml\analysis\fr_region.py`,
 `fr_region.txt`, v2.5 scores). In France, 34.9 % of the records with a kept pair have no

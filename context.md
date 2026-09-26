@@ -1,26 +1,29 @@
 # Handoff context: Amazon ML Challenge 2026 (Business Entity Resolution), team "pootato"
 
-Written 2026-09-26 ~14:00 IST at the end of the second long Claude Code session (the first
-one's handoff is in git history, commit e83a912). Read this first, then `progress.md` (the
-detailed log with the logic and every number; the newest sections are "v2.3", "v2.4" and
-"Memory"). The problem statement text is at `D:\aml\problem_pdf.txt` (the PDF is
+Updated 2026-09-26 ~21:45 IST during the third Claude Code session (written ~14:00 at the
+end of the second; the first one's handoff is in git history, commit e83a912). Read this
+first, then `progress.md` (the detailed log with the logic and every number; the newest
+sections are "v2.5", "v2.4" and "v2.3"). The problem statement text is at
+`D:\aml\problem_pdf.txt` (the PDF is
 `C:\Users\Rudraksha\Downloads\6ab674645103d_emails_comms_amazon_ml_challenge_2026.pdf`).
 
 ---
 
 ## 1. Situation
 
-- **Best file: v2.4, public LB 0.980973** (v2.2 0.980 — its exact 6-decimal value is on the
-  leaderboard page, ask the user; v2.1 0.977, main 0.975). It is
-  in `output\` and `D:\aml\submissions\v2.4_hold\`; the code on branch `improve/v2` (pushed)
-  reproduces it with the default config. `pootato_submission.zip` (project root) was
-  rebuilt from it (see section 9 for the final checklist).
+- **Best file: v2.5, public LB 0.981708** (v2.4 0.980973; v2.2 0.980; v2.1 0.977; main
+  0.975). It is in `output\` and `D:\aml\submissions\v2.5_hold04_complete\`; the code on
+  branch `improve/v2` (pushed) reproduces it with the default config (run `v25`).
+  `pootato_submission.zip` (project root) was rebuilt from it (section 9: final checklist).
+- v2.5 = v2.4 + stage 2 on 40 % held-out train regions (was 20 %) whose S2/S3 records
+  follow their owner's region (`rerank.hold_by: owner`) + stage 2 trained only on pairs
+  whose S1 group is complete (`rerank.train_complete: true`). Details: progress "v2.5".
 - The **public LB shows 6 decimals** (not 3, as the previous handoff implied), so it can
   resolve differences of ~0.0005. It is computed on a subset of the test S1; the private LB
   (final ranking) on the rest. `candidate_pairs.tsv` and the code are also reviewed:
   smaller candidate set per S1 ranks higher.
 - **Deadline:** Unstop timer ends ≈ **Sun 27 Sep 2026 23:59 IST** (verify on the page).
-  **5 LB submissions per team per day**; used on 2026-09-26: v2.1, v2.2, v2.4 (3 of 5).
+  **5 LB submissions per team per day**; used on 2026-09-26: v2.1, v2.2, v2.4, v2.5 (4 of 5).
 - Team priority (explicit): a well-generalising, defensible approach over squeezing the
   public score. The user uploads files themselves; we prepare them and say which one.
 
@@ -51,12 +54,19 @@ detailed log with the logic and every number; the newest sections are "v2.3", "v
 - `artifacts\<run>\<stage>\` (gitignored). Runs that matter:
   - `v2` = full production upstream (normalize, candidates, features: train + test) and
     the v2.2 stage 1. **Don't delete** (other runs link to it).
-  - **`v24` = the current final run**: `normalize/candidates/features` are junctions to v2;
-    `features_hold, scorer, rerank, decide, submit` are its own. `v24\rerank` holds the
-    final stage-2 fold models (experiment E1) and `v24\decide\decision_params.json` the
-    final decision parameters incl. the anchor bias factors. `v24\exp\E*` = the saved
-    outputs/models of each stage-2 experiment. **For new experiments use a new run dir with
-    junctions** (as `v24m` does), not `v24`, or the final models get overwritten.
+  - **`v25` = the current final run** (v2.5): `normalize/candidates/features` are
+    junctions to v2; `features_hold` (hold_frac 0.4, owner rule, 97.5 M pairs), `scorer`,
+    `rerank, decide, submit` are its own. The v2.5 stage-2 fold models and OOF val scores
+    are saved in `v25\exp\E1b_valhold_s1_complete\` (`v25\rerank` gets overwritten by
+    later experiments: to redo the v2.5 test pass, copy that experiment's model_fold*.txt
+    and scores_val.parquet back first, or re-run it with `D:\aml\run_v25.sh --skip-scorer
+    E1b_valhold_s1_complete`). `v25\exp\E*` = every v2.5 experiment.
+    `D:\aml\run_v25.sh [--skip-scorer] <names>` runs named stage-2 experiments (cases in the
+    script); `D:\aml\run_v25_test.sh <out name> [--set ...]` = decide sweep + test pass +
+    submit; `D:\aml\analysis\clean_eval.py name=dir ...` compares experiments on the full val
+    and on the "clean" val S1 (complete groups in every variant).
+  - `v24` = v2.4's run (hold 0.2, own-region rule); `v24\exp\E1_valhold_s1` = its models.
+    `v25chk` = refactor check (junctions to v24).
   - `v2x` = v2.2's stage 2 + decide; `v23` = v2.3 (v2.2 + anchor); `v2m` = memory-refactor
     equivalence check; `v24m` = scratch (min_p 0.3 check); `dev2`, `main` = old.
 - `D:\aml\submissions\{v2, v2.1, v2.2_domainnorm, v2.3_anchor, v2.4_hold, probe_*}\` = every
@@ -73,7 +83,7 @@ Git Bash, from `D:\aml\amazon-ml-challenge`, `export PYTHONUTF8=1`. Stages:
 `ber <stage> --run <run> [--set key=value ...]`; `--set data.phase=train|test` runs one side
 (a test pass reuses the train pass's models/params; needs the train pass first).
 Tests: `cd code/business_entity_resolution && ../../.venv/Scripts/python.exe -m pytest -q
--p no:cacheprovider --basetemp=/d/aml/pytest_tmp` (141 pass).
+-p no:cacheprovider --basetemp=/d/aml/pytest_tmp` (144 pass).
 
 Timings / peak RAM (laptop, full data):
 
@@ -82,28 +92,30 @@ Timings / peak RAM (laptop, full data):
 | normalize | 7 min | 4 GB |
 | candidates | ~2.5 h train (GPU helps) + 78 min test | 8 GB |
 | features | 64 min train + 115 min test | 10 GB |
-| features-hold (hold_frac 0.2) | 61 min (16 min of it = per-S1 candidate context) | 7.6 GB |
-| scorer | 8 min train (+ val/hold scoring) + 12 min test | 4.8 GB |
-| rerank (val + hold) | 14 min train + 10 min test | 4.9 GB |
+| features-hold (hold_frac 0.4) | 79 min (13 min of it = per-S1 candidate context) | 8.9 GB |
+| scorer | 10 min train (incl. val + 97 M hold pairs scoring) + 12 min test | 9.3 GB |
+| rerank (val + hold, 5.4 M pairs) | ~20 min train (4 folds × ~4.5 min) + 13 min test | 8 GB / 4.9 GB |
 | decide | 2–5 min per pass (full min_p sweep ~4 min) | 4.6 GB |
 | submit | 1 min | 4.1 GB |
 
 Cheap loop: anything after features-hold (scorer/rerank/decide) re-runs in minutes in a
 junction run; changing normalisation/candidates/features costs a full re-run (~6–8 h).
 
-## 5. What the pipeline is now (v2.4)
+## 5. What the pipeline is now (v2.5)
 
 Normalise → region-blocked char-3gram TF-IDF top-k (3 indexes, ~24.6 S1 per record, 99.05 %
 of true pairs) → 102 pair features → **stage 1** LightGBM (p1), trained on train regions
-*outside* the held-out ones; keep p1 ≥ 0.001 (**= `candidate_pairs.tsv`, 5.63 per S1,
-99.97 % of retrieved true pairs**) → **stage 2** re-ranker LightGBM on p1 + S1/record group
-context + all 102 stage-1 features, with domain normalisation of 20 size-dependent
-features, **trained cross-fitted (4 folds by the record's top S1) on the val regions (10 %)
-+ 20 % held-out train regions** (India AP GJ HR KL OD RJ, US AR CT IA ID IN MD NY;
-`rerank.hold_frac: 0.2`, `train_sides: [val, hold]`) → one owner per record → **anchor prior
-correction** (`decide.prior_shift: anchor`; fires only for France's generic-word swaps) →
-per-S1 expected-F0.5 (min_p chosen on val: 0.02, flat) → TSVs + official validator.
-Methodology write-up: `Documentation_template.md` (up to date for v2.4).
+*outside* the held-out ones (`scorer.train_query_frac: 0.14` → 3.6 M rows); keep p1 ≥ 0.001
+(**= `candidate_pairs.tsv`, 5.53 per S1, 99.97 % of retrieved true pairs**) → **stage 2**
+re-ranker LightGBM on p1 + S1/record group context + all 102 stage-1 features, with domain
+normalisation of 20 size-dependent features, **trained cross-fitted (4 folds by the
+record's top S1) on the val regions (10 %) + 40 % held-out train regions** (India AP GJ HR
+MH OD RJ; US AL AR AZ CO CT IA ID IN LA MD MO MT NY OK TN UT WY; `rerank.hold_frac: 0.4`,
+`hold_by: owner`, `train_sides: [val, hold]`), **only on pairs whose S1 group is complete**
+(`train_complete: true`) → one owner per record → **anchor prior correction**
+(`decide.prior_shift: anchor`; fires only for France's generic-word swaps) → per-S1
+expected-F0.5 (min_p chosen on val: 0.02, flat) → TSVs + official validator.
+Methodology write-up: `Documentation_template.md` (up to date for v2.5).
 
 ## 6. Results
 
@@ -113,7 +125,12 @@ Methodology write-up: `Documentation_template.md` (up to date for v2.4).
 | v2.1 stage 2 on all features | 0.98895 | 0.98684 | 0.977 |
 | v2.2 + domain normalisation | 0.98897 | – | 0.980 |
 | v2.3 + anchor correction (France) | 0.98897 (no-op on val) | – | not submitted |
-| **v2.4 stage 2 on val + held-out regions (+ v2.3)** | **0.98911** | **0.98776** (val-only: 0.98660) | **0.980973** |
+| v2.4 stage 2 on val + held-out regions (+ v2.3) | 0.98911 | 0.98776 (val-only: 0.98660) | 0.980973 |
+| **v2.5 40 % hold regions by owner + complete groups only** | **0.98923** | **0.98822** | **0.981708** |
+
+On the 191,917 val S1 whose groups are complete in every variant ("clean", the fair
+comparison once hold sets differ): v2.4 0.99241 → v2.5 0.99270; unseen regions 0.99125 →
+0.99171 (`D:\aml\analysis\clean_eval.py`).
 
 ## 7. Key findings (evidence in `progress.md`; scripts in `D:\aml\analysis\`)
 
@@ -145,32 +162,36 @@ Methodology write-up: `Documentation_template.md` (up to date for v2.4).
 6. **More regions for stage 2 help unseen regions** (E0–E4 table in progress): +0.0012
    unseen-region (India +0.0020, singletons +0.0055); hold-only training transfers to val as
    well as val's own regions (0.98666 vs 0.98660).
-7. Earlier (v2 session): noise catalogue (fillers, brand syllables, injected ids, prepended
+7. **Hold records by owner + complete-group training (v2.5, progress "v2.5")**: v2.4 picked
+   hold records by their own address region, missing 5 % of the hold S1's true copies
+   (mostly region-less, whole-country searchers) and loading copies of non-hold S1. Training
+   stage 2 only on complete groups removes the "empty group → reject" shortcut and improves
+   every val measure (clean S1 and artefact-affected S1 alike). LB +0.0007.
+8. **France's 35 % region-less S2/S3 records are fine** (`fr_region.py`): addresses that
+   stop at the city; anchor true-copy share 0.869 vs model 0.873. In US/India "no region"
+   ≈ empty address (different population).
+9. Earlier (v2 session): noise catalogue (fillers, brand syllables, injected ids, prepended
    house numbers), error budget (missed pairs mostly records with empty address), label-shift
    EM unreliable, adversarial weights degenerate, candidate filter trade-off (p1 ≥ 0.001:
    1.078 pairs/record, 99.97 %; 0.003: 0.984, 99.93 %; 0.01: 0.885, 99.77 %).
 
 ## 8. Next steps (in priority order; the user wants a better score)
 
-1. **More held-out regions for stage 2** (strongest evidence so far): try `rerank.hold_frac`
-   0.3–0.4 in a **new run dir** (junctions: normalize/candidates/features → v2).
-   `features-hold` recomputes all hold queries (~1 h per 20 %; the per-S1 candidate context
-   step alone is 16 min — could be cached/sped up with Arrow). Then scorer + the E2/E3
-   protocol (region folds, val-only vs val+hold) + E1; compare unseen-region CV with
-   0.98776. Note: `hold_regions()` picks regions greedily from a seeded permutation, so a
-   larger frac mostly (not strictly) extends the 0.2 set. Stage 1 loses those regions too
-   (at 0.2: val AUC 0.999938 vs 0.99994 — negligible).
-2. **Complete the remaining S1 groups ("fix B")**: 141k val pairs still sit on S1 outside
-   the loaded regions (empty groups). Option: exclude such pairs from stage-2 *training*
-   (flag via the split's `s1.parquet` geo + hold regions), keep them for scoring; compare
-   E1 vs E1b on val/unseen-region CV. Cheap (rerank + decide ~20 min).
-3. **D1 diagnostic** (`D:\aml\analysis\d1_v22_complete_groups.py`, written, not run):
-   v2.2's stage-2 models on val with fuller groups → quantifies how much v2.2 suffered
-   from the empty-group artefact (documentation value; ~10 min, ~3 GB).
-4. Candidate-set size: `rerank.min_p1` 0.003 (0.984 vs 1.078 pairs/record, −0.04 % of
-   retrieved true pairs) for the final-ranking criterion; check val cost first.
-5. Stage-1 domain normalisation (size-dependent features are ~1.3 % of stage-1 gain: small).
-6. Bigger, only if time: France pseudo-labelling; a transformer cross-encoder on the
+Done in the third session: more hold regions (0.4, owner rule) and "fix B" (train on
+complete groups) → v2.5, LB 0.981708. France's region-less records checked: fine.
+
+1. **Running (started 21:32, ~2.5 h, `D:\aml\logs\v25_experiments3.log`)**: stage 2 with a
+   3,500-round cap (most folds hit 2,000) and the second stage-2 round (`rerank.rounds 2`),
+   each with region folds (unseen-region) and folds by S1: `E3b_r3500`, `E3r2b_...`,
+   `E1b_r3500`, `E1r2b_...` in `v25\exp\`. Compare with `clean_eval.py` against E3b
+   (clean 0.99171) and E1b (0.99270). If one clearly helps both → v2.6 test pass
+   (`run_v25_test.sh v2.6_<name> --set ...`; the models of the chosen experiment must be the
+   last ones trained in `v25\rerank`).
+2. Candidate-set size: `rerank.min_p1` 0.003 (0.974 vs 1.069 pairs/record, −0.05 % of
+   retrieved true pairs; case `E1_minp003` in run_v25.sh needs `train_complete=true` added).
+3. D1 diagnostic (`D:\aml\analysis\d1_v22_complete_groups.py`, not run): documentation only.
+4. Stage-1 domain normalisation (small).
+5. Bigger, only if time: France pseudo-labelling; a transformer cross-encoder on the
    uncertain band (downloads ~3.6 GB need the user's OK).
 
 ## 9. Before the deadline (leave ≥ 3 h)
@@ -201,3 +222,11 @@ the zip is, and ask about a PR / merge into main.
   checks `candidate_pairs.tsv` too.
 - Windows: absolute D: paths; Git Bash heredocs with nested quotes can break — write scripts
   to files; `sleep` loops are blocked in the harness (use background jobs / `until` loops).
+- Stage `log.txt` files accumulate across runs: a `grep FAILED` can match an old run
+  (wait for "=== stage X ok" of the new run instead). `cmd; cat log` hides cmd's exit code.
+- pandas 3 (copy-on-write) hands out read-only numpy arrays (`.to_numpy()`): no in-place
+  `&=` on them.
+- LightGBM picks row- or col-wise histograms by timing, so a re-run can stop early at
+  another iteration (seen once: fold 3 of the v2.4 E1 re-run); results differ by ~1e-4.
+- The default config now has `rerank.train_complete: true`; experiment cases without fix B
+  pass `train_complete=false` explicitly (run_v25.sh does).

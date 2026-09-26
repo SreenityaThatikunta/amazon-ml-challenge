@@ -273,8 +273,8 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
 - **Leaderboard (public):** first submission 0.975 (val 0.982); stage-2 re-ranker on all
   features 0.977 (val 0.98895); + domain normalisation 0.980 (val 0.98897); re-ranker on
   validation + 20 % held-out regions, French prior correction **0.980973** (val 0.98911,
-  unseen-region 0.98776); the final model (40 % held-out regions, complete groups: val
-  0.98923, unseen-region 0.98822) was submitted as a regression check. The widening
+  unseen-region 0.98776); final model (40 % held-out regions, records following their
+  owner, complete groups only) **0.981708** (val 0.98923, unseen-region 0.98822). The widening
   val-LB gap led to adversarial validation (a classifier separates val from test pairs with
   AUC 0.99): test US has half the S1 of train US and 23 % more S2/S3 records per S1, so
   count- and IDF-based features sit on a different scale. Dividing them by their
