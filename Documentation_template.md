@@ -140,6 +140,9 @@ of the record's other p1); **S1 context** (rank of the record among all records 
 the S1, best/sum/count of competing p1, the same within the record's source, and
 "claims": records whose best S1 this is, their expected count and best competitor);
 all 102 stage-1 features passed through (25 of them: val 0.98748; all: 0.98895).
+**Domain normalisation:** 16 count-like features (per-S1 and per-record counts, name
+frequency) are divided by their mean and 4 IDF-like ones by their 99th percentile, within each
+country and split, because test has a different S1 density than train (section 5).
 
 **Model type:** LightGBM (MIT) binary classifiers. Stage 1: 127 leaves, lr 0.05, early
 stopping on 5 % of val records (best iteration 346), trained on 4.5 M pairs from 10 % of
@@ -175,7 +178,12 @@ for 0.02–0.5). Exact duplicate records share one owner.
   with half of all S1 names shared, the name alone often can't choose. Others: pairs whose
   noise mimics a distractor (house number ±2 and city renamed), made-up brand names at an
   address that hosts several S1, and retrieval ties among dozens of S1 with the same name.
-- **Leaderboard:** first submission 0.975 public (val 0.982). v2: {TBD_LB}.
+- **Leaderboard (public):** first submission 0.975 (val 0.982); stage-2 re-ranker on all
+  features 0.977 (val 0.98895); + domain normalisation 0.980 (val 0.98897). The widening
+  val-LB gap led to adversarial validation (a classifier separates val from test pairs with
+  AUC 0.99): test US has half the S1 of train US and 23 % more S2/S3 records per S1, so
+  count- and IDF-based features sit on a different scale. Dividing them by their
+  per-country, per-split scale before stage 2 recovered +0.003 on the leaderboard.
 
 ---
 
