@@ -401,7 +401,7 @@ def run_rerank(cfg: Config) -> None:
                                                                    & ~complete].sum())}
                                 for sd in sides})
             if rc.train_complete:
-                trainable &= complete
+                trainable = trainable & complete
 
             # folds grouped by the query's top S1 (keeps most S1 groups in one fold)
             top = keys.assign(q=q).sort_values(["q", "p"], ascending=[True, False]
