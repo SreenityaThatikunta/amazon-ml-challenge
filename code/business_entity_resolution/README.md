@@ -28,8 +28,8 @@ cd code/business_entity_resolution && ../../.venv/bin/pytest && ../../.venv/bin/
 Every stage is one command that reads the previous stage's artifacts from
 `artifacts/<run>/` and writes its own (with `manifest.json` + `log.txt`).
 Run them one at a time: heavy stages in parallel swap on a 16 GB machine
-(peak memory: candidates ~8 GB, features ~10 GB, features-hold ~7 GB, scorer / rerank /
-decide ≤ 5 GB).
+(peak memory: candidates ~8 GB, features ~10 GB, features-hold ~9 GB, scorer ~9 GB,
+rerank ~8 GB, decide ≤ 5 GB).
 
 ```bash
 B=.venv/bin/ber            # Windows: .venv\Scripts\ber.exe (set PYTHONUTF8=1)
@@ -37,7 +37,7 @@ $B split       --run main  # geographic train/val split + dev slice            (
 $B normalize   --run main  # normalise 24M records, learn Indic dictionary     (~7 min)
 $B candidates  --run main  # region-blocked TF-IDF top-k + recall report       (~1.5 h GPU / ~4 h CPU, train+test)
 $B features    --run main  # 102 pair + context features                       (~4 h, train+test)
-$B features-hold --run main  # all pairs of the held-out train regions (rerank.hold_frac) (~1 h)
+$B features-hold --run main  # all pairs of the held-out train regions (rerank.hold_frac) (~1.3 h)
 $B scorer      --run main  # stage-1 LightGBM (without the held-out regions), scores val + hold + test (~25 min)
 $B rerank      --run main  # stage-2 re-ranker (cross-fitted on val + held-out regions) + test (~25 min)
 $B decide      --run main  # one owner per record + expected F0.5 (+ anchor prior correction); val F0.5 (~10 min)
@@ -52,9 +52,12 @@ for s in candidates features features-hold scorer rerank decide; do $B $s --run 
 for s in candidates features scorer rerank decide submit; do $B $s --run main --set data.phase=test; done
 ```
 
-Stage 2 (`rerank`) trains on the validation regions and on ~20 % more whole train-side
-regions that stage 1 never sees (`rerank.hold_frac: 0.2`, `rerank.train_sides: [val,
+Stage 2 (`rerank`) trains on the validation regions and on ~40 % more whole train-side
+regions that stage 1 never sees (`rerank.hold_frac: 0.4`, `rerank.train_sides: [val,
 hold]`; `hold_frac: 0` gives the v2.2 setup: validation regions only, no `features-hold`).
+Held-out S2/S3 records follow their owner's region, as in the validation split
+(`rerank.hold_by: owner`; v2.4 used `query_region`), and stage 2 trains only on pairs
+whose S1 group is complete (`rerank.train_complete: true`), as every group is at test time.
 `decide.prior_shift: anchor` corrects a name-change kind's probabilities when the
 house-number evidence in the test data says the model misjudges how often it is a true
 copy (on current data only France's generic-word swaps; `none` switches it off).

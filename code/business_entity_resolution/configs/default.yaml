@@ -66,7 +66,8 @@ scorer:               # stage 2 (T3.4): LightGBM pair scorer
   n_threads: 0          # 0 = cpu_count - 2
   oof_folds: 1          # >1: out-of-fold scores for train-side pairs (only llm-export needs them; set 3)
   model_from_run: null  # apply the model trained in that run instead of training (e.g. France proxy)
-  train_query_frac: 0.1   # share of featurised train-side queries used to train (~4.5M rows, ~2.5 GB float32)
+  train_query_frac: 0.14  # share of featurised train-side queries (outside the hold regions) used to
+                          # train: ~3.6M rows, ~1.5 GB float32 (v2.4: 0.1 with hold_frac 0.2, same size)
   es_query_frac: 0.05     # share of val-side queries used for early stopping (all val pairs are scored)
   drop_features: []       # ablations: feature names or "prefix*" left out of the model
 
@@ -76,11 +77,17 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   fold_by: s1         # s1 (folds grouped by the record's top S1) | region (whole regions per fold: robustness check)
   weights_file: null  # parquet (q_id, s1_id, w) of training weights for the val pairs (adversarial reweighting)
   domain_norm: true   # divide size/density-dependent features by their per-country, per-split scale (LB 0.977 -> 0.980)
-  hold_frac: 0.2      # v2.4: > 0 sets aside whole train-side regions (~this share of each country's S1)
+  hold_frac: 0.4      # > 0 sets aside whole train-side regions (~this share of each country's S1)
                       # for stage 2: `ber features-hold` featurises all their queries, the scorer
                       # trains without them and scores them (scores_hold), stage 2 can train on them
+                      # (v2.4: 0.2; v2.5: 0.4, unseen-region val +0.0003 on complete groups)
+  hold_by: owner      # which S2/S3 records belong to a hold region: owner (v2.5: the owner's region if
+                      # matched, as in the val split, so hold S1 groups are complete) | query_region (v2.4)
   train_sides: [val, hold]  # stage-2 training pairs: [val] | [val, hold] | [hold] (hold only: val is then
                       # scored by the fold mean, i.e. a pure unseen-region check)
+  train_complete: true  # v2.5: train only on pairs whose S1 lies in a loaded (val / hold) region, i.e.
+                      # whose group is complete as at test time; the others are still scored
+  rounds: 1           # 2 = second round with group features from the round-1 p2 (experimental)
   learning_rate: 0.05
   num_leaves: 63
   min_data_in_leaf: 200

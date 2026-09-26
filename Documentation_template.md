@@ -11,18 +11,19 @@
 A four-stage cascade that never compares all pairs: normalisation tuned to the noise we
 measured in the data, region-blocked character-trigram TF-IDF retrieval (24.6 S1
 candidates per S2/S3 record, 99.05 % of true pairs), a LightGBM pair scorer with 102
-features that also acts as a learned filter (**~1.08 candidates per record kept, 99.97 %
-of the retrieved true pairs**), and a second LightGBM that re-ranks the survivors with
-*group context*: how many other records claim the same S1, how strongly and from which
-source. The re-ranker is trained on whole held-out regions (the validation states plus
-20 % more train-side states), so it has seen many regions and scores unseen ones well. A
-per-S1 expected-F0.5 rule (one owner per record) produces the final links, with a
-label-free prior correction for a French name-noise pattern that the training countries
-do not have. Validation macro F0.5 is **0.98911** on a geographic hold-out (10 % of the
-S1 entities, whole states), **0.98776 with every validation state unseen by the model
-that scores it**, up from 0.98211 for our first submission. Everything runs on one
-laptop (16 GB RAM; optional NVIDIA GPU for the retrieval step) with MIT/BSD/Apache
-dependencies and no pretrained model.
+features that also acts as a learned filter (**~1.07 candidates per record kept, 99.97 %
+of the retrieved true pairs; 5.53 candidates per S1 on test**), and a second LightGBM that
+re-ranks the survivors with *group context*: how many other records claim the same S1,
+how strongly and from which source. The re-ranker is trained on whole held-out regions
+(the validation states plus 40 % more train-side states, with every S1 group complete, as
+it is at test time), so it has seen many regions and scores unseen ones well. A per-S1
+expected-F0.5 rule (one owner per record) produces the final links, with a label-free
+prior correction for a French name-noise pattern that the training countries do not
+have. Validation macro F0.5 is **0.98923** on a geographic hold-out (10 % of the S1
+entities, whole states), **0.98822 with every validation state unseen by the model that
+scores it**, up from 0.98211 for our first submission. Everything runs on one laptop
+(16 GB RAM; optional NVIDIA GPU for the retrieval step) with MIT/BSD/Apache dependencies
+and no pretrained model.
 
 ---
 
@@ -85,14 +86,14 @@ Data roles (whole regions, i.e. US and Indian states, never split):
 
 | Part | Share of S1 | Used for |
 |---|---|---|
-| train regions | ~70 % | stage 1 (a 10 % sample of the 20 % featurised records) |
-| held-out train regions ("hold") | ~20 % | stage 2 training (all records featurised; stage 1 never saw them) |
+| train regions | ~50 % | stage 1 (a 14 % sample of the 20 % featurised records) |
+| held-out train regions ("hold") | ~40 % | stage 2 training (all records featurised; stage 1 never saw them) |
 | validation regions | ~10 % | stage 2 training, cross-fitted (every val pair gets an out-of-fold p2), all metrics |
 
 Whole regions keep lookalike distractors, which sit at nearby addresses, on the same
-side as the entities they imitate. Val queries (S2/S3) follow their owner; all val records
-are scored, so val F0.5 includes blocking losses, singletons and every stage, like the
-leaderboard.
+side as the entities they imitate. S2/S3 records follow their owner's region (unmatched
+ones their own), in val and in the hold regions alike; all val records are scored, so val
+F0.5 includes blocking losses, singletons and every stage, like the leaderboard.
 
 ---
 
@@ -118,13 +119,13 @@ leaderboard.
 - **Learned filter (stage 1):** the pair scorer (section 4) keeps pairs with p1 ≥ 0.001.
   This is the last filter before the final model and defines `candidate_pairs.tsv`.
 - **Candidate pairs generated (test):** TF-IDF: 243,753,102 pairs (24.4 per record);
-  after the stage-1 filter (= `candidate_pairs.tsv`): 9,750,222 pairs (0.98 per record),
-  5.63 per S1 entity (the S1 has 3.4 true matches on average).
+  after the stage-1 filter (= `candidate_pairs.tsv`): 9,582,745 pairs (0.96 per record),
+  **5.53 per S1 entity** (the S1 has 3.4 true matches on average).
 - **How true matches were not lost:** recall measured on the validation side at every
   step: TF-IDF 99.05 % of true pairs (US 99.3 %, India 98.2–99.2 %), the stage-1 filter
   keeps 99.97 % of those (trade-off table in `artifacts/<run>/rerank/manifest.json`:
-  0.001 → 1.08 pairs/record, 0.01 → 0.88 pairs/record at 99.78 %). The remaining misses
-  are dominated by address-less records whose name dozens of S1 share.
+  0.001 → 1.07 pairs/record, 0.003 → 0.97 at 99.92 %, 0.01 → 0.88 at 99.75 %). The
+  remaining misses are dominated by address-less records whose name dozens of S1 share.
 - **Scale:** streaming per country and per region block; one country's records in memory
   at a time; optional GPU top-k (CuPy, cuSPARSE) for large blocks. Test retrieval: 78 min
   on a laptop with an RTX 4050 (2.4 h CPU-only for train).
@@ -164,37 +165,49 @@ frequency) are divided by their mean and 4 IDF-like ones by their 99th percentil
 country and split, because test has a different S1 density than train (section 5).
 
 **Model type:** LightGBM (MIT) binary classifiers. Stage 1: 127 leaves, lr 0.05, early
-stopping on 5 % of val records (best iteration 324), trained on 3.5 M pairs from 10 % of
-the featurised train-side records outside the held-out regions. Stage 2: 63 leaves,
-trained on the pairs of the validation regions and of the held-out train regions
-(1.12 M + 1.86 M pairs with p1 ≥ 0.001; stage 1 never saw either, so p1 is out-of-sample
-as on test) with **4-fold cross-fitting** grouped by the record's top S1: every val pair
-gets an out-of-fold p2 (honest validation), test pairs get the mean of the 4 fold models.
-No pretrained model, far below the 8 B parameter limit.
+stopping on 5 % of val records (best iteration 330; val AUC 0.99994), trained on 3.6 M
+pairs from 14 % of the featurised train-side records outside the held-out regions. Stage
+2: 63 leaves, trained on the pairs of the validation regions and of the held-out train
+regions (1.11 M + 4.28 M pairs with p1 ≥ 0.001; stage 1 never saw either, so p1 is
+out-of-sample as on test) whose S1 group is complete (below), with **4-fold
+cross-fitting** grouped by the record's top S1: every val pair gets an out-of-fold p2
+(honest validation), test pairs get the mean of the 4 fold models. No pretrained model,
+far below the 8 B parameter limit.
 
 **Why stage 2 needs many regions.** Stage 2 first trained on the validation regions
 only (10 % of S1). With whole validation regions held out per fold its score fell from
 0.98895 to 0.98684: part of what it learns is region-specific, and every test region is
-unseen by it. Adding 20 % more train-side regions (India AP, GJ, HR, KL, OD, RJ; US AR,
-CT, IA, ID, IN, MD, NY), featurised in full by `ber features-hold` and excluded from
-stage 1, raises the unseen-region score by 0.0012 (0.98660 → 0.98776; India +0.0020;
-singletons +0.0055) and the standard one by 0.00065. A re-ranker trained on the held-out
-regions alone scores the validation regions as well as one trained on other validation
-regions (0.98666 vs 0.98660), so the regions are interchangeable training data.
+unseen by it. So we set aside whole train-side regions for it (`ber features-hold`
+featurises all their records; stage 1 never trains on them): first 20 %, now 40 % of
+each country's S1 (India AP, GJ, HR, MH, OD, RJ; US AL, AR, AZ, CO, CT, IA, ID, IN, LA, MD,
+MO, MT, NY, OK, TN, UT, WY). Stage 1 does not suffer (val AUC 0.999939 with 40 % of the
+regions removed vs 0.99994 with none). A re-ranker trained on held-out regions alone
+scores the validation regions as well as one trained on other validation regions
+(0.98666 vs 0.98660), so the regions are interchangeable training data. Results with
+whole validation regions unseen by the scoring model, on the 191,917 validation S1 whose
+groups are complete in every variant (see below): validation regions only 0.99020, + 20 %
+held-out regions 0.99125, + 40 % (owner rule) 0.99156, + training on complete groups only
+**0.99171** (India 0.98497 → 0.98778, singletons 0.98224 → 0.98903).
 
 **Complete S1 groups.** The re-ranker's S1 context is only right if every record that
-lists the S1 is loaded. With validation records alone, 16 % of the validation pairs sit
-on train-side S1 whose owners are missing, so their groups looked empty and these (all
-negative) pairs were trivially easy; at test time every group is complete, in particular
-for the 21 % of test pairs from records without a detectable region, which search the
-whole country (35 % of French records). Loading the held-out regions completes many of
-these groups and gives the re-ranker thousands of examples of "a cross-region candidate
-whose S1 is strongly claimed by its own copies", which it had never seen.
+lists the S1 is loaded. Two fixes make training look like test, where every group is
+complete:
+- *Held-out records follow their owner.* A matched S2/S3 record belongs to its owner's
+  region, as in the validation split, not to the region named in its own address; else
+  5 % of the held-out S1's true copies were missing (mostly records whose address names
+  no region: the ones that search the whole country, like 35 % of France's records).
+- *Train only on complete groups.* Validation and held-out records also list S1 of the
+  other train regions (cross-region candidates, whole-country searches). Those S1's own
+  copies are never loaded, so their groups look empty and rejecting such a pair is
+  trivially easy (9 % of the validation pairs, all negative); a model trained on them
+  learns "empty group → reject", which never applies at test time. Excluding them from
+  training (they are still scored) improves every validation measure: 0.98896 → 0.98923
+  overall, 0.99156 → 0.99171 on unseen regions (complete-group S1).
 
 **Threshold selection method:** one owner per record (its highest p2), then per S1 the
 prefix of its records (sorted by p2) that maximises the expected F0.5
 (≈ 1.25·Σp / (0.25·Σp_all + k), vs P(no match) = Π(1 − p) for the empty prediction), after
-dropping p2 < min_p. min_p = 0.3 chosen on validation; the curve is flat (within 0.0001
+dropping p2 < min_p. min_p = 0.02 chosen on validation; the curve is flat (0.98916–0.98923
 for 0.02–0.5). Exact duplicate records share one owner.
 
 **Prior correction per name-change kind (`decide.prior_shift = anchor`,
@@ -214,32 +227,40 @@ beyond 2× and the kind has ≥ 2,000 pairs, the kind's p2 are rescaled by that 
 validation: no correction fires under eight simulated label shifts where the model stays
 calibrated; when one kind's scores are replaced by house-number-only scores with a wrong
 prior (France's situation), the correction recovers 96–99 % of the lost F0.5. On test
-it fires only for **France's generic-word swaps** (π = 0.81 vs mean p2 0.40, odds × 5.5):
-16,217 more French links, nothing else changes.
+it fires only for **France's generic-word swaps** (final model: π = 0.81 vs mean p2 0.39,
+odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
 
 ---
 
 ## 5. Results & Error Analysis
 
-- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.98911** (US 0.99043,
-  India 0.98704; singletons 0.98701; pair precision 0.99799, recall 0.97306). With every
+- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.98923** (US 0.99044,
+  India 0.98734; singletons 0.98902; pair precision 0.99838, recall 0.97142). With every
   validation state unseen by the model that scores it (whole regions held out per
-  cross-fitting fold, the harsher test-like check): **0.98776**.
+  cross-fitting fold, the harsher test-like check): **0.98822**.
   Progression: first submission 0.98211 → v2 features, stage 1 only 0.98337 → + stage-2
   re-ranker on 25 stage-1 features 0.98748 → on all 102 features 0.98895 → re-ranker
-  trained on validation + held-out train regions 0.98911 (0.98776 unseen-region, vs
-  0.98660 when trained on validation regions only). Stage 2 trained on US val only and
-  applied to Indian val still beats stage 1 there (0.9807 vs 0.9790), our best proxy for
-  France; a re-ranker trained only on the held-out regions scores the validation regions
-  as well as one trained on them (0.98666 vs 0.98660).
+  trained on validation + 20 % held-out train regions 0.98911 (0.98776 unseen-region, vs
+  0.98660 when trained on validation regions only) → 40 % held-out regions, records
+  following their owner, training on complete groups only 0.98923 (0.98822). Stage 2
+  trained on US val only and applied to Indian val still beats stage 1 there (0.9807 vs
+  0.9790), our best proxy for France; a re-ranker trained only on the held-out regions
+  scores the validation regions as well as one trained on them (0.98666 vs 0.98660).
 
-  | Re-ranker trained on (same stage 1) | Folds | Val F0.5 | US | India |
-  |---|---|---|---|---|
-  | validation regions | by S1 | 0.98846 | 0.99000 | 0.98605 |
-  | validation + held-out regions (**final**) | by S1 | **0.98911** | 0.99043 | 0.98704 |
-  | validation regions | whole regions held out | 0.98660 | 0.98968 | 0.98176 |
-  | validation + held-out regions | whole regions held out | **0.98776** | 0.99029 | 0.98377 |
-  | held-out regions only | – (validation never seen) | 0.98666 | 0.98865 | 0.98355 |
+  Loading more held-out regions also completes more validation groups (their S1's copies
+  are then loaded), which makes the validation set harder, as test is. So the variants
+  are compared on the 191,917 validation S1 (86 %) whose groups are complete in all of
+  them ("clean"):
+
+  | Re-ranker trained on | Folds | Val F0.5 | Clean | Clean US | Clean India |
+  |---|---|---|---|---|---|
+  | validation regions | whole regions held out | 0.98660 | 0.99020 | 0.99347 | 0.98497 |
+  | + 20 % held-out regions | whole regions held out | 0.98776 | 0.99125 | 0.99401 | 0.98684 |
+  | + 40 % held-out regions (owner rule) | whole regions held out | 0.98789 | 0.99156 | 0.99410 | 0.98750 |
+  | + complete groups only | whole regions held out | **0.98822** | **0.99171** | 0.99417 | 0.98778 |
+  | + 20 % held-out regions | by S1 | 0.98911 | 0.99241 | 0.99400 | 0.98987 |
+  | + 40 % held-out regions (owner rule) | by S1 | 0.98896 | 0.99261 | 0.99421 | 0.99005 |
+  | + complete groups only (**final**) | by S1 | **0.98923** | **0.99270** | 0.99424 | 0.99025 |
 - **Common false positives (wrong merges)** (error analysis of the 25-feature re-ranker): 2,765 of 752,513 predicted links: 1,842
   lookalike distractors (same address, one-letter name edit or house number shifted by a
   few units, often indistinguishable from a true pair with a digit typo), 923 records of
@@ -250,9 +271,10 @@ it fires only for **France's generic-word swaps** (π = 0.81 vs mean p2 0.40, od
   noise mimics a distractor (house number ±2 and city renamed), made-up brand names at an
   address that hosts several S1, and retrieval ties among dozens of S1 with the same name.
 - **Leaderboard (public):** first submission 0.975 (val 0.982); stage-2 re-ranker on all
-  features 0.977 (val 0.98895); + domain normalisation 0.980 (val 0.98897); final model
-  (re-ranker on validation + held-out regions, French prior correction) **0.980973**
-  (val 0.98911, unseen-region 0.98776). The widening
+  features 0.977 (val 0.98895); + domain normalisation 0.980 (val 0.98897); re-ranker on
+  validation + 20 % held-out regions, French prior correction **0.980973** (val 0.98911,
+  unseen-region 0.98776); the final model (40 % held-out regions, complete groups: val
+  0.98923, unseen-region 0.98822) was submitted as a regression check. The widening
   val-LB gap led to adversarial validation (a classifier separates val from test pairs with
   AUC 0.99): test US has half the S1 of train US and 23 % more S2/S3 records per S1, so
   count- and IDF-based features sit on a different scale. Dividing them by their

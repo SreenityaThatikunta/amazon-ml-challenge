@@ -368,6 +368,52 @@ OK TN UT WY (38 %). Stage 1 then trains on ~51 % of the S1 regions; `scorer.
 train_query_frac` 0.14 keeps its sample at ~3.5 M rows as in v2.4. Experiments:
 `D:\aml\run_v25.sh`.
 
+`features-hold` took 79 min (97.5 M hold pairs, peak 8.85 GB). Refactor check (run
+`v25chk` = v2.4's stage 1 + hold features, E1 settings, rounds = 1): fold models 0–2
+bit-identical to v2.4's; fold 3 stopped early at another iteration (1887 vs 1967; the
+first trees are identical), i.e. LightGBM's timing-dependent choice between row- and
+col-wise histograms, not the code (max |Δp2| 0.06, mean 0.0005 on the fold's rows). The
+v24 rerank log also shows the hold-rule problem directly: 42,605 hold pairs on S1 outside
+the hold regions, 35,637 of them positives (own-region rule).
+
+**5. Results** (stage 1 of v25: 3.62 M rows, val AUC 0.999939 / logloss 0.00294, same as
+v2.4's 0.999938 / 0.00293; kept pairs: val 1,112,888 of which 102,055 on incomplete groups
+(v2.4: 137,258), hold 4,281,230 (2.92 M positives), none of the positives on an incomplete
+group (v2.4: 35,637)). "Clean" = the 191,917 val S1 (86 %) whose groups are complete in
+every variant; "affected" = the other 30,707, which carry the empty-group artefact and get
+harder as more groups are completed, so only the clean column compares hold sets fairly.
+
+| Stage 2 | folds | val F0.5 | clean | clean US | clean India | clean singletons |
+|---|---|---|---|---|---|---|
+| v2.4 E2: val only | region | 0.98660 | 0.99020 | 0.99347 | 0.98497 | 0.98224 |
+| v2.4 E3: val + hold 0.2 (own region) | region | 0.98776 | 0.99125 | 0.99401 | 0.98684 | 0.98703 |
+| v2.5 E3: val + hold 0.4 (owner) | region | 0.98789 | 0.99156 | 0.99410 | 0.98750 | 0.98825 |
+| **v2.5 E3b: + train on complete groups only** | region | **0.98822** | **0.99171** | 0.99417 | 0.98778 | 0.98903 |
+| v2.4 E1: val + hold 0.2 | by S1 | 0.98911 | 0.99241 | 0.99400 | 0.98987 | 0.98703 |
+
+Fix B (`train_complete`) helps on the clean S1 (+0.00015) *and* on the affected ones
+(0.96637 vs 0.96496), although its OOF logloss is worse (0.0399 vs 0.0384: it now scores the
+artefact pairs, empty groups on val, without the shortcut it never learned). The shortcut
+"empty S1 group → reject" was costing real decisions, not just calibration on artefacts.
+
+Production folds (by S1; each fold model sees every region):
+
+| Stage 2 | val F0.5 | clean | clean US | clean India | clean singletons | affected | OOF AUC / logloss |
+|---|---|---|---|---|---|---|---|
+| v2.4 E1 (LB 0.980973) | 0.98911 | 0.99241 | 0.99400 | 0.98987 | 0.98703 | 0.96844 | 0.999251 / 0.0311 |
+| v2.5 E1: hold 0.4 (owner) | 0.98896 | 0.99261 | 0.99421 | 0.99005 | 0.98842 | 0.96617 | 0.999018 / 0.0341 |
+| **v2.5 E1b: + complete groups only** | **0.98923** | **0.99270** | 0.99424 | 0.99025 | 0.98921 | 0.96753 | 0.998869 / 0.0359 |
+
+(The affected column and the OOF AUC/logloss are not comparable between v2.4 and v2.5:
+v2.5 completes 35 k more val groups, which makes those pairs harder, as at test time.)
+**Decision: v2.5 = E1b** (hold 0.4 by owner, train on complete groups, folds by S1): best
+in every column of both protocols, above v2.4 on the full val despite its harder val.
+
+On unseen regions the larger, owner-ruled hold set adds +0.0003 on the clean S1 (India
++0.0007, singletons +0.0012) on top of v2.4's +0.0010: diminishing, same direction.
+3 of 4 folds stopped at the 2,000-round cap (1662/1998/2000/1995): with 5.4 M rows stage 2
+is capacity-limited.
+
 **LB probe prepared:** `D:\aml\submissions\probe_v24_france_empty\` = the v2.4 file with
 all 259,452 French S1 (14.98 % of test S1) left empty (v2.4 left 5.35 % of them empty).
 LB(v2.4) − LB(probe) = 0.1498 × (F_France − s_France), so F_France ≈ Δ / 0.1498 +
