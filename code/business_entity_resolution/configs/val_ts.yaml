@@ -1,0 +1,25 @@
+# Test-shaped validation (plan.md §0.1b N1, E26/E27): v3's models applied to a val side
+# where ~19-20% of S1 are dropped and their S2/S3 copies stay as unmatched records
+# (records per S1 4.68 -> ~5.8, as on test). Val side only, train pass only.
+extends: default.yaml
+
+run_id: v3ts
+
+data:
+  phase: train
+
+reshape:
+  drop_s1: {US: 0.19, India: 0.20}
+  sides: [val]
+
+candidates:
+  query_sides: [val]      # S1 index unchanged (train + val S1), candidates only for val queries
+
+features:
+  train_query_frac: 0.0   # val side only: the models come from v3
+
+scorer:
+  model_from_run: v3
+
+rerank:
+  model_from_run: v3

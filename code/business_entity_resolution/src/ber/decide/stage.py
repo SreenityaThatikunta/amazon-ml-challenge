@@ -90,6 +90,25 @@ def evaluate(kept: pd.DataFrame, truth: dict[str, list[str]], s1_meta: pd.DataFr
     return df.join(s1_meta, on="s1_id")
 
 
+def _orphan_metrics(st: StageRun, rec_path, kept: pd.DataFrame) -> None:
+    """val_ts (reshape): how many copies of dropped S1 (``owner_dropped``) still get
+    linked to some S1: the false-positive type that plain val cannot show (E26)."""
+    import pyarrow.parquet as pq
+    first = next(iter(sorted(rec_path.glob("*.parquet"))), None)
+    if first is None or "owner_dropped" not in pq.read_schema(first).names:
+        return
+    od = pd.read_parquet(rec_path, columns=["entity_id", "owner_dropped"],
+                         filters=[("side", "==", "val"), ("source", "!=", 1)])
+    orph = set(od.entity_id[od.owner_dropped != ""])
+    if not orph:
+        return
+    linked = kept[kept.q_id.astype(str).isin(orph)]
+    st.metric("val_orphan_copies", {"n": len(orph), "linked": len(linked),
+                                    "linked_share": round(len(linked) / len(orph), 4),
+                                    "s1_hit": int(linked.s1_id.nunique()),
+                                    "share_of_kept_links": round(len(linked) / max(len(kept), 1), 5)})
+
+
 def _decide_val(st: StageRun, cfg: Config) -> dict:
     """Val side: sweep the decision parameters, score macro F0.5, return the
     chosen parameters (also written as ``decision_params.json``)."""
@@ -150,6 +169,7 @@ def _decide_val(st: StageRun, cfg: Config) -> dict:
 
     kept = decide(assigned, dc.method, chosen["threshold"], chosen["min_p"], dc.empty_prior)
     ent = evaluate(kept, truth, s1_meta)
+    _orphan_metrics(st, rec_path, kept)
     st.write_parquet(ent, "val_per_entity")
     st.write_parquet(kept.reset_index(drop=True), "decisions_val")
     st.metric("val_f05", round(float(ent.f05.mean()), 5))

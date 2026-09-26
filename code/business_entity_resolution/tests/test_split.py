@@ -101,3 +101,22 @@ def test_choose_regions_falls_back_to_closest_region():
                        "MP": 22503, "DL": 121337, "MH": 191679})
     chosen = choose_regions(sizes, 8832, np.random.default_rng(0))
     assert sizes[chosen].sum() > 4400 and "PB" in chosen
+
+
+def test_reshape_drops_s1_and_orphans_copies():
+    import pandas as pd
+    from ber.eval.reshape import dropped_s1, orphan_queries
+    s1 = pd.DataFrame({"entity_id": [f"S1-{i}" for i in range(2000)],
+                       "country": ["US"] * 1000 + ["India"] * 1000,
+                       "side": (["val"] * 500 + ["train"] * 500) * 2})
+    d = dropped_s1(s1, {"US": 0.2}, ["val"], seed=0)
+    ids = s1.set_index("entity_id")
+    assert all(ids.country[e] == "US" and ids.side[e] == "val" for e in d)
+    assert 70 < len(d) < 130                      # ~20% of 500 US val S1
+    assert d == dropped_s1(s1, {"US": 0.2}, ["val"], seed=0)   # deterministic
+    assert dropped_s1(s1, {}, ["val"], seed=0) == set()
+    e = sorted(d)[0]
+    q = pd.DataFrame({"entity_id": ["S2-1", "S3-1", "S2-2"], "owner": [e, "S1-999", ""]})
+    o = orphan_queries(q, d)
+    assert o.owner.tolist() == ["", "S1-999", ""]
+    assert o.owner_dropped.tolist() == [e, "", ""]

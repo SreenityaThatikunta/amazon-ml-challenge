@@ -26,6 +26,7 @@ import pandas as pd
 
 from ..artifacts import StageRun
 from ..config import Config
+from ..eval.reshape import dropped_s1, orphan_queries
 from ..eval.split import slice_mask
 from ..io import read_source, write_parquet
 from ..log import timed
@@ -107,7 +108,8 @@ def _learn(st: StageRun, cfg: Config,
 
 
 def _normalize_split(st: StageRun, cfg: Config, split: str, lut: dict[str, str],
-                     vocab: dict[str, str], sides: dict[int, pd.DataFrame] | None) -> None:
+                     vocab: dict[str, str], sides: dict[int, pd.DataFrame] | None,
+                     dropped: set[str] = frozenset()) -> None:
     out_dir = st.path(f"records_{split}")
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("*.parquet"):
@@ -120,6 +122,8 @@ def _normalize_split(st: StageRun, cfg: Config, split: str, lut: dict[str, str],
                 df = read_source(cfg, split, n)
                 df.insert(1, "source", n)
                 if sides is not None:  # train: attach split info, apply slice
+                    if n == 1 and dropped:  # reshape: these S1 are not in the pool
+                        df = df[~df.entity_id.isin(dropped)]
                     df = df.merge(sides[n], on="entity_id", how="left", validate="1:1")
                     df = df[slice_mask(df, cfg)]
                 size = cfg.normalize.chunk_size
@@ -139,11 +143,21 @@ def run_normalize(cfg: Config) -> None:
         q_split = st.read_input("split", "queries", run=cfg.data.split_run)
         lut, vocab, lut_all = _learn(st, cfg, q_split)
 
+        rs = cfg.reshape
+        dropped = dropped_s1(s1_split, rs.drop_s1, rs.sides, rs.seed)
+        if rs.drop_s1:
+            by_c = s1_split[s1_split.entity_id.isin(dropped)].country.value_counts()
+            st.metric("reshape_dropped_s1", {str(k): int(v) for k, v in by_c.items()})
+        q_split = orphan_queries(q_split, dropped)
+        st.metric("reshape_orphaned_queries", int((q_split.owner_dropped != "").sum()))
         cols = ["entity_id", "side", "dev", "geo"]
-        sides = {1: s1_split[cols].assign(owner=""),
-                 2: q_split.loc[q_split.entity_id.str.startswith("S2-"), cols + ["owner"]],
-                 3: q_split.loc[q_split.entity_id.str.startswith("S3-"), cols + ["owner"]]}
-        _normalize_split(st, cfg, "train", lut, vocab, sides)
+        s1_kept = s1_split[~s1_split.entity_id.isin(dropped)]
+        sides = {1: s1_kept[cols].assign(owner="", owner_dropped=""),
+                 2: q_split.loc[q_split.entity_id.str.startswith("S2-"),
+                                cols + ["owner", "owner_dropped"]],
+                 3: q_split.loc[q_split.entity_id.str.startswith("S3-"),
+                                cols + ["owner", "owner_dropped"]]}
+        _normalize_split(st, cfg, "train", lut, vocab, sides, dropped)
         if cfg.run_test:
             _normalize_split(st, cfg, "test", lut_all, vocab, None)
         else:

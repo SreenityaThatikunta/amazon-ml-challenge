@@ -288,6 +288,8 @@ def run_candidates(cfg: Config) -> None:
                     del side_train
                     report.set_country(c)
                 s1, q = c[c.source == 1], c[c.source != 1]
+                if split == "train" and cfg.candidates.query_sides is not None:
+                    q = q[q.side.isin(cfg.candidates.query_sides)]
                 del c
                 with timed(st.log, f"{split} {country}: {len(q):,} queries x {len(s1):,} S1"):
                     for part in generate_country(s1, q, cfg, st.log, neighbors.get(country)):

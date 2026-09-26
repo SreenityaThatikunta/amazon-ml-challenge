@@ -266,8 +266,17 @@ def run_rerank(cfg: Config) -> None:
                      .w.fillna(1.0).to_numpy(dtype=np.float64))
                 st.metric("train_weights", {"file": rc.weights_file,
                                             "q": np.quantile(w, [0.01, 0.5, 0.99]).round(3).tolist()})
+            if rc.model_from_run:  # e.g. v3's models on val_ts: fold k model on fold k pairs
+                with timed(st.log, f"apply {rc.model_from_run}'s {rc.folds} fold models"):
+                    for k in range(rc.folds):
+                        te = fold == k
+                        src = st.input_path("rerank", "importance", run=rc.model_from_run).parent
+                        m = lgb.Booster(model_file=str(src / f"model_fold{k}.txt"))
+                        oof[te] = m.predict(X[te][m.feature_name()],
+                                            num_iteration=m.best_iteration)
+                        imp += m.feature_importance("gain")
             with timed(st.log, f"cross-fit {rc.folds} folds"):
-                for k in range(rc.folds):
+                for k in range(rc.folds if not rc.model_from_run else 0):
                     tr, te = fold != k, fold == k
                     # early stopping on 10% of the training groups (never the held-out fold)
                     es = tr & (u * 10 % 1 < 0.1)

@@ -55,6 +55,15 @@ class DataConfig:
 
 
 @dataclass
+class ReshapeConfig:
+    """Test-shaped data (E26): drop a fraction of S1 per country on ``sides`` and keep
+    their S2/S3 copies as unmatched records."""
+    drop_s1: dict[str, float] = field(default_factory=dict)  # country -> share of S1 dropped
+    sides: list[str] = field(default_factory=lambda: ["val"])  # "val" and/or "train"
+    seed: int = 0
+
+
+@dataclass
 class NormalizeConfig:
     workers: int = 0              # processes; 0 = cpu_count - 2
     chunk_size: int = 100_000     # records per worker task
@@ -83,7 +92,9 @@ class CandidatesConfig:
     n_threads: int = 0            # 0 = cpu_count - 2
     block_by_region: bool = True
     region_min_share: float = 0.001  # neighbourhood: owner regions with >= this share
-    k_name_noaddr: int = 30       # name candidates for queries with an empty address
+    query_sides: list[str] | None = None  # train split: only queries on these sides get
+                                          # candidates (e.g. [val] for a val-only rerun); S1 index unchanged
+    k_name_noaddr: int = 100      # name candidates for queries with an empty address
     device: str = "auto"          # top-k search: "cpu" | "gpu" (CuPy) | "auto"
     gpu_mem_gb: float = 1.5       # GPU memory for one chunk's dense similarity block
     gpu_min_s1: int = 50_000      # blocks with fewer S1 records search on the CPU
@@ -134,6 +145,8 @@ class RerankConfig:
     num_boost_round: int = 2000
     early_stopping: int = 50
     raw_features: list[str] = field(default_factory=lambda: ["all"])  # or a feature list
+    model_from_run: str | None = None  # apply that run's fold models to val (same fold
+                                       # assignment) instead of training, e.g. on val_ts
 
 
 @dataclass
@@ -198,6 +211,7 @@ class Config:
     paths: PathsConfig = field(default_factory=PathsConfig)
     data: DataConfig = field(default_factory=DataConfig)
     split: SplitConfig = field(default_factory=SplitConfig)
+    reshape: ReshapeConfig = field(default_factory=ReshapeConfig)
     normalize: NormalizeConfig = field(default_factory=NormalizeConfig)
     candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
