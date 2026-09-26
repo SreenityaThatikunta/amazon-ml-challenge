@@ -90,6 +90,42 @@ keeping 99.97 % of the true pairs that TF-IDF found (24.6 per record before the 
 Top stage-2 features: the record's margin over its other candidates, p1, then the S1-side
 claims (`c_expected`, `c_best_other`, `c_sum_other`), i.e. exactly the group context stage 1 lacks.
 
+### Leaderboard vs validation (2026-09-26)
+| File | Val F0.5 | Public LB | Gap |
+|---|---|---|---|
+| main (6120d59) | 0.98211 | 0.975 | 0.007 |
+| v2.1 (stage 2 on all features) | 0.98895 (0.98684 with whole regions held out) | **0.977** | 0.012 (0.010) |
+
+Val gained +0.0068 but the leaderboard only +0.002, so what test does differently matters
+more than further val gains. Checks so far (`D:\aml\analysis\shift.py`, `lowp_inspect.txt`,
+`france_inspect.txt`):
+
+- **Test has ~2× the "shifted house number" lookalikes per S1.** Top candidate of each
+  record has a shifted number: US 32.2 % (val 20.9 %), India 17.5 % (10.7 %), France 23.5 %;
+  legal-form conflicts US 7.5 % (5.0 %), India 2.7 % (1.8 %); records with no plausible
+  candidate (p1 < 0.01) 32–34 % vs 21–23 %. Per S1: ≈ 0.85 shifted near-copies on test vs
+  ≈ 0.45 on val (US); val says only 12 % of those are true matches.
+- **…but that doesn't explain the gap.** Doubling val's shifted lookalikes (69,607 duplicated
+  unmatched records) costs only −0.0003 F0.5, and halving the odds of shifted pairs wins back
+  < 0.0001. The model already rejects them (they sit at p1 ≈ 1e-4).
+- **Label-shift EM per segment (Saerens et al. 2002) is unreliable here:** most segment odds
+  ratios hit the bounds (0.2 / 5), even in "exact name + equal number" (99.9 % true), because
+  the feature distribution shifts *within* segments (the EM assumption fails). Kept as
+  `decide.prior_shift=segment_em` (off by default); not submitted.
+- **France looks healthy** on inspection (25 random S1): links are correct noisy copies
+  (typos, initials `MU` for `MED Union SAS`, made-up brands at the same address), link counts
+  per S1 match US/India. Weak spot: address-less records with generic names (as in US/India).
+- **Records without a candidate are lookalikes** in test as in val (same name + a filler,
+  same street, house number moved 5–20), not a recall hole.
+- Region-held-out CV says ~0.002 of the val score is stage 2 learning region-specific patterns.
+
+**LB probes prepared** (the only way to see test performance by part):
+`D:\aml\submissions\probe_france_empty\` (v2.1, every French S1 left empty → France's own
+F0.5 by subtraction) and `D:\aml\submissions\probe_stage1\` (v2 without stage 2, val 0.98337 →
+does stage 2 transfer to test?). Next: adversarial validation on stage-2 inputs
+(`D:\aml\analysis\adversarial.py`) and a test-shaped (importance-weighted) stage 2
+(`rerank.weights_file`).
+
 ### v2 error budget (val, 770,168 true pairs; `D:\aml\analysis\errors_v2.py`)
 | Outcome | Share of true pairs | Notes |
 |---|---|---|

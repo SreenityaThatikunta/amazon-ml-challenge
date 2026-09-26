@@ -74,6 +74,7 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   min_p1: 0.001       # pairs below this stage-1 p are dropped first (never selected anyway)
   folds: 4            # trained on the val side, cross-fitted: out-of-fold p2 for every val pair
   fold_by: s1         # s1 (folds grouped by the record's top S1) | region (whole regions per fold: robustness check)
+  weights_file: null  # parquet (q_id, s1_id, w) of training weights for the val pairs (adversarial reweighting)
   learning_rate: 0.05
   num_leaves: 63
   min_data_in_leaf: 200
@@ -88,6 +89,8 @@ decide:               # stage 4 (T3.5/T4.1)
   min_p: null         # expected_f: drop assigned pairs below this p; null = best from sweep
   empty_prior: 1.0    # expected_f: multiplier on P(no true match) for the "no match" option
   tie_duplicates: true  # exact duplicate S2/S3 records (same source/name/address) share one owner
+  prior_shift: none     # none | segment_em: rescale test p per lookalike segment by the EM-estimated
+                        # test/val prior odds ratio (test has ~2x the shifted-house-number lookalikes)
   scores_stage: rerank  # scorer (stage 1 only) | rerank (stage 2) | llm-import (after the LLM round trip)
   sweep: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8]
 

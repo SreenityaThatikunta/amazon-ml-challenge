@@ -46,6 +46,10 @@ from ..features.build import _best_other
 from ..log import timed
 
 HI = 0.5  # "strong" candidate / claim
+# stage-1 features copied to the stage-2 score files: they define the segments of the
+# prior-shift correction in ber decide (lookalike type: house-number relation, legal
+# conflict, exact name key, address similarity)
+SEGMENT_COLS = ["hn_rel", "l_conflict", "k_eq", "a_tsr", "n_core_eq"]
 
 
 def _group_stats(key: np.ndarray, v: np.ndarray) -> dict[str, np.ndarray]:
@@ -215,14 +219,24 @@ def run_rerank(cfg: Config) -> None:
                                            for k in range(rc.folds)})
             oof = np.zeros(len(X), dtype=np.float64)
             imp = np.zeros(X.shape[1])
+            w = None
+            if rc.weights_file:  # e.g. adversarial-validation weights (val rows made test-shaped)
+                wf = pd.read_parquet(rc.weights_file)
+                w = (keys[["q_id", "s1_id"]].astype(str)
+                     .merge(wf.astype({"q_id": str, "s1_id": str}), on=["q_id", "s1_id"], how="left")
+                     .w.fillna(1.0).to_numpy(dtype=np.float64))
+                st.metric("train_weights", {"file": rc.weights_file,
+                                            "q": np.quantile(w, [0.01, 0.5, 0.99]).round(3).tolist()})
             with timed(st.log, f"cross-fit {rc.folds} folds"):
                 for k in range(rc.folds):
                     tr, te = fold != k, fold == k
                     # early stopping on 10% of the training groups (never the held-out fold)
                     es = tr & (u * 10 % 1 < 0.1)
                     fit = tr & ~es
-                    dtr = lgb.Dataset(X[fit], y[fit], free_raw_data=True)
-                    des = lgb.Dataset(X[es], y[es], reference=dtr)
+                    dtr = lgb.Dataset(X[fit], y[fit], free_raw_data=True,
+                                      weight=None if w is None else w[fit])
+                    des = lgb.Dataset(X[es], y[es], reference=dtr,
+                                      weight=None if w is None else w[es])
                     m = lgb.train(_params(cfg), dtr, num_boost_round=rc.num_boost_round,
                                   valid_sets=[des], valid_names=["es"],
                                   callbacks=[lgb.early_stopping(rc.early_stopping, verbose=False)])
@@ -240,8 +254,13 @@ def run_rerank(cfg: Config) -> None:
                 "gain", ascending=False)
             st.write_parquet(imp_df, "importance")
             st.log.info("stage-2 features by gain:\n%s", imp_df.to_string(index=False))
-            st.write_parquet(keys[["q_id", "s1_id", "y"]].assign(
-                p=oof.astype(np.float32), p1=keys.p.to_numpy()), "scores_val")
+            out = keys[["q_id", "s1_id", "y"]].assign(p=oof.astype(np.float32),
+                                                      p1=keys.p.to_numpy())
+            for c in SEGMENT_COLS:  # kept for the prior-shift correction in decide
+                if c in X:
+                    out[c] = X[c].to_numpy()
+            st.write_parquet(out, "scores_val")
+            del out
             del X, raw, keys
 
         if cfg.run_test:
@@ -301,10 +320,11 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
                 xa = X.iloc[a:a + step]
                 p2[a:a + step] = np.mean([m.predict(xa, num_iteration=m.best_iteration)
                                           for m in models], axis=0)
+            seg = {c: X[c].to_numpy() for c in SEGMENT_COLS if c in X}
             del X
             out = pd.DataFrame({"q_id": q_cat.categories.to_numpy()[k.q.to_numpy()],
                                 "s1_id": s_cat.categories.to_numpy()[k.s.to_numpy()],
-                                "p": p2.astype(np.float32), "p1": k.p.to_numpy()})
+                                "p": p2.astype(np.float32), "p1": k.p.to_numpy(), **seg})
             out.to_parquet(out_dir / f"part-{country}.parquet", index=False)
             n_total += len(out)
             st.metric(f"test_pairs_kept.{country}", len(out))

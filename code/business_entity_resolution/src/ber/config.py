@@ -119,6 +119,7 @@ class RerankConfig:
     min_p1: float = 0.001           # drop pairs below this stage-1 p before stage 2
     folds: int = 4                  # cross-fitting folds on the val side
     fold_by: str = "s1"             # "s1" (groups by the record's top S1) | "region" (check)
+    weights_file: str | None = None  # parquet (q_id, s1_id, w): training weights for val pairs
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200
@@ -134,6 +135,7 @@ class DecideConfig:
     min_p: float | None = None      # expected_f: drop p below this; None = best on val sweep
     empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
     tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
+    prior_shift: str = "none"       # "none" | "segment_em" (test: EM prior correction per segment)
     scores_stage: str = "rerank"    # "scorer" (stage 1 only), "rerank" (stage 2) or "llm-import"
     sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
                                                         0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])

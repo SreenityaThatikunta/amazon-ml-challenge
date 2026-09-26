@@ -38,3 +38,21 @@ def test_tie_duplicates():
                       "p": [0.4, 0.9, 0.5]})
     t = tie_duplicates(a, dup_keys(recs))
     assert t.s1_id.tolist() == ["Y", "Y", "Z"] and t.p.tolist() == [0.9, 0.9, 0.5]
+
+
+def test_prior_shift_em_recovers_prior_and_rescales_segment():
+    from ber.decide.prior_shift import adjust, em_ratio, segment_priors
+    rng = np.random.default_rng(0)
+    n = 50000
+    y = rng.random(n) < 0.4
+    # perfectly calibrated scores: p = P(y | bin) with two bins
+    p = np.where(rng.random(n) < 0.5, 0.8, 0.2)
+    y = rng.random(n) < p
+    keep = ~y | (rng.random(n) < 0.5)            # test: half of the positives gone
+    r, pi = em_ratio(p[keep], float(p.mean()))
+    assert abs(pi - y[keep].mean()) < 0.01 and r < 1
+    seg = dict(hn_rel=4, l_conflict=0, k_eq=1, a_tsr=100.0)
+    val = pd.DataFrame({"p": p, **seg})
+    test = pd.DataFrame({"p": p[keep], **seg})
+    adj, rep = adjust(test, segment_priors(val), min_pairs=10)
+    assert list(rep) == ["4|0|1"] and (adj.p <= test.p + 1e-6).all()

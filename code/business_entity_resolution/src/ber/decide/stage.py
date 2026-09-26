@@ -24,6 +24,7 @@ from ..eval.metrics import per_entity, summarize
 from ..eval.split import slice_mask
 from ..log import timed
 from .expected_f import select
+from .prior_shift import SEG_COLS, adjust, segment_priors
 
 
 def one_owner(scores: pd.DataFrame) -> pd.DataFrame:
@@ -136,6 +137,12 @@ def _decide_val(st: StageRun, cfg: Config) -> dict:
               "threshold": best_t if dc.threshold is None else dc.threshold,
               "min_p": best_m if dc.min_p is None else dc.min_p}
     st.metric("chosen", chosen)
+    if all(c in scores for c in SEG_COLS):  # val priors per lookalike segment (prior shift)
+        cty = recs.set_index("entity_id").country
+        sc_c = scores.assign(country=cty.reindex(scores.q_id).to_numpy())
+        chosen["segment_priors"] = {"pooled": segment_priors(sc_c)}
+        for c, g in sc_c.groupby("country"):
+            chosen["segment_priors"][str(c)] = segment_priors(g)
     st.write_json(chosen, "decision_params")
 
     kept = decide(assigned, dc.method, chosen["threshold"], chosen["min_p"], dc.empty_prior)
@@ -164,8 +171,31 @@ def run_decide(cfg: Config) -> None:
                 # stream: every scores part holds complete queries, so the best row
                 # per query can be taken part by part (~10M rows kept, not ~250M)
                 src = st.input_path(dc.scores_stage, "scores_test")
-                a_t = pd.concat([one_owner(pd.read_parquet(f).astype({"q_id": str, "s1_id": str}))
-                                 for f in sorted(src.glob("*.parquet"))], ignore_index=True)
+                if dc.prior_shift not in ("none", "segment_em"):
+                    raise ValueError(f"unknown decide.prior_shift {dc.prior_shift!r}")
+                s1_country = None
+                if dc.prior_shift == "segment_em":
+                    if "segment_priors" not in chosen:
+                        raise ValueError("decide.prior_shift=segment_em needs segment priors: "
+                                         "re-run the train pass after `ber rerank`")
+                    rt = pd.read_parquet(st.input_path("normalize", "records_test"),
+                                         columns=["entity_id", "country"],
+                                         filters=[("source", "==", 1)])
+                    s1_country = rt.set_index("entity_id").country
+                parts, reports = [], {}
+                for f in sorted(src.glob("*.parquet")):
+                    d = pd.read_parquet(f).astype({"q_id": str, "s1_id": str})
+                    if s1_country is not None and len(d):
+                        c = str(s1_country[d.s1_id.iloc[0]])
+                        pri = chosen["segment_priors"].get(c, chosen["segment_priors"]["pooled"])
+                        d, rep = adjust(d, pri)
+                        reports[f"{c}:{f.name}"] = rep
+                    parts.append(one_owner(d))
+                if reports:
+                    st.write_json(reports, "prior_shift_test")
+                    st.metric("prior_shift_test", reports)
+                a_t = pd.concat(parts, ignore_index=True)
+                del parts
                 if a_t.q_id.duplicated().any():  # a query split across parts: resolve globally
                     a_t = one_owner(a_t)
                 if dc.tie_duplicates:
