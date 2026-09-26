@@ -134,6 +134,11 @@ more than further val gains. Checks so far (`D:\aml\analysis\shift.py`, `lowp_in
   scale. Caveat: part of the difference is genuine (a common name really has fewer competitors
   in a half-size pool), so only the leaderboard can tell which way is right.
 
+  Result: val 0.98897 (neutral, as expected on one domain); test file
+  `D:ml\submissions2.2_domainnorm\` (validator PASS, 5,912,771 links, 3.413 per S1) differs
+  from v2.1 on 4.1 % of S1 (France 6.4 %, India 4.0 %, US 3.3 %). The stage-1-only probe
+  differs from v2.1 on 9.4 % of S1.
+
 **LB probes prepared** (the only way to see test performance by part):
 `D:\aml\submissions\probe_france_empty\` (v2.1, every French S1 left empty → France's own
 F0.5 by subtraction) and `D:\aml\submissions\probe_stage1\` (v2 without stage 2, val 0.98337 →
