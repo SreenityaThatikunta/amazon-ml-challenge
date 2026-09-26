@@ -139,7 +139,12 @@ class ScorerConfig:
 class RerankConfig:
     min_p1: float = 0.001           # drop pairs below this stage-1 p before stage 2
     folds: int = 4                  # cross-fitting folds on the val side
-    fold_by: str = "s1"             # "s1" (groups by the record's top S1) | "region" (check)
+    fold_by: str = "s1"             # "s1" (groups by the record's top S1) | "region" (check) |
+                                    # "country" (leave one country out: unseen-country rehearsal)
+    pseudo_rounds: int = 0          # self-training on the held-out fold's confident predictions
+    pseudo_hi: float = 0.99         # record's top pair >= this (and every other < pseudo_lo): positive
+    pseudo_lo: float = 0.01         # record's pairs all < this: all negative
+    pseudo_weight: float = 1.0      # weight of pseudo-labelled rows
     weights_file: str | None = None  # parquet (q_id, s1_id, w): training weights for val pairs
     domain_norm: bool = True        # size-dependent features / their per-country-split scale
     learning_rate: float = 0.05

@@ -23,3 +23,15 @@ def test_group_features_query_and_s1_context():
     # claims: every query's best S1 is 10 -> S1 10 has 3 claims, S1 11 none
     np.testing.assert_allclose(f.c_expected, [2.2, 0.0, 2.2, 2.2], atol=1e-6)
     assert f.dtypes.map(lambda d: d == np.float32).all()
+
+
+def test_pseudo_labels():
+    import numpy as np
+    from ber.rerank.stage import pseudo_labels
+    q = np.array([0, 0, 1, 1, 2, 3, 3])
+    p = np.array([0.995, 0.002, 0.8, 0.1, 0.003, 0.999, 0.5])
+    mask, lab = pseudo_labels(q, p, hi=0.99, lo=0.01)
+    # record 0: confident top + clean runner-up -> 1/0; record 1: unsure -> out;
+    # record 2: nothing plausible -> 0; record 3: runner-up too strong -> out
+    assert mask.tolist() == [True, True, False, False, True, False, False]
+    assert lab[mask].tolist() == [1, 0, 0]

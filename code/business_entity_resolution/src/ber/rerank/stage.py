@@ -178,6 +178,27 @@ def add_copy_features(X: pd.DataFrame, q: np.ndarray, s: np.ndarray, p: np.ndarr
     return X
 
 
+def pseudo_labels(q: np.ndarray, p: np.ndarray, hi: float, lo: float
+                  ) -> tuple[np.ndarray, np.ndarray]:
+    """Confident pseudo-labels from predictions p of pairs grouped by record q:
+    a record whose top pair has p >= hi and every other pair p < lo gives 1 for the
+    top pair and 0 for the others; a record with every pair < lo gives 0s. Returns
+    (row mask, labels); other records are left out."""
+    o = np.lexsort((-p, q))
+    qs, ps = q[o], p[o]
+    starts = np.r_[0, np.flatnonzero(qs[1:] != qs[:-1]) + 1]
+    sizes = np.diff(np.r_[starts, len(qs)])
+    top = np.repeat(ps[starts], sizes)
+    second = np.repeat(np.where(sizes > 1, ps[np.minimum(starts + 1, len(ps) - 1)], 0.0), sizes)
+    rank = np.arange(len(qs)) - np.repeat(starts, sizes)
+    pos_rec = (top >= hi) & (second < lo)
+    neg_rec = top < lo
+    mask, lab = np.zeros(len(q), bool), np.zeros(len(q), np.int8)
+    mask[o] = pos_rec | neg_rec
+    lab[o] = (pos_rec & (rank == 0)).astype(np.int8)
+    return mask, lab
+
+
 def _params(cfg: Config) -> dict:
     rc = cfg.rerank
     return {"objective": "binary", "learning_rate": rc.learning_rate,
@@ -264,6 +285,15 @@ def run_rerank(cfg: Config) -> None:
                             index=top.q.to_numpy())
             u = grp.reindex(q).to_numpy()
             fold = np.minimum((u * rc.folds).astype(int), rc.folds - 1)
+            n_folds = rc.folds
+            if rc.fold_by == "country":  # leave one country out (unseen-country rehearsal)
+                cty_q = pd.read_parquet(st.input_path("normalize", "records_train"),
+                                        columns=["entity_id", "country"],
+                                        filters=[("side", "==", "val")]
+                                        ).set_index("entity_id").country
+                codes, names = pd.factorize(cty_q.reindex(keys.q_id.astype(str)).fillna(""))
+                fold, n_folds = codes, len(names)
+                st.metric("fold_countries", {int(k): str(c) for k, c in enumerate(names)})
             if rc.fold_by == "region":  # robustness check: whole regions held out per fold
                 reg = pd.read_parquet(st.input_path("normalize", "records_train"),
                                       columns=["entity_id", "region"],
@@ -300,8 +330,8 @@ def run_rerank(cfg: Config) -> None:
                         oof[te] = m.predict(X[te][m.feature_name()],
                                             num_iteration=m.best_iteration)
                         imp += m.feature_importance("gain")
-            with timed(st.log, f"cross-fit {rc.folds} folds"):
-                for k in range(rc.folds if not rc.model_from_run else 0):
+            with timed(st.log, f"cross-fit {n_folds} folds"):
+                for k in range(n_folds if not rc.model_from_run else 0):
                     tr, te = fold != k, fold == k
                     # early stopping on 10% of the training groups (never the held-out fold)
                     es = tr & (u * 10 % 1 < 0.1)
@@ -314,6 +344,25 @@ def run_rerank(cfg: Config) -> None:
                                   valid_sets=[des], valid_names=["es"],
                                   callbacks=[lgb.early_stopping(rc.early_stopping, verbose=False)])
                     oof[te] = m.predict(X[te], num_iteration=m.best_iteration)
+                    for r in range(rc.pseudo_rounds):  # self-training on the held-out fold
+                        te_idx = np.flatnonzero(te)
+                        pm, pl = pseudo_labels(q[te_idx], oof[te_idx], rc.pseudo_hi, rc.pseudo_lo)
+                        rows = te_idx[pm]
+                        st.metric(f"pseudo_fold{k}_round{r}", {
+                            "rows": int(len(rows)), "pos": int(pl[pm].sum()),
+                            "label_acc": round(float((pl[pm] == y[rows]).mean()), 5) if len(rows) else None})
+                        Xa = pd.concat([X[fit], X.iloc[rows]], ignore_index=True)
+                        ya = np.r_[y[fit], pl[pm]]
+                        wa = np.r_[np.ones(int(fit.sum())) if w is None else w[fit],
+                                   np.full(len(rows), rc.pseudo_weight)]
+                        dtr = lgb.Dataset(Xa, ya, weight=wa, free_raw_data=True)
+                        des = lgb.Dataset(X[es], y[es], reference=dtr)
+                        m = lgb.train(_params(cfg), dtr, num_boost_round=rc.num_boost_round,
+                                      valid_sets=[des], valid_names=["es"],
+                                      callbacks=[lgb.early_stopping(rc.early_stopping,
+                                                                    verbose=False)])
+                        oof[te] = m.predict(X[te], num_iteration=m.best_iteration)
+                        del Xa
                     imp += m.feature_importance("gain")
                     m.save_model(str(st.path(f"model_fold{k}.txt")))
                     st.log.info("fold %d: best iteration %d, held-out AUC %.6f", k,

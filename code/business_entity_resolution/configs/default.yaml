@@ -83,6 +83,11 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   min_p1: 0.001       # pairs below this stage-1 p are dropped first (never selected anyway)
   folds: 4            # trained on the val side, cross-fitted: out-of-fold p2 for every val pair
   fold_by: s1         # s1 (folds grouped by the record's top S1) | region (whole regions per fold: robustness check)
+                      # | country (leave one country out: rehearsal for France, E30)
+  pseudo_rounds: 0    # self-training rounds on the held-out fold's confident predictions (E30)
+  pseudo_hi: 0.99     # a record's top pair >= this with every other pair < pseudo_lo -> positive, others negative
+  pseudo_lo: 0.01     # a record whose pairs are all < this -> all negative
+  pseudo_weight: 1.0  # weight of pseudo-labelled rows
   weights_file: null  # parquet (q_id, s1_id, w) of training weights for the val pairs (adversarial reweighting)
   domain_norm: true   # divide size/density-dependent features by their per-country, per-split scale (LB 0.977 -> 0.980)
   learning_rate: 0.05
