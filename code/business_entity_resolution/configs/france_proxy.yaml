@@ -17,3 +17,6 @@ features:
 scorer:
   model_from_run: main  # apply the US/India model: measures generalisation to France
   oof_folds: 1
+rerank:               # synthetic data: everything is validation, no held-out regions
+  hold_frac: 0.0
+  train_sides: [val]

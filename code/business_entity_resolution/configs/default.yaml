@@ -76,10 +76,10 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
   fold_by: s1         # s1 (folds grouped by the record's top S1) | region (whole regions per fold: robustness check)
   weights_file: null  # parquet (q_id, s1_id, w) of training weights for the val pairs (adversarial reweighting)
   domain_norm: true   # divide size/density-dependent features by their per-country, per-split scale (LB 0.977 -> 0.980)
-  hold_frac: 0.0      # v2.4: > 0 sets aside whole train-side regions (~this share of each country's S1)
+  hold_frac: 0.2      # v2.4: > 0 sets aside whole train-side regions (~this share of each country's S1)
                       # for stage 2: `ber features-hold` featurises all their queries, the scorer
                       # trains without them and scores them (scores_hold), stage 2 can train on them
-  train_sides: [val]  # stage-2 training pairs: [val] | [val, hold] | [hold] (hold only: val is then
+  train_sides: [val, hold]  # stage-2 training pairs: [val] | [val, hold] | [hold] (hold only: val is then
                       # scored by the fold mean, i.e. a pure unseen-region check)
   learning_rate: 0.05
   num_leaves: 63
@@ -95,7 +95,7 @@ decide:               # stage 4 (T3.5/T4.1)
   min_p: null         # expected_f: drop assigned pairs below this p; null = best from sweep
   empty_prior: 1.0    # expected_f: multiplier on P(no true match) for the "no match" option
   tie_duplicates: true  # exact duplicate S2/S3 records (same source/name/address) share one owner
-  prior_shift: none     # none | segment_em: rescale test p per lookalike segment by the EM-estimated
+  prior_shift: anchor   # none | segment_em: rescale test p per lookalike segment by the EM-estimated
                         # test/val prior odds ratio (test has ~2x the shifted-house-number lookalikes) |
                         # anchor: per name-change kind (exact / typo / generic-word swap / other), the
                         # share of true copies from the house-number mixture vs the model's mean p,

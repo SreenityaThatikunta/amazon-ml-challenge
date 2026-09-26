@@ -28,7 +28,8 @@ cd code/business_entity_resolution && ../../.venv/bin/pytest && ../../.venv/bin/
 Every stage is one command that reads the previous stage's artifacts from
 `artifacts/<run>/` and writes its own (with `manifest.json` + `log.txt`).
 Run them one at a time: heavy stages in parallel swap on a 16 GB machine
-(peak ~10 GB per stage).
+(peak memory: candidates ~8 GB, features ~10 GB, features-hold ~7 GB, scorer / rerank /
+decide ≤ 5 GB).
 
 ```bash
 B=.venv/bin/ber            # Windows: .venv\Scripts\ber.exe (set PYTHONUTF8=1)
@@ -36,9 +37,10 @@ $B split       --run main  # geographic train/val split + dev slice            (
 $B normalize   --run main  # normalise 24M records, learn Indic dictionary     (~7 min)
 $B candidates  --run main  # region-blocked TF-IDF top-k + recall report       (~1.5 h GPU / ~4 h CPU, train+test)
 $B features    --run main  # 102 pair + context features                       (~4 h, train+test)
-$B scorer      --run main  # stage-1 LightGBM, scores val + test pairs         (~20 min)
-$B rerank      --run main  # stage-2 re-ranker (cross-fitted on val) + test    (~15 min)
-$B decide      --run main  # one owner per record + expected F0.5; val F0.5     (~10 min)
+$B features-hold --run main  # all pairs of the held-out train regions (rerank.hold_frac) (~1 h)
+$B scorer      --run main  # stage-1 LightGBM (without the held-out regions), scores val + hold + test (~25 min)
+$B rerank      --run main  # stage-2 re-ranker (cross-fitted on val + held-out regions) + test (~25 min)
+$B decide      --run main  # one owner per record + expected F0.5 (+ anchor prior correction); val F0.5 (~10 min)
 $B submit      --run main  # output/matching_results.tsv + candidate_pairs.tsv + official validator
 ```
 
@@ -46,9 +48,16 @@ The train/val side and the test side can also run as two passes (the test pass r
 the model, region neighbourhoods and decision parameters of the train pass):
 
 ```bash
-for s in candidates features scorer rerank decide; do $B $s --run main --set data.phase=train; done
+for s in candidates features features-hold scorer rerank decide; do $B $s --run main --set data.phase=train; done
 for s in candidates features scorer rerank decide submit; do $B $s --run main --set data.phase=test; done
 ```
+
+Stage 2 (`rerank`) trains on the validation regions and on ~20 % more whole train-side
+regions that stage 1 never sees (`rerank.hold_frac: 0.2`, `rerank.train_sides: [val,
+hold]`; `hold_frac: 0` gives the v2.2 setup: validation regions only, no `features-hold`).
+`decide.prior_shift: anchor` corrects a name-change kind's probabilities when the
+house-number evidence in the test data says the model misjudges how often it is a true
+copy (on current data only France's generic-word swaps; `none` switches it off).
 
 `output/candidate_pairs.tsv` is the input of the final model: the pairs that passed the
 stage-1 filter (`rerank.min_p1`), ~1 per S2/S3 record. `decide.scores_stage=scorer` gives

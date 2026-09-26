@@ -1,193 +1,203 @@
 # Handoff context: Amazon ML Challenge 2026 (Business Entity Resolution), team "pootato"
 
-Written 2026-09-26 ~08:30 IST at the end of a long Claude Code session. Read this first, then
-`progress.md` (the detailed log: every change, its reasoning, every experiment and number).
-The problem statement PDF is supplied separately (its text is also extracted at
-`D:\aml\problem_pdf.txt`). This file does not repeat it.
+Written 2026-09-26 ~14:00 IST at the end of the second long Claude Code session (the first
+one's handoff is in git history, commit e83a912). Read this first, then `progress.md` (the
+detailed log with the logic and every number; the newest sections are "v2.3", "v2.4" and
+"Memory"). The problem statement text is at `D:\aml\problem_pdf.txt` (the PDF is
+`C:\Users\Rudraksha\Downloads\6ab674645103d_emails_comms_amazon_ml_challenge_2026.pdf`).
 
 ---
 
-## 1. Situation in one paragraph
+## 1. Situation
 
-We are on the public leaderboard at **0.980** (best so far) with the file produced by
-branch `improve/v2` (commit `8811d17`). The **final ranking uses the private part of the
-test set** (the rest of the test S1 entities), and `candidate_pairs.tsv` plus the code are
-reviewed for the final ranking (smaller candidate set per S1 ranks higher). The team's explicit
-priority for the remaining time is **a well-generalising, defensible approach over
-squeezing the public score**: a change that is principled and robust is preferred even if the
-public score dips below 0.980. Deadline: Unstop timer ends ≈ **Sun 27 Sep 2026 23:59 IST**
-(verify on the page). **5 leaderboard submissions per team per day**; 2 were used on
-2026-09-26 (v2.1 → 0.977, v2.2 → 0.980).
+- **Best file: v2.4, public LB 0.980973** (v2.2 0.980 — its exact 6-decimal value is on the
+  leaderboard page, ask the user; v2.1 0.977, main 0.975). It is
+  in `output\` and `D:\aml\submissions\v2.4_hold\`; the code on branch `improve/v2` (pushed)
+  reproduces it with the default config. `pootato_submission.zip` (project root) was
+  rebuilt from it (see section 9 for the final checklist).
+- The **public LB shows 6 decimals** (not 3, as the previous handoff implied), so it can
+  resolve differences of ~0.0005. It is computed on a subset of the test S1; the private LB
+  (final ranking) on the rest. `candidate_pairs.tsv` and the code are also reviewed:
+  smaller candidate set per S1 ranks higher.
+- **Deadline:** Unstop timer ends ≈ **Sun 27 Sep 2026 23:59 IST** (verify on the page).
+  **5 LB submissions per team per day**; used on 2026-09-26: v2.1, v2.2, v2.4 (3 of 5).
+- Team priority (explicit): a well-generalising, defensible approach over squeezing the
+  public score. The user uploads files themselves; we prepare them and say which one.
 
 ## 2. People, repo, rules for working
 
-- Team: Sreenitya Thatikunta (wrote `main`), Rudraksha Dev Sharma (the user in these
-  sessions; email rudrakshash@gmail.com, git user `RudrakshaSh`).
+- Team: Sreenitya Thatikunta (wrote `main`), Rudraksha Dev Sharma (the user; email
+  rudrakshash@gmail.com, git user `RudrakshaSh`).
 - GitHub: https://github.com/SreenityaThatikunta/amazon-ml-challenge
-  - `main` = Sreenitya's pipeline (val 0.98211, public LB 0.975). **Never commit to main.**
-  - `improve/v2` = all our work (15 commits ahead of main). Push works from the laptop
-    (Git Credential Manager). Commit messages end with
-    `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
-  - `Rudy_commit_1` = an unrelated earlier pipeline of Rudraksha's (ignore).
-- The user wants a `progress.md` that explains the **logic** behind every change (like
-  main's `plan.md`/`progress.md`). Keep appending to the "v2" section at its top.
-- The user is sensitive to **RAM use** (16 GB laptop, often ~4–7 GB free): never run
-  heavy analyses at the same time as a pipeline stage; keep stages ≤ ~10 GB peak.
+  - `main` = Sreenitya's pipeline (val 0.98211, LB 0.975). **Never commit to main.**
+  - `improve/v2` = all our work. Push works (Git Credential Manager). Commit messages end
+    with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+  - Ask the user before opening a PR / merging into main (not done so far).
+- Keep `progress.md` updated with the **logic** behind every change (append to the v2
+  section at its top) and record every LB submission and why.
+- **RAM:** 16 GB laptop, the user keeps Chrome/ChatGPT/Claude open (often only 2–6 GB
+  free). Run one heavy stage at a time; don't run analyses next to a stage. Windows' page
+  file is on D: (18.6 GB), so stages swap rather than crash, but slowly.
 - Downloads (pip packages, models) need the user's explicit OK first (name, source, size).
+- The user likes short status updates while long jobs run.
 
 ## 3. Machine and folders
 
-- Windows 11, 16 threads, 16 GB RAM, **RTX 4050 Laptop 6 GB** (CUDA 13.1 toolkit installed).
-  **C: has only ~12 GB free → everything lives on D:.**
-- `D:\aml\amazon-ml-challenge\` = the git clone (the session's project dir)
-  - `dataset\` (gitignored) = the organisers' TSVs, extracted from
-    `C:\Users\Rudraksha\OneDrive\Desktop\Amazon ML\6ab10eb3b23ba_student_resource.zip`
-  - `.venv\` (gitignored) = Python 3.13 (miniconda base) with `requirements.txt` +
-    `cupy-cuda13x` (GPU top-k, MIT) + editable `ber` package. CLI: `.venv\Scripts\ber.exe`.
-  - `artifacts\<run>\<stage>\` (gitignored): `v2` = the full production run (all stages,
-    train+test); `v2x` = experiment run whose normalize/candidates/features/scorer dirs are
-    **directory junctions to v2** (only rerank/decide/submit are its own; don't delete
-    v2's dirs); `dev2` = dev-slice run; `main` = partial old run (split used by everything:
-    `data.split_run=main`).
-  - `output\` = files for upload/zip (currently **v2.2**). `pootato_submission.zip` = final
-    package built from `output\` + code + `Documentation_template.md` (currently v2.2).
-- `D:\aml\submissions\{v2, v2.1, v2.2_domainnorm, probe_stage1, probe_france_empty}\` =
-  every candidate file we produced (v2.2 = LB 0.980, v2.1 = 0.977; the two probes were not
-  submitted).
-- `D:\aml\logs\` = stage logs; `D:\aml\analysis\` = analysis scripts and their outputs
-  (`shift.py/.txt`, `adversarial.py/.txt`, `errors_v2.py/.txt`, `france_inspect.txt`,
-  `lowp_inspect.txt`); `D:\aml\run_*.sh` = helper runners (bash).
-- `C:\Users\Rudraksha\OneDrive\Desktop\Amazon ML\` holds the user's *other* older pipeline
-  (its own CLAUDE.md, `submission\`, and an old `pootato_submission.zip`): **not the one we
-  use; do not upload that zip.**
+- Windows 11, 16 threads, 16 GB RAM, RTX 4050 Laptop 6 GB (CUDA 13.1). C: has ~10 GB free →
+  everything on D:. GPU is used only by the candidates stage (CuPy top-k); the pip LightGBM
+  has no GPU build (checked).
+- `D:\aml\amazon-ml-challenge\` = the git clone (`dataset\` gitignored, `.venv\` Python 3.13
+  with `requirements.txt` + `cupy-cuda13x`, CLI `.venv\Scripts\ber.exe`).
+- `artifacts\<run>\<stage>\` (gitignored). Runs that matter:
+  - `v2` = full production upstream (normalize, candidates, features: train + test) and
+    the v2.2 stage 1. **Don't delete** (other runs link to it).
+  - **`v24` = the current final run**: `normalize/candidates/features` are junctions to v2;
+    `features_hold, scorer, rerank, decide, submit` are its own. `v24\rerank` holds the
+    final stage-2 fold models (experiment E1) and `v24\decide\decision_params.json` the
+    final decision parameters incl. the anchor bias factors. `v24\exp\E*` = the saved
+    outputs/models of each stage-2 experiment. **For new experiments use a new run dir with
+    junctions** (as `v24m` does), not `v24`, or the final models get overwritten.
+  - `v2x` = v2.2's stage 2 + decide; `v23` = v2.3 (v2.2 + anchor); `v2m` = memory-refactor
+    equivalence check; `v24m` = scratch (min_p 0.3 check); `dev2`, `main` = old.
+- `D:\aml\submissions\{v2, v2.1, v2.2_domainnorm, v2.3_anchor, v2.4_hold, probe_*}\` = every
+  candidate file. `D:\aml\logs\` stage logs; `D:\aml\analysis\` analysis scripts + outputs
+  (see section 7); `D:\aml\run_v24.sh` (stage-1 retrain + five stage-2 experiments) and
+  `D:\aml\run_v24_test.sh` (final decide + test pass + submit) are the templates for new runs.
+- `C:\Users\Rudraksha\OneDrive\Desktop\Amazon ML\` = the user's *other*, older pipeline:
+  not the one we use; don't upload its zip.
 
-## 4. How to run (details in `code/business_entity_resolution/README.md`)
+## 4. How to run (details: `code/business_entity_resolution/README.md`)
 
-Run from `D:\aml\amazon-ml-challenge` in Git Bash with `export PYTHONUTF8=1`.
-Stages: `split normalize candidates features scorer rerank decide submit`, each
-`ber <stage> --run <run> [--set key=value ...]`, artifacts + `manifest.json` per stage.
-`--set data.phase=train` runs only the train/val side (experiments), `data.phase=test`
-only the test side, reusing the train pass's models/params. Helpers:
-`D:\aml\run_train_phase.sh <run> <from-stage>`, `run_test_phase.sh`, `run_rerank_refresh.sh`.
+Git Bash, from `D:\aml\amazon-ml-challenge`, `export PYTHONUTF8=1`. Stages:
+`split normalize candidates features features-hold scorer rerank decide submit`, each
+`ber <stage> --run <run> [--set key=value ...]`; `--set data.phase=train|test` runs one side
+(a test pass reuses the train pass's models/params; needs the train pass first).
 Tests: `cd code/business_entity_resolution && ../../.venv/Scripts/python.exe -m pytest -q
--p no:cacheprovider --basetemp=/d/aml/pytest_tmp` (all pass).
+-p no:cacheprovider --basetemp=/d/aml/pytest_tmp` (141 pass).
 
-Timings / peak RAM on this laptop (full data):
+Timings / peak RAM (laptop, full data):
 
-| Stage | Train/val side | Test side | Peak RAM |
-|---|---|---|---|
-| normalize | 7 min (both) | – | 4 GB |
-| candidates | 145 min CPU (≈60–80 min with GPU) | 78 min (GPU) | 8.2 GB |
-| features | 64 min | 115 min | 9.9 GB |
-| scorer | 4 min (+val scoring) | 12 min | 6.5 GB |
-| rerank | 3 min | 8 min | 7.5–9.3 GB |
-| decide + submit | 5 min | 2 min | ≤ 4 GB |
-
-Cheap iteration loop: anything after `features` (scorer/rerank/decide) can be re-run in
-`v2x` in minutes; changing normalisation/candidates/features costs a full re-run (~6–8 h).
-
-## 5. What the pipeline is now (v2.2)
-
-Normalise → region-blocked char-3gram TF-IDF top-k (3 indexes, ~24 S1 per record, 99.05 %
-of true pairs; GPU for large blocks) → 102 pair features → **stage 1** LightGBM (p1),
-keep p1 ≥ 0.001 (**= `candidate_pairs.tsv`, 5.57 per S1, 99.97 % of retrieved true pairs
-kept**) → **stage 2** re-ranker LightGBM on p1 + S1/record group context + all 102 stage-1
-features, trained cross-fitted on the val side, with **domain normalisation** of 20
-size-dependent features → one owner per record → per-S1 expected-F0.5 (min_p 0.2) → TSVs +
-official validator. Full description: `Documentation_template.md` (methodology, filled) and
-`progress.md`.
-
-## 6. Results so far
-
-| Version | Val macro F0.5 (geographic split, 222,624 S1) | Public LB |
+| Stage | Time | Peak RAM |
 |---|---|---|
-| main (6120d59) | 0.98211 | 0.975 |
-| v2 stage 1 only (new features) | 0.98337 | (probe file ready, not submitted) |
-| v2.1 stage 2, 25 → all features | 0.98748 → 0.98895 (region-held-out CV 0.98684) | 0.977 |
-| **v2.2 + domain normalisation** | 0.98897 | **0.980** |
+| normalize | 7 min | 4 GB |
+| candidates | ~2.5 h train (GPU helps) + 78 min test | 8 GB |
+| features | 64 min train + 115 min test | 10 GB |
+| features-hold (hold_frac 0.2) | 61 min (16 min of it = per-S1 candidate context) | 7.6 GB |
+| scorer | 8 min train (+ val/hold scoring) + 12 min test | 4.8 GB |
+| rerank (val + hold) | 14 min train + 10 min test | 4.9 GB |
+| decide | 2–5 min per pass (full min_p sweep ~4 min) | 4.6 GB |
+| submit | 1 min | 4.1 GB |
 
-Val ↔ LB gap: 0.007 → 0.012 → 0.009. Val is optimistic for test; treat val as a
-*relative* signal and prefer robustness checks (section 8).
+Cheap loop: anything after features-hold (scorer/rerank/decide) re-runs in minutes in a
+junction run; changing normalisation/candidates/features costs a full re-run (~6–8 h).
 
-## 7. Key findings (evidence in `progress.md` and `D:\aml\analysis\`)
+## 5. What the pipeline is now (v2.4)
 
-1. **Test ≠ train in density.** Test US has **half** the S1 of train US (663k vs 1.32M);
-   test has 5.5–5.8 S2/S3 records per S1 vs 4.7 in train (~40 % unmatched vs 26 %).
-   Adversarial validation on stage-2 inputs: AUC 0.986 (US), 0.990 (India), 0.9997 (France).
-   Top drifting features are size-dependent: per-S1 counts (`s_n`, `s_n_top1`, `s_n_cands`,
-   `c_expected`), `s_name_freq` (S1 sharing the core name: p90 31 on test vs 61 on val for
-   certain matches), IDF of unmatched tokens (lower by log 2 on test US).
-   → Domain normalisation in stage 2 gave **+0.003 LB**. Stage 1 still sees raw values.
-2. Test has ~2× the "same name, same street, house number shifted" lookalikes per S1, but
-   the model already rejects them: doubling them on val costs only −0.0003.
-3. Label-shift EM per segment (Saerens) is unreliable here (feature shift within segments);
-   left as `decide.prior_shift` (off). Adversarial importance weights are degenerate
-   (effective sample share 11 %); `rerank.weights_file` exists but unused.
-4. France (15 % of test, no labels): predictions look correct on inspection; link counts
-   per S1 match US/India. The stage-2 model trained on US-only still helped India (best
-   proxy for France transfer).
-5. Val error budget (v2): missed pairs 2.65 % of true pairs, **more than half from the 4 %
-   of records with an empty address** (they lose 32.5 % of their pairs; names are shared by
-   many S1, often unrecoverable); false links 0.37 % of links (lookalikes).
-6. Noise catalogue learned from data (see `progress.md`): injected ids/phones in names,
-   filler words per country, made-up brand names (syllables jax/tavo/zeph…), prepended fake
-   house numbers in India, doubled words, legal-word typos.
-7. Candidate-set size matters for the final ranking. Trade-off at the stage-1 filter
-   (val): p1 ≥ 0.001 → 1.08 pairs/record, 99.97 % kept; 0.003 → 0.98, 99.93 %; 0.01 → 0.88,
-   99.78 %.
+Normalise → region-blocked char-3gram TF-IDF top-k (3 indexes, ~24.6 S1 per record, 99.05 %
+of true pairs) → 102 pair features → **stage 1** LightGBM (p1), trained on train regions
+*outside* the held-out ones; keep p1 ≥ 0.001 (**= `candidate_pairs.tsv`, 5.63 per S1,
+99.97 % of retrieved true pairs**) → **stage 2** re-ranker LightGBM on p1 + S1/record group
+context + all 102 stage-1 features, with domain normalisation of 20 size-dependent
+features, **trained cross-fitted (4 folds by the record's top S1) on the val regions (10 %)
++ 20 % held-out train regions** (India AP GJ HR KL OD RJ, US AR CT IA ID IN MD NY;
+`rerank.hold_frac: 0.2`, `train_sides: [val, hold]`) → one owner per record → **anchor prior
+correction** (`decide.prior_shift: anchor`; fires only for France's generic-word swaps) →
+per-S1 expected-F0.5 (min_p chosen on val: 0.02, flat) → TSVs + official validator.
+Methodology write-up: `Documentation_template.md` (up to date for v2.4).
 
-## 8. Strategy for the remaining time: generalise, don't chase the public LB
+## 6. Results
 
-The public LB is one random subset of test S1 (~sampling noise is tiny at this size, so a
-0.003 change is real), but **choosing among many variants by public score overfits the
-selection**. Rules we agreed on:
+| Version | Val F0.5 (222,624 S1) | Unseen-region CV | Public LB |
+|---|---|---|---|
+| main (6120d59) | 0.98211 | – | 0.975 |
+| v2.1 stage 2 on all features | 0.98895 | 0.98684 | 0.977 |
+| v2.2 + domain normalisation | 0.98897 | – | 0.980 |
+| v2.3 + anchor correction (France) | 0.98897 (no-op on val) | – | not submitted |
+| **v2.4 stage 2 on val + held-out regions (+ v2.3)** | **0.98911** | **0.98776** (val-only: 0.98660) | **0.980973** |
 
-- A change ships only if (a) it has a mechanism we can explain from the data, (b) it does not
-  hurt val, (c) it holds under **robustness checks**: region-held-out CV
-  (`rerank.fold_by=region`), cross-country transfer (train on US val only → India),
-  per-country test prediction stats (links/S1, empty rate, share of uncertain p), and
-  adversarial AUC going *down*. The LB is a coarse sanity check, not the objective.
-- Prefer **invariant / scale-free features and domain normalisation** over tuned thresholds;
-  prefer ensembles/averaging over single tuned models; keep precision-first decisions
-  (expected F0.5, flat around min_p 0.02–0.5, so no threshold tuning on LB).
-- Keep the candidate set small (final-ranking criterion) but never trade real recall for it.
-- Use at most 1–2 LB submissions per idea, and keep a written record (in `progress.md`) of
-  every submission and why it was made.
+## 7. Key findings (evidence in `progress.md`; scripts in `D:\aml\analysis\`)
 
-## 9. Next steps, in priority order
+1. **Test ≠ train in density** (v2 session): test US has half the S1 of train US; test has
+   5.5–5.8 S2/S3 per S1 vs 4.7 → domain normalisation of size-dependent stage-2 features
+   (+0.003 LB).
+2. **France's generic-word swaps** (`swap_check.py`, `fr_swaps.py`, `fr_hn_mix.py`): same
+   address + house number, the generic word of the name swapped ("Ski College SARL" → "Ski
+   Comite SARL", "Dessin Club" → "Dessin & Fils"): 6.6 % of French same-street pairs vs
+   0.1–1.5 % in US/India (mostly decoys there). The model is uninformed (mean p2 0.26–0.40).
+   House-number profile (independent of the name change given the match status) says
+   ~80 % are true copies; not clustered at shared addresses (not "sibling" decoys).
+3. **Anchor correction** (`decide/anchor.py`; `anchor_proto.py`, `anchor_sim.py`,
+   `anchor_sim2.py`, `anchor_legal.py`): per country × name-change kind, share of true
+   copies from the hn_rel mixture vs the model's mean p, de-biased on val; corrected only
+   beyond 2×. Validated: no false alarms under 8 label-shift scenarios; recovers 96–99 % of
+   the loss of an uninformed wrong-prior score. Limit: along the legal-conflict axis the
+   assumption fails (India val bias 13.8×), so it is used for name-change kinds only.
+4. **Model self-estimate** (`selfest.py`): expected F0.5 under its own p2 — test 0.9913
+   (France 0.9870 lowest) vs val 0.9949; minus val optimism → ≈ 0.985 predicted for test,
+   so part of the val→LB gap is invisible to the model.
+5. **Incomplete S1 groups** (progress "v2.4"): stage 2 only loads val (+hold) records, so
+   16 % of v2.2's val pairs (181k negatives on train-side S1 whose owners were never
+   loaded) looked trivially easy; at test all groups are complete, esp. for records without
+   a region (21 % of test pairs, mostly France's 35 % region-less records, which search the
+   whole country). A val-only stage 2 mis-scores such pairs once their groups are complete
+   (E0). Training on val + hold fixes much of it; 141k val pairs still sit on S1 outside
+   the loaded regions.
+6. **More regions for stage 2 help unseen regions** (E0–E4 table in progress): +0.0012
+   unseen-region (India +0.0020, singletons +0.0055); hold-only training transfers to val as
+   well as val's own regions (0.98666 vs 0.98660).
+7. Earlier (v2 session): noise catalogue (fillers, brand syllables, injected ids, prepended
+   house numbers), error budget (missed pairs mostly records with empty address), label-shift
+   EM unreliable, adversarial weights degenerate, candidate filter trade-off (p1 ≥ 0.001:
+   1.078 pairs/record, 99.97 %; 0.003: 0.984, 99.93 %; 0.01: 0.885, 99.77 %).
 
-1. **Domain-normalise stage 1 too** (most principled continuation of what worked): the same
-   per-country-per-split scaling for the size-dependent stage-1 features (`s_name_freq`,
-   `s_n_cands`, `s_n_top1`, IDF-based `k_idf_*`, `a_idf_*`, `q_vocab_oov`, rank features if
-   justified), applied when the scorer loads features (no feature re-run needed): retrain
-   scorer in `v2x`, then rerank/decide (val + region CV), then the test scoring
-   (`scorer`/`rerank`/`decide`/`submit` with `data.phase=test`, ~30 min). Check adversarial
-   AUC before/after (`D:\aml\analysis\adversarial.py`).
-2. Consider a more principled normalisation than "divide by the mean": e.g. corpus statistics
-   (IDF, vocabulary, name frequency) computed on the **union of train+test S1 per country**,
-   or rank/quantile normalisation per domain. Document the choice.
-3. Stage-2 robustness: average the S1-fold and region-fold stage-2 models, or drop stage-2
-   features that remain strongly drifting after normalisation.
-4. Optional, bigger: a transformer cross-encoder (Ditto-style, e.g. `xlm-roberta-base`, MIT,
-   0.28B params) on the uncertain band, trained on the GPU; needs PyTorch + transformers
-   (~3.6 GB downloads, ask first); ~4–5 h. Only worth it if the checks point to capacity rather
-   than distribution shift.
-5. Candidate-set size: consider `rerank.min_p1` 0.003 (0.98 pairs/record, −0.04 % recall).
-6. **Before the deadline** (leave ≥ 3 h): pick the final file on robustness grounds, put it in
-   `output\`, update `Documentation_template.md` + `progress.md`, rebuild the zip with
-   `python code/business_entity_resolution/tools/make_submission_zip.py --team pootato`
-   (checks CRC), confirm the official validator PASS on both TSVs, push `improve/v2`, and
-   tell the user which file to upload and where the zip is. Ask whether to open a PR / merge
-   into main (not done so far).
+## 8. Next steps (in priority order; the user wants a better score)
+
+1. **More held-out regions for stage 2** (strongest evidence so far): try `rerank.hold_frac`
+   0.3–0.4 in a **new run dir** (junctions: normalize/candidates/features → v2).
+   `features-hold` recomputes all hold queries (~1 h per 20 %; the per-S1 candidate context
+   step alone is 16 min — could be cached/sped up with Arrow). Then scorer + the E2/E3
+   protocol (region folds, val-only vs val+hold) + E1; compare unseen-region CV with
+   0.98776. Note: `hold_regions()` picks regions greedily from a seeded permutation, so a
+   larger frac mostly (not strictly) extends the 0.2 set. Stage 1 loses those regions too
+   (at 0.2: val AUC 0.999938 vs 0.99994 — negligible).
+2. **Complete the remaining S1 groups ("fix B")**: 141k val pairs still sit on S1 outside
+   the loaded regions (empty groups). Option: exclude such pairs from stage-2 *training*
+   (flag via the split's `s1.parquet` geo + hold regions), keep them for scoring; compare
+   E1 vs E1b on val/unseen-region CV. Cheap (rerank + decide ~20 min).
+3. **D1 diagnostic** (`D:\aml\analysis\d1_v22_complete_groups.py`, written, not run):
+   v2.2's stage-2 models on val with fuller groups → quantifies how much v2.2 suffered
+   from the empty-group artefact (documentation value; ~10 min, ~3 GB).
+4. Candidate-set size: `rerank.min_p1` 0.003 (0.984 vs 1.078 pairs/record, −0.04 % of
+   retrieved true pairs) for the final-ranking criterion; check val cost first.
+5. Stage-1 domain normalisation (size-dependent features are ~1.3 % of stage-1 gain: small).
+6. Bigger, only if time: France pseudo-labelling; a transformer cross-encoder on the
+   uncertain band (downloads ~3.6 GB need the user's OK).
+
+## 9. Before the deadline (leave ≥ 3 h)
+
+Pick the final file on validation/robustness evidence (LB only as a regression check), put
+it in `output\`, make sure `configs/default.yaml` reproduces it, update
+`Documentation_template.md` + `progress.md`, rebuild the zip with
+`python code/business_entity_resolution/tools/make_submission_zip.py --team pootato`
+(checks CRC), run the official validator on both TSVs (`utils/validate_submission.py
+--matching output/matching_results.tsv --candidate output/candidate_pairs.tsv --test-dir
+dataset/test --check-ids`), push `improve/v2`, tell the user which file to upload and where
+the zip is, and ask about a PR / merge into main.
 
 ## 10. Gotchas
 
-- Features of test and train are computed per split; any new corpus statistic must be learned
-  identically for both (the features stage already learns filler words from both splits).
+- New corpus statistics must be learned identically for train and test.
 - `data.phase=test` merges the stage's previous manifest; a train pass must exist first.
-- Config-hash warnings between stages are harmless.
-- LightGBM gets float32 matrices (a mixed-dtype DataFrame silently becomes float64 = 2× RAM).
-- The official validator is also copied to `code/business_entity_resolution/tools/` so the
-  code folder is self-contained; `submit` checks `candidate_pairs.tsv` too.
-- Windows: use absolute D: paths; long temp paths break git clone; `sleep` loops are blocked
-  in the harness (use background jobs / Monitor).
+  `ber decide --set data.phase=test` reads `decision_params.json` from the train pass: `--set
+  decide.min_p` on a test-only pass has no effect.
+- `run_v24.sh` overwrites `v24\rerank` per experiment (the last one, E1, is the final); save
+  models per experiment (`exp\`) or use another run.
+- `hold_frac > 0` needs `ber features-hold` before `ber scorer` (the scorer excludes the hold
+  queries from training and scores them; `dev.yaml` / `france_proxy.yaml` set it to 0).
+- Filter by id with Arrow (`pc.is_in` on a prebuilt array), not `Series.isin(python_set)`:
+  the latter took 19 s per 1 M-row part (was the cause of a 10-min stall).
+- Config-hash warnings between stages are harmless. LightGBM gets float32 matrices.
+- The official validator is also in `code/business_entity_resolution/tools/`; `submit`
+  checks `candidate_pairs.tsv` too.
+- Windows: absolute D: paths; Git Bash heredocs with nested quotes can break — write scripts
+  to files; `sleep` loops are blocked in the harness (use background jobs / `until` loops).

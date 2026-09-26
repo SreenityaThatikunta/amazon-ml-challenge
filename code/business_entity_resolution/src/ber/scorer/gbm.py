@@ -75,16 +75,23 @@ def load_sampled(path, cfg: Config, log, feats: list[str], keep_s1: bool = False
     masks first (ids only), then the rows go straight into preallocated matrices
     (no concatenation copy). Queries in ``exclude`` (the held-out regions of
     ``rerank.hold_frac``) never enter the training sample."""
+    import pyarrow as pa
+    import pyarrow.compute as pc
+    import pyarrow.parquet as pq
     sc = cfg.scorer
     files = sorted(path.glob("*.parquet"))
+    # the excluded ids as one Arrow array, built once (a Python set handed to
+    # Series.isin is converted again for every part: minutes instead of seconds)
+    excl = pa.array(sorted(exclude), type=pa.large_string()) if exclude else None
     masks = []
     for f in files:
         d = pd.read_parquet(f, columns=["q_id", "side"])
         q = d.q_id.astype(str)
         u = stable_unit(q, cfg.seed + 4)
         t = ((d.side == "train").to_numpy() & (u < sc.train_query_frac))
-        if exclude:
-            t &= ~q.isin(exclude).to_numpy()
+        if excl is not None:
+            qa = pq.read_table(f, columns=["q_id"]).column("q_id").cast(pa.large_string())
+            t &= ~pc.is_in(qa, value_set=excl).to_numpy(zero_copy_only=False)
         e = ((d.side == "val").to_numpy() & (u < sc.es_query_frac))
         masks.append((t, e))
         del d, q

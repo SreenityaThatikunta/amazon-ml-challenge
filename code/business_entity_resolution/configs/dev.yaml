@@ -13,3 +13,7 @@ features:
 scorer:
   train_query_frac: 1.0
   es_query_frac: 1.0
+
+rerank:               # the dev slice has no held-out regions of its own
+  hold_frac: 0.0
+  train_sides: [val]

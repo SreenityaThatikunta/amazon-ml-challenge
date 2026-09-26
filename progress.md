@@ -98,7 +98,16 @@ claims (`c_expected`, `c_best_other`, `c_sum_other`), i.e. exactly the group con
 | main (6120d59) | 0.98211 | 0.975 | 0.007 |
 | v2.1 (stage 2 on all features) | 0.98895 (0.98684 with whole regions held out) | 0.977 | 0.012 (0.010) |
 | **v2.2 (+ domain normalisation of size-dependent stage-2 features)** | 0.98897 | **0.980** | 0.009 |
-| v2.3 (+ anchor prior correction: France's generic-word swaps) | 0.98897 | (not yet submitted) | |
+| v2.3 (+ anchor prior correction: France's generic-word swaps) | 0.98897 | not submitted (decision below) | |
+| **v2.4 (stage 2 on val + 20 % held-out train regions, stage 1 without them, + v2.3's anchor correction)** | 0.98911 (unseen-region CV 0.98776) | **0.980973** | 0.008 |
+
+Submission policy (2026-09-26, with the user): we assumed the public board shows 3
+decimals (it shows 6, as the v2.4 score 0.980973 revealed), so a v2.3 upload looked
+uninformative (expected gain ≈ +0.0007). The public part is presumably a random part of the same test set
+(hundreds of thousands of S1, sampling noise ≈ 0.0001), so differences between our files
+do carry over to the private part, but only large ones are visible. Decision: v2.3 is not
+uploaded on its own; v2.4 (which includes it) is uploaded once as a check against a
+regression; the final choice rests on validation and robustness evidence.
 
 v2.2 is now the default (`rerank.domain_norm: true`) and the file in `output/` (2026-09-26 08:14).
 Submissions: 5 per team per day (2 used on 2026-09-26: v2.1, v2.2).
@@ -251,6 +260,73 @@ France's generic swaps are corrected (π_anchor 0.815 vs mean p 0.404 → r 6.48
 linked; candidate_pairs.tsv unchanged (9,649,852). Expected LB effect is small (≈ +0.0006
 to +0.0008 if ≥ 90 % of the new links are right, ≈ 0 at 70 %): a 3-decimal leaderboard may
 not show it.
+
+### v2.4 (2026-09-26): stage 2 trained on more regions (val + 20 % held-out train regions)
+
+**Why.** Stage 2 (the re-ranker, worth +0.0056 on val) trained only on the val side:
+10 % of the S1 (US: 9 states; India: 5 regions, mostly Uttar Pradesh and Punjab). With
+whole val regions held out per fold it scored 0.98684 vs 0.98895 when every fold saw
+every region, so part of what it learns is region-specific, and every test region is
+unseen by it. More regions in its training set should make it more robust.
+
+**How.** `rerank.hold_frac = 0.2`: per country, whole train-side regions are set aside
+(seeded, same greedy rule as the val split): India AP, GJ, HR, KL, OD, RJ (21.7 % of
+India's S1), US AR, CT, IA, ID, IN, MD, NY (19.8 %). `ber features-hold` featurises all
+their queries: 50.6 M pairs of 2.09 M records, 61 min, peak 7.6 GB; identical to
+`ber features` (checked on the 1.0 M pairs both computed: all 103 columns equal). The
+stage-1 scorer trains without them (3.52 M rows instead of 4.52 M; val AUC 0.999938 vs
+0.99994, logloss 0.00293 vs 0.00290) and scores them out-of-sample. Stage 2 loads val and
+hold pairs (group features and domain scales over both); `rerank.train_sides` picks the
+training rows.
+
+**Finding: incomplete S1 groups made part of val too easy.** Stage 2 only ever loads val
+(and now hold) records. 16.2 % of v2.2's kept val pairs (181,360; all negatives; p2 ≈
+0.001) sit on train-side S1 whose owners are never loaded, so their S1 groups look
+empty and rejecting them is trivial. At test time every group is complete. With the hold
+regions loaded, 40,520 of them get their owners' claims (3.2 true claims per S1 on
+average), and a val-only stage 2 (E0) scores them badly (median p2 0.022, 3.7 % above
+0.5, 905 outrank the record's true S1): it had never seen a cross-region candidate whose
+S1 is strongly claimed by its own copies. That is what whole-country searchers meet on
+test: records without a detectable region are 20.9 % of the kept test pairs (mostly
+France's 35 % region-less records). So v2.2's val score is flattered by these pairs, and
+v2.2 may be weak on this case at test time; training on val + hold, which contains many
+such cases, addresses it. (E0 vs v2.2 therefore mixes this with the weaker stage 1:
+−0.0005; on the 1.05 M pairs not affected, stage-2 logloss +7.6 %, on the 41.6 k
+affected ×38.)
+
+**Experiments** (run `v24`, same new stage 1 everywhere, 222,624 val S1; min_p 0.2 in all):
+
+| | stage 2 trained on | folds | val F0.5 | US | India | singletons | pair P / R | p2 AUC / logloss |
+|---|---|---|---|---|---|---|---|---|
+| E0 | val | by S1 | 0.98846 | 0.99000 | 0.98605 | 0.98525 | 0.99763 / 0.97228 | 0.999132 / 0.0334 |
+| **E1** | **val + hold** | by S1 | **0.98911** | 0.99043 | 0.98704 | 0.98701 | 0.99799 / 0.97306 | 0.999251 / 0.0311 |
+| E2 | val | whole regions | 0.98660 | 0.98968 | 0.98176 | 0.98172 | 0.99750 / 0.96831 | 0.998773 / 0.0396 |
+| **E3** | **val + hold** | whole regions | **0.98776** | 0.99029 | 0.98377 | 0.98717 | 0.99798 / 0.97009 | 0.999016 / 0.0357 |
+| E4 | hold only | – (val never seen) | 0.98666 | 0.98865 | 0.98355 | 0.98701 | 0.99827 / 0.96502 | 0.997323 / 0.0626 |
+
+- On unseen regions (whole regions held out per fold) more regions help: **+0.0012**
+  (E3 vs E2), India +0.0020, singletons +0.0055.
+- With folds by S1: +0.00065 (E1 vs E0); E1 is above v2.2's 0.98897 although its val
+  now contains the harder complete-group negatives.
+- A stage 2 trained only on the hold regions (E4) does as well on val as one trained on
+  other val regions (0.98666 vs 0.98660): the hold regions are as useful as val for
+  training, and the model transfers across regions. Its val logloss is poor (0.063):
+  trained on one set of regions it is overconfident elsewhere (precision 0.99827, recall
+  0.96502), the region-specificity that mixing regions reduces.
+- Decision: **v2.4 = E1** (stage 2 on val + hold, folds by S1) + the v2.3 anchor correction.
+
+**v2.4 test pass** (`D:\aml\run_v24_test.sh`; decision parameters re-chosen with the default
+sweep: val F0.5 0.98911, min_p 0.02, the sweep is flat 0.98909–0.98911 over 0.02–0.5; min_p
+0.3 changes 633 of 1.73 M test S1 (0.04 %), so the automatic choice was kept). Anchor
+correction: again only France's generic swaps (π_anchor 0.780 vs mean p2 0.264: the new
+stage 2, which saw more Indian regions where such swaps are mostly decoys, is even more
+sceptical; de-biased ratio 8.8, capped at 6); every US/India kind 0.86–1.68.
+Files `D:\aml\submissions\v2.4_hold\` = `output\` (official validator PASS, also with
+`--check-ids`): 5,906,819 links; `candidate_pairs.tsv` 9,750,222 pairs = 5.63 per S1 (the
+new stage 1 keeps 1 % more); links per S1 France 3.420 / India 3.397 / US 3.420 (v2.2: 3.403
+/ 3.406 / 3.425); empty S1 5.4–5.7 % as before; S1 changed vs v2.2: France 8.5 %, India
+5.1 %, US 3.5 %. **Public LB 0.980973** (2026-09-26 ~14:00; the board shows 6 decimals,
+not 3 as assumed above, so small differences are visible).
 
 ### Memory: stage 2 and the scorer without the big in-RAM copies (2026-09-26)
 
