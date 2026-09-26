@@ -293,8 +293,21 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   `test_parallel_rows_match_serial`. Dev val F0.5 after rerunning scorer → decide: 0.99083 (was 0.99061):
   that difference is LightGBM run-to-run noise, so **dev differences of ±0.0002 are noise**.
 
-### E25. Full v3 run (task 1.1, running)
-- `bash experiments/run_v3_full.sh` (log `logs/v3_full.log`, started ~08:30): normalize → train pass
-  (candidates, features, scorer, rerank, decide) → test pass (+ submit). main v2's output archived as
+### E25. Full v3 run (task 1.1)
+- `bash experiments/run_v3_full.sh` (log `logs/v3_full.log`, 08:30 → 13:56; the Mac slept ~09:40–11:22 with the
+  lid closed, since then `caffeinate -dimsu -w <script pid>`). main v2's output archived as
   `output/archive/matching_results_main_v2_val098906_lb0972.tsv`.
+- Active times: normalize 4 min; train candidates 48 min (pair recall **99.40%**, v2 99.05%); train features
+  ~25 min; scorer 4 min (val AUC 0.999913); rerank 3 min; decide 2.5 min; test candidates 37 min; test
+  features 77 min (262.3M pairs built and scored, **10.2M kept** at p1 ≥ 0.001); test scorer 1 min, rerank
+  6 min, decide + submit 1.5 min.
+- **Val F0.5 0.98954** (v2.2: 0.98897): US 0.99069, India 0.98775; pair P 0.9973 / R 0.9769; singletons
+  0.98581; expected-F min_p 0.02.
+- Pruning check on real data: rerank kept France 1,532,211 + India 4,906,492 + US 3,780,342 = 10,219,045 =
+  pairs written by features. Peak RSS 7.5 GB.
+- Submission: 5,910,541 links (v2.2: 5,912,771); `candidate_pairs.tsv` 10,219,045 pairs = 5.90 per S1 (v2.1:
+  5.57); matches ⊆ candidates; **official validator PASS**. Copy: `output/archive/matching_results_v3_val098954.tsv`.
+- vs main v1 (pairs/S1, empty rate): India 3.33 → 3.40, 5.6% → 5.7%; US 3.37 → 3.42, 5.6% → 5.7%;
+  France 3.48 → 3.42, 4.9% → 5.5% (France v2.1: 3.44).
+- **Public LB: pending** (the user uploads).
 

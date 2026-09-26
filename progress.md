@@ -475,6 +475,9 @@ does stage 2 transfer to test?). Next: adversarial validation on stage-2 inputs
 - Full v3 train pass: **val F0.5 0.98954** (US 0.99069, India 0.98775; candidate pair recall 99.40% vs v2's
   99.05%; P 0.9973 / R 0.9769). Test pass running (E25).
 
+- **Full v3 run done** (E25): val 0.98954, validator PASS, 5.91M links, candidate_pairs 5.90/S1;
+  `output/matching_results.tsv` + `output/candidate_pairs.tsv` ready for upload. Public LB pending.
+
 ---
 
 ## Open questions
