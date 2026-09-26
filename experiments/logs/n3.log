@@ -29,3 +29,9 @@
 20:15:38 INFO  ber.candidates |   index name : 706839 S1 x 15943 n-grams
 20:15:50 INFO  ber.candidates |   index addr : 706839 S1 x 25190 n-grams
 20:16:05 INFO  ber.candidates |   index combo: 706839 S1 x 28749 n-grams
+20:35:48 INFO  ber.candidates | train India: 4,133,346 queries x 706,839 S1 done in 1213.8s (peak RSS 7.48 GB)
+20:36:00 INFO  ber.candidates | train US: 6,186,873 queries x 1,072,609 S1 ...
+20:36:00 INFO  ber.candidates |   top-k search on cpu
+20:36:09 INFO  ber.candidates |   index name : 1072609 S1 x 13946 n-grams
+20:36:21 INFO  ber.candidates |   index addr : 1072609 S1 x 14116 n-grams
+20:36:40 INFO  ber.candidates |   index combo: 1072609 S1 x 18695 n-grams

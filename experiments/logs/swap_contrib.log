@@ -1,0 +1,340 @@
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:37: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  rows.append(t[m].assign(grp=c))
+/Users/sreenityathatikunta/Documents/Projects/student_resource/experiments/swap_contrib.py:40: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  F["p1"] = model.predict(X, num_iteration=model.best_iteration)
+France swap pairs 67645 (p1 .05-.8: 21486); US swap pairs 93270 (p1 >= .9: 85144)
+                       contrib_FR  contrib_US  value_FR  value_US  delta
+k_tsr                      -0.820       0.323    68.407    94.073 -1.142
+k_idf_unmatched_q          -0.687       0.388     4.867     5.815 -1.075
+n_jw_margin                 0.055       0.773    -0.127     0.054 -0.719
+k_idf_prec                 -0.269       0.343     0.657     0.778 -0.612
+n_sub                      -0.480      -0.031     3.165     2.045 -0.449
+a_tsr_margin                0.322       0.627     2.282    17.022 -0.305
+k_ratio_margin             -0.036       0.269   -30.172     7.938 -0.305
+k_n_unmatched_q             0.061       0.311     0.983     0.436 -0.250
+num_jacc                    1.047       1.291     0.993     0.997 -0.244
+n_jw_gap                    0.139       0.368     0.133     0.024 -0.229
+q_vocab_oov                -0.202       0.016     0.003     0.146 -0.218
+hn_quality_margin           0.132       0.339     0.800     1.874 -0.207
+cos_name_margin             0.073       0.265    -0.182     0.062 -0.192
+k_ratio_rank               -0.044       0.135     8.846     1.235 -0.178
+n_nocity_ratio_margin      -0.028       0.148   -31.647     5.205 -0.176
+k_lev                      -0.043       0.090     8.352     5.419 -0.133
+l_q_empty                  -0.001       0.109     0.282     0.428 -0.110
+a_tsr_gap                   0.151       0.249     0.000     0.000 -0.098
+n_lev                      -0.017       0.080     6.737     6.628 -0.097
+a_n_unmatched_q             0.103       0.199     0.000     0.000 -0.096

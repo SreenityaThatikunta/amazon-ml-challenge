@@ -434,3 +434,30 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
   (E3: S1 twins at the same address 13% vs 4.6%, generic "<City> <word> <legal form>" names, legal-form /
   street / short-number lookalikes) remains the prime suspect.
 
+### E31. France diagnosis without labels: generic-word swaps
+- `experiments/twin_segments.py` (log `logs/twin_segments.log`): val_ts F0.5 of S1 with an exact-address twin
+  0.9848 (US) / 0.9824 (India) vs 0.9902 / 0.9873 without; name twins 0.9855 / 0.9823 vs 0.9939 / 0.9923.
+  Test shares: address twins France 13.3% (US 4.6%, India 5.2%); name twins France 48% (India 53%, US 40%).
+  France's extra twins are worth only ~0.0005 of France F0.5: **structure doesn't explain France ≈ 0.94**.
+- `experiments/ambiguous_dump.py v3 France 40` (log `logs/ambiguous_france_v3.log`): records with top p2 in
+  [0.2, 0.8] per record: France 0.0351, India 0.0214, US 0.0177. Most ambiguous France records share the
+  S1's exact address, first word and legal form, with the **generic second word swapped** ("Echo Atelier SASU"
+  vs "Echo Amicale SASU").
+- `experiments/word_swap.py` (log `logs/word_swap.log`): same-address pairs whose core names differ in exactly
+  one (non-typo) word. Val with labels: true-match rate **97–99.6%** when the S1's swapped word is common
+  (S1 document frequency > 10), 71% (US) when it is rare; v3's p2 matches (well calibrated). Test, kept pairs:
+  US 93,270 (0.024 per record, mean p2 0.925, 1.1% in [0.2, 0.8]); India 53,749 (0.011, 0.986, 0.6%);
+  **France 67,645 (0.047 per record, mean p2 0.752, 24.5% in [0.2, 0.8])**, swapped word df median 5,623.
+- `experiments/swap_contrib.py` (log `logs/swap_contrib.log`): stage-1 contributions, French swaps with p1 in
+  [0.05, 0.8] vs US swaps with p1 ≥ 0.9: `k_tsr` (68 vs 94: two-word names lose half their tokens),
+  `k_idf_unmatched_q`, `n_jw_margin` / `k_ratio_margin` (another S1 elsewhere carries the query's exact name,
+  a France S1 twin).
+- `experiments/swap_capacity.py` (log `logs/swap_capacity.log`), label-free copy-slot test: a true copy takes
+  one of its S1's copy slots, a distractor is an extra record. Confident other links per S1, with vs without a
+  generic swap: US val TRUE −0.25 / FALSE −0.17; India val TRUE −0.33 / FALSE +0.08; test US −0.21, India
+  −0.24, **France −0.13**, i.e. **roughly half the French swaps are true copies**. v3's hesitation (p2 ≈ 0.75)
+  is about right: this France ambiguity is largely built into the data (the generator swaps generic words in
+  copies and in distractors; French names are *all* generic words). No label-free trick recovers it.
+- Decision: no France-specific change from this; France gains must come from better general discrimination
+  (N3/N4), not from re-weighting French swaps.
+

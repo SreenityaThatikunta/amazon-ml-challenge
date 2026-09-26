@@ -1,0 +1,34 @@
+val_ts per-S1 F0.5 by segment (v3ts_rc):
+                      mean    size
+country addr_twin                 
+India   False      0.98725   66256
+        True       0.98237    3104
+US      False      0.99024  104044
+        True       0.98482    6069 
+
+                         mean    size
+country city_in_name                 
+India   False         0.98749   63450
+        True          0.98213    5910
+US      False         0.98985  105832
+        True          0.99211    4281 
+
+                      mean   size
+country name_twin                
+India   False      0.99232  32901
+        True       0.98227  36459
+US      False      0.99394  57907
+        True       0.98550  52206 
+
+test S1 segment shares:
+         addr_twin  city_in_name  name_twin
+country                                    
+France      0.1331        0.1239     0.4833
+India       0.0520        0.0853     0.5305
+US          0.0456        0.0382     0.3996
+
+val_ts S1 segment shares:
+         addr_twin  city_in_name  name_twin
+country                                    
+India       0.0448        0.0852     0.5256
+US          0.0551        0.0389     0.4741

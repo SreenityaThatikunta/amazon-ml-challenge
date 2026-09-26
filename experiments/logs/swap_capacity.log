@@ -1,0 +1,5 @@
+US val {'S1 without swap': 3.31, 'S1 with swap': 3.063, 'n with swap': 9599, 'S1 with TRUE swap': 3.061, 'S1 with FALSE swap': 3.141}
+India val {'S1 without swap': 3.296, 'S1 with swap': 2.967, 'n with swap': 4936, 'S1 with TRUE swap': 2.964, 'S1 with FALSE swap': 3.375}
+US test {'S1 without swap': 3.284, 'S1 with swap': 3.07, 'n with swap': 74989}
+India test {'S1 without swap': 3.306, 'S1 with swap': 3.07, 'n with swap': 42763}
+France test {'S1 without swap': 3.212, 'S1 with swap': 3.079, 'n with swap': 55255}

@@ -1,0 +1,39 @@
+
+US val: one-word swaps at the same address, by how common the S1's word is among S1 names
+             n  true_rate  mean_p2
+generic                           
+<=10      1278      0.713    0.712
+11-100    6124      0.972    0.972
+101-1000  8763      0.977    0.979
+>1000     1672      0.990    0.990
+examples:                      q_name_core                      s_name_core  y        p
+physical therapy caal associates physical therapy care associates  1 0.999992
+            data partners center             data wealth partners  1 0.999969
+                 metz s services                   metz s capital  1 0.999976
+                  center barnett                 barnett machines  1 0.999902
+                         red dic                         red deli  1 0.999997
+              bobby dsegdus lcsw                 bobby dukes lcsw  1 0.999702
+            bistro cbaci corea s           corea s classic bistro  1 0.996531
+                   youth service                    youth society  1 0.999991
+
+India val: one-word swaps at the same address, by how common the S1's word is among S1 names
+             n  true_rate  mean_p2
+generic                           
+<=10       820      0.974    0.971
+11-100    1126      0.996    0.995
+101-1000  3436      0.991    0.990
+>1000     2178      0.985    0.986
+examples:                 q_name_core               s_name_core  y        p
+               aim ftnuuler                aim future  1 0.999986
+rakshamata memorial service rakshamata memorial trust  1 0.999929
+           soar care center   soar distributions care  1 0.997811
+                 vsc msrken             vsc marketing  1 0.999998
+               tower center               tower world  1 0.999993
+                    l foods                  al foods  1 0.998953
+       dynamic taikanalojij      dynamic technologies  1 0.998507
+             cotex services         cotex consultants  1 0.999694
+
+test: one-word swaps at the same address among kept pairs (v3)
+US: 93270 pairs = 0.0244 per record; p2 mean 0.925; p2 in [0.2,0.8] 0.011; S1 word df median 857
+India: 53749 pairs = 0.0114 per record; p2 mean 0.986; p2 in [0.2,0.8] 0.006; S1 word df median 5148
+France: 67645 pairs = 0.0471 per record; p2 mean 0.752; p2 in [0.2,0.8] 0.245; S1 word df median 5623

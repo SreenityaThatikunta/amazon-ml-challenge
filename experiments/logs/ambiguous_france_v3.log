@@ -1,0 +1,97 @@
+records with top p2 in [0.2, 0.8] per S2/S3 record:
+country
+India     0.0214
+US        0.0177
+France    0.0351
+
+Q  Echo  Atelier SASU | 31 BOULEVARD JEAN JOSEPH DE CACQUERAY, LA BAULE-ESCOUBLAC
+   p2 0.70 (p1 0.73)  Echo Amicale SASU | 31 Boulevard Jean joseph de Cacqueray, La Baule-Escoublac, Pays de la Loire
+Q  Bordeaux Groupe International SARL | 19 R ALBERT PITRES, BORDEAUX, Gironde
+   p2 0.65 (p1 0.33)  Bordeaux Compagnie SARL | 19 Rue Albert Pitres, Bordeaux, Nouvelle-Aquitaine
+Q  Peche Culturelle | 55 BIS RUE PAULIE KERGOMARD, BORDEAUX, Nouvelle-Aquitaine
+   p2 0.58 (p1 0.13)  Peche Élémentaire | 55 bis Rue Pauline Kergomard, Bordeaux, Nouvelle-Aquitaine
+Q  Professionnels SARL & Fils | 6 R. Boileau, Mérignac
+   p2 0.42 (p1 0.46)  Professionnels Sportive SARL | 6 Rue Boileau, Mérignac, Nouvelle-Aquitaine
+Q  Ets Degucotoin Groupe SA | 105 R Fieffe, Bordeaux
+   p2 0.31 (p1 0.12)  Ets Reeducation SAS | 105 Rue Fieffe, Bordeaux, Nouvelle-Aquitaine
+Q  WLK SARL Et Fils | 11 RUE GAY-LUSSAC, MÉRIGNAC, Gironde
+   p2 0.48 (p1 0.02)  WK College SARL | Mérignac, Nouvelle-Aquitaine, 11 Rue Gay-Lussac
+Q  pessac societe sarl | 43 R. Simone De Beauvoir, Pessac, Gironde
+   p2 0.43 (p1 0.45)  Pessac Amicale SARL | 43 Rue Simone de Beauvoir, Pessac, Nouvelle-Aquitaine
+   p2 0.00 (p1 0.01)  Pessac Societe SAS | 18 Rue Simone de Beauvoir, Pessac, Nouvelle-Aquitaine
+Q  IMU Sportive | 27 Rue Du Fonteny, Nantes, Loire-Atlantique
+   p2 0.21 (p1 0.41)  IMU Groupement SAS | 27 Rue du Fonteny, Nantes, Pays de la Loire
+Q  Club du Oye Développement | 33 Rue De Trevuse 2eme Etage, Lille, Hauts-de-France
+   p2 0.37 (p1 0.43)  Club du Oye | 33 RUE de Trevise 2eme etage, Lille, Hauts-de-France
+Q  TUR Primaire SARL | RUE EDOUARD VAILLANT, APP 206 2EME ETAGE RESIDENCE EGIDE, ROUBAIX
+   p2 0.72 (p1 0.75)  TUR Primaire | 177 RUE Edouard Vaillant, Hauts-de-France, Roubaix, Appartement 206 2eme Etage Residence Egide
+Q  Ptites Maternelle | Nouvelle-Aquitaine, LA TESTE-DE-BUCH, 17 AV. DES ARBOUSIERS
+   p2 0.68 (p1 0.31)  Ptites Compagnie | 17 Avenue des Arbousiers, La Teste-de-Buch, Nouvelle-Aquitaine
+Q  DINTERET SPORT | 223 BIS R. DE LA BENAUGE, BORDEAUX
+   p2 0.76 (p1 0.72)  Dinteret Fetes | 223 bis Rue de la Benauge, Bordeaux, Nouvelle-Aquitaine
+Q  Geste École EURL | 12 RUE JEAN JAURÉS, LILLE
+   p2 0.53 (p1 0.46)  Geste Societe EURL | 12 Rue Jean Jaurés, Lille, Hauts-de-France
+Q  Athletique Gestion | 53 - ALLÉE DES TAMARINIERS, NANTES, Loire-Atlantique
+   p2 0.45 (p1 0.47)  Athletique College SAS | 53 Allée des Tamariniers, Nantes, Pays de la Loire
+Q  Harmonie Theatre (France) Frânce EURL | 20 R De Norvège, Lille
+   p2 0.45 (p1 0.89)  Harmonie Theatre (France) EURL | 11 Rue de Norvège, Lille, Hauts-de-France
+Q  ingenieurs maison | 1 R De Grasset, Merignac
+   p2 0.64 (p1 0.82)  Ingenieurs Club | 1 Rue de Grasset, Mérignac, Nouvelle-Aquitaine
+Q  Deleves + Cie SA | 110 A9 RUE DU CHEVALIER FRANCAIS, LILLE, Nord
+   p2 0.47 (p1 0.64)  Deleves & Cie SAS | 110 A2 Rue du Chevalier Français, Lille, Hauts-de-France
+Q  Union des Socio | 
+   p2 0.78 (p1 0.41)  Union des Socio | 31 Rue de la Monnaie, Lille, Hauts-de-France
+   p2 0.74 (p1 0.33)  Union des Socio | 2 Bis Passage Saint Yves, Nantes, Pays de la Loire
+Q  Avivio | Hauts-de-France, Roubaix, 90 Rue d'Alger
+   p2 0.59 (p1 0.77)  ZWI Etablissement SAS | 90 Rue d'Alger, Roubaix, Hauts-de-France
+   p2 0.27 (p1 0.25)  Secourisme Compagnie | 90 Rue d'Alger, Roubaix, Hauts-de-France
+Q  EHPAD de Georges SARL | 5 RUE SALLES DE L'ERAUDIÈRE, NANTES, Pays de la Loire
+   p2 0.21 (p1 0.09)  EHPAD de Georges | 1 Rue Salles de l'Eraudière, Nantes, Pays de la Loire
+Q  Lyravantage | Bd Des Martyres Nantais De La Resistance, Nantes
+   p2 0.67 (p1 0.88)  Nantes Amicale SAS | 23 BD des martyres nantais de la resistance, Nantes, Pays de la Loire
+   p2 0.01 (p1 0.00)  Commercant Amis (France) SAS | 17 Boulevard des Martyrs Nantais de la Résistance, Nantes, Pays de la Loire
+Q  S.A.S. Temps Loisirs | N° 26 Rue D'espagne, Roubaix
+   p2 0.29 (p1 0.46)  Temps Centre SAS | Roubaix, Hauts-de-France, 26 Rue d'Espagne
+Q  Centre Martin-France | RUE DU PARADISIER, NANTES, Pays de la Loire
+   p2 0.60 (p1 0.60)  Centre Médical Martin | 17 Rue du Paradisier, Nantes, Pays de la Loire
+Q  Loisir  (France) Club SA | Nº 15 COUR POISSONNIER, ROUBAIX, Nord
+   p2 0.46 (p1 0.17)  Loisir (France) Club | 14 Cour Poissonnier, 84 rue edouard vaillant, Roubaix, Hauts-de-France
+Q  Caloflux | 4 Promenade Bougainville, Tourcoing, Hauts-de-France
+   p2 0.56 (p1 0.28)  Trois & Fils SARL | 4 Promenade Bougainville, Tourcoing, Hauts-de-France
+   p2 0.39 (p1 0.22)  Boulistes Groupement SARL | 4 Promenade Bougainville, Tourcoing, Hauts-de-France
+Q  Refuge Club | 35 Avenue De Mésignac, Bordeaux
+   p2 0.28 (p1 0.59)  Refuge College | 35 Avenue de Mérignac, Bordeaux, Nouvelle-Aquitaine
+Q  Beloiridova | 20bis Rue Laroche, Bordeaux
+   p2 0.22 (p1 0.57)  Curling Groupement SARL | Nouvelle-Aquitaine, 20 bis RUE Laroche, Bordeaux
+   p2 0.20 (p1 0.28)  FBD Club SARL | 20 bis RUE Laroche, Bordeaux, Nouvelle-Aquitaine
+Q  Nationale Comite SARL | 11 RTE DE LA PRÉVENENRIE, LA BAULE ESCOUBLAC, Pays de la Loire
+   p2 0.77 (p1 0.95)  Nationale Amicale SARL | 11 Route de la Prévennerie, La Baule-Escoublac, Pays de la Loire
+Q  Ets Regionale | 
+   p2 0.73 (p1 0.08)  Ets Regionale SARL | 20 Rue des Ormes, Nouvelle-Aquitaine, Mérignac
+   p2 0.71 (p1 0.08)  Ets Regionale | 12 Avenue du Sémaphore Cap Ferret, Lège-Cap-Ferret, Nouvelle-Aquitaine
+Q  Arcevo | 66 AVENUE DES LILSA, La Baule-Escoublac
+   p2 0.34 (p1 0.31)  Crossroads Ecole (France) SARL | 66 Avenue des Lilas, La Baule-Escoublac, Pays de la Loire
+   p2 0.25 (p1 0.65)  Barlin Union (France) SARL | Pays de la Loire, 66 Avenue des Lilas, La Baule-Escoublac
+Q  Amicale des Savoir Services | 59 R DELANNOY, LILLE, Nord
+   p2 0.34 (p1 0.88)  Amicale des Savoir | 59 Rue Delannoy, Lille, Hauts-de-France
+Q  Reflets Sportive SA | 9 R Du Traité D’amsterdam, Pornic
+   p2 0.76 (p1 0.65)  Reflets Maison SA | 9 Rue du Traité d’Amsterdam, Pornic, Pays de la Loire
+Q  UP Anciens | 20 RUE DE LA VILLE DE MIRMONT, BORDEAUX, Gironde
+   p2 0.23 (p1 0.22)  UP Collège | 20 Rue de la Ville de Mirmont, Bordeaux, Nouvelle-Aquitaine
+Q  Iricalo | N° 56 RUE DE L’OCÉAN, Pornic, Loire-Atlantique
+   p2 0.43 (p1 0.73)  Fédération des Solidarite | 56 Rue de l’Océan, Pornic, Pays de la Loire
+   p2 0.07 (p1 0.48)  2014 Palet Anciens SASU | 56 bis Rue de l’Océan, Pornic, Pays de la Loire
+Q  Information Àmicale SARL | 
+   p2 0.79 (p1 0.34)  Information Amicale SARL | 7 g Rue Soult, Roubaix, Hauts-de-France
+   p2 0.76 (p1 0.51)  Information Amicale SARL | Calais, Hauts-de-France, 1496 av. toumaniantz bat a
+Q  YR  SAS & FILS | 87 R. DE LA CONVENTIIN, NANTES, Loire-Atlantique
+   p2 0.52 (p1 0.57)  YR Amicale SAS | 87 Rue de la Convention, Nantes, Pays de la Loire
+Q  DELTA (FRANCE) PRIMAIRE S.C.I. | 44 RUE BRÛLE-MAISON, LILLE
+   p2 0.60 (p1 0.71)  Delta (France) Federation SCI | 44 Rue Brûle-Maison, Lille, Hauts-de-France
+Q  CM | 1 Rue De La Liberte, Dunkerque
+   p2 0.49 (p1 0.03)  Commerciale Musique (France) SA | 1 Rue de la Liberté, Dunkerque, Hauts-de-France
+Q  Dunkerque Club | Hauts-de-France, Dunkerque, 68 Rue Léon Corsart
+   p2 0.30 (p1 0.55)  Dunkerque Theatre | Hauts-de-France, 68 Rue Léon Corsart, Dunkerque
+Q  HALOVEODREX | 36 R NATIONALE, Dunkerque, Hauts-de-France
+   p2 0.47 (p1 0.55)  Amazones Ehpad | 36 Rue Nationale, Dunkerque, Hauts-de-France
+   p2 0.31 (p1 0.37)  Communale (France) Club EURL | 36 Rue Nationale, Dunkerque, Hauts-de-France
