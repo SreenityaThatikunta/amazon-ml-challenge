@@ -1,0 +1,211 @@
+{
+  "stage": "decide",
+  "run_id": "main",
+  "status": "ok",
+  "error": null,
+  "started_utc": "2026-09-25T15:50:33+00:00",
+  "duration_s": 344.52,
+  "peak_rss_gb": 6.458,
+  "config_hash": "4c5060d81443",
+  "git": {
+    "commit": "56b5ea3",
+    "dirty": false
+  },
+  "ber_version": "0.1.0",
+  "python": "3.12.0",
+  "inputs": {
+    "main:normalize/records_train": {
+      "file": "/Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/main/normalize/records_train",
+      "config_hash": "cdf71b156938"
+    },
+    "main:scorer/scores_val": {
+      "file": "/Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/main/scorer/scores_val.parquet",
+      "config_hash": "1df3b237c09e"
+    },
+    "main:scorer/scores_test": {
+      "file": "/Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/main/scorer/scores_test",
+      "config_hash": "1df3b237c09e"
+    },
+    "main:normalize/records_test": {
+      "file": "/Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/main/normalize/records_test",
+      "config_hash": "cdf71b156938"
+    }
+  },
+  "outputs": {
+    "decision_params": {
+      "file": "decision_params.json",
+      "bytes": 65
+    },
+    "val_per_entity": {
+      "file": "val_per_entity.parquet",
+      "bytes": 2623422,
+      "rows": 222624,
+      "columns": [
+        "s1_id",
+        "n_true",
+        "n_pred",
+        "tp",
+        "f05",
+        "country",
+        "has_indic_match",
+        "segment"
+      ]
+    },
+    "decisions_val": {
+      "file": "decisions_val.parquet",
+      "bytes": 11686362,
+      "rows": 741855,
+      "columns": [
+        "q_id",
+        "s1_id",
+        "y",
+        "p"
+      ]
+    },
+    "decisions_test": {
+      "file": "decisions_test.parquet",
+      "bytes": 90827501,
+      "rows": 5826932,
+      "columns": [
+        "q_id",
+        "s1_id",
+        "p"
+      ]
+    }
+  },
+  "metrics": {
+    "val_s1": {
+      "n": 222624,
+      "singletons": 12474
+    },
+    "val_one_owner_precision_at_1": 0.72468,
+    "val_duplicates_retied": 0,
+    "val_sweep": {
+      "0.02": {
+        "threshold": 0.95258,
+        "expected_f_min_p": 0.98338
+      },
+      "0.05": {
+        "threshold": 0.96667,
+        "expected_f_min_p": 0.98337
+      },
+      "0.1": {
+        "threshold": 0.97438,
+        "expected_f_min_p": 0.98337
+      },
+      "0.15": {
+        "threshold": 0.97781,
+        "expected_f_min_p": 0.98336
+      },
+      "0.2": {
+        "threshold": 0.97995,
+        "expected_f_min_p": 0.98334
+      },
+      "0.25": {
+        "threshold": 0.98139,
+        "expected_f_min_p": 0.98335
+      },
+      "0.3": {
+        "threshold": 0.98222,
+        "expected_f_min_p": 0.98334
+      },
+      "0.35": {
+        "threshold": 0.98278,
+        "expected_f_min_p": 0.98333
+      },
+      "0.4": {
+        "threshold": 0.98317,
+        "expected_f_min_p": 0.98331
+      },
+      "0.45": {
+        "threshold": 0.9834,
+        "expected_f_min_p": 0.98328
+      },
+      "0.5": {
+        "threshold": 0.98346,
+        "expected_f_min_p": 0.98323
+      },
+      "0.6": {
+        "threshold": 0.98336,
+        "expected_f_min_p": 0.98314
+      },
+      "0.7": {
+        "threshold": 0.98294,
+        "expected_f_min_p": 0.98291
+      },
+      "0.8": {
+        "threshold": 0.98201,
+        "expected_f_min_p": 0.98201
+      }
+    },
+    "chosen": {
+      "method": "expected_f",
+      "threshold": 0.5,
+      "min_p": 0.02
+    },
+    "val_f05": 0.98338,
+    "val_by_country": {
+      "India": {
+        "n": 86656.0,
+        "f05": 0.97941,
+        "pair_p": 0.99676,
+        "pair_r": 0.94887,
+        "singleton_frac": 0.05688,
+        "singleton_acc": 0.97849
+      },
+      "US": {
+        "n": 135968.0,
+        "f05": 0.9859,
+        "pair_p": 0.99705,
+        "pair_r": 0.96342,
+        "singleton_frac": 0.05549,
+        "singleton_acc": 0.98091
+      }
+    },
+    "val_by_segment": {
+      "has_matches": {
+        "n": 210150.0,
+        "f05": 0.98358,
+        "pair_p": 0.99729,
+        "pair_r": 0.95776,
+        "singleton_frac": 0.0,
+        "singleton_acc": NaN
+      },
+      "singleton": {
+        "n": 12474.0,
+        "f05": 0.97996,
+        "pair_p": 0.0,
+        "pair_r": 1.0,
+        "singleton_frac": 1.0,
+        "singleton_acc": 0.97996
+      }
+    },
+    "val_by_has_indic_match": {
+      "False": {
+        "n": 195772.0,
+        "f05": 0.98469,
+        "pair_p": 0.99672,
+        "pair_r": 0.96131,
+        "singleton_frac": 0.06372,
+        "singleton_acc": 0.97996
+      },
+      "True": {
+        "n": 26852.0,
+        "f05": 0.97382,
+        "pair_p": 0.99847,
+        "pair_r": 0.93423,
+        "singleton_frac": 0.0,
+        "singleton_acc": NaN
+      }
+    },
+    "val_overall": {
+      "n": 222624.0,
+      "f05": 0.98338,
+      "pair_p": 0.99694,
+      "pair_r": 0.95776,
+      "singleton_frac": 0.05603,
+      "singleton_acc": 0.97996
+    },
+    "test_matches": 5826932
+  }
+}

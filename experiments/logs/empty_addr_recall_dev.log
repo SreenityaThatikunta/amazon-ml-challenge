@@ -1,0 +1,10 @@
+           n  in_topk  recall  recall_given_topk
+empty                                           
+False  86245    0.997   0.984              0.986
+True    3975    0.947   0.835              0.882
+
+decision precision by empty address:
+         size    mean
+empty               
+False  85190  0.9958
+True    3401  0.9759

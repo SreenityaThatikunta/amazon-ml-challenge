@@ -1,0 +1,192 @@
+{
+  "stage": "decide",
+  "run_id": "dev",
+  "status": "ok",
+  "error": null,
+  "started_utc": "2026-09-25T13:35:19+00:00",
+  "duration_s": 16.37,
+  "peak_rss_gb": 1.122,
+  "config_hash": "539249b843a1",
+  "git": {
+    "commit": "c939bcc",
+    "dirty": true
+  },
+  "ber_version": "0.1.0",
+  "python": "3.12.0",
+  "inputs": {
+    "dev:normalize/records_train": {
+      "file": "/Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/normalize/records_train",
+      "config_hash": "dd3c99359e39"
+    },
+    "dev:scorer/scores_val": {
+      "file": "/Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/scorer/scores_val.parquet",
+      "config_hash": "e8af265c81e2"
+    }
+  },
+  "outputs": {
+    "decision_params": {
+      "file": "decision_params.json",
+      "bytes": 66
+    },
+    "val_per_entity": {
+      "file": "val_per_entity.parquet",
+      "bytes": 347302,
+      "rows": 26132,
+      "columns": [
+        "s1_id",
+        "n_true",
+        "n_pred",
+        "tp",
+        "f05",
+        "country",
+        "has_indic_match",
+        "segment"
+      ]
+    },
+    "decisions_val": {
+      "file": "decisions_val.parquet",
+      "bytes": 1647508,
+      "rows": 86409,
+      "columns": [
+        "q_id",
+        "s1_id",
+        "y",
+        "p"
+      ]
+    }
+  },
+  "metrics": {
+    "val_s1": {
+      "n": 26132,
+      "singletons": 1497
+    },
+    "val_one_owner_precision_at_1": 0.73153,
+    "val_duplicates_retied": 0,
+    "val_sweep": {
+      "0.02": {
+        "threshold": 0.93367,
+        "expected_f_min_p": 0.97823
+      },
+      "0.05": {
+        "threshold": 0.9559,
+        "expected_f_min_p": 0.97823
+      },
+      "0.1": {
+        "threshold": 0.96646,
+        "expected_f_min_p": 0.97822
+      },
+      "0.15": {
+        "threshold": 0.9716,
+        "expected_f_min_p": 0.97821
+      },
+      "0.2": {
+        "threshold": 0.97455,
+        "expected_f_min_p": 0.97817
+      },
+      "0.25": {
+        "threshold": 0.97624,
+        "expected_f_min_p": 0.97816
+      },
+      "0.3": {
+        "threshold": 0.97699,
+        "expected_f_min_p": 0.97814
+      },
+      "0.35": {
+        "threshold": 0.97761,
+        "expected_f_min_p": 0.97817
+      },
+      "0.4": {
+        "threshold": 0.97809,
+        "expected_f_min_p": 0.97807
+      },
+      "0.45": {
+        "threshold": 0.97826,
+        "expected_f_min_p": 0.97796
+      },
+      "0.5": {
+        "threshold": 0.97826,
+        "expected_f_min_p": 0.97773
+      },
+      "0.6": {
+        "threshold": 0.97763,
+        "expected_f_min_p": 0.97714
+      },
+      "0.7": {
+        "threshold": 0.97619,
+        "expected_f_min_p": 0.97618
+      },
+      "0.8": {
+        "threshold": 0.97323,
+        "expected_f_min_p": 0.97323
+      }
+    },
+    "chosen": {
+      "method": "expected_f",
+      "threshold": 0.45,
+      "min_p": 0.02
+    },
+    "val_f05": 0.97823,
+    "val_by_country": {
+      "India": {
+        "n": 13022.0,
+        "f05": 0.96658,
+        "pair_p": 0.99426,
+        "pair_r": 0.92582,
+        "singleton_frac": 0.05905,
+        "singleton_acc": 0.96619
+      },
+      "US": {
+        "n": 13110.0,
+        "f05": 0.9898,
+        "pair_p": 0.99645,
+        "pair_r": 0.97737,
+        "singleton_frac": 0.05553,
+        "singleton_acc": 0.98489
+      }
+    },
+    "val_by_segment": {
+      "has_matches": {
+        "n": 24635.0,
+        "f05": 0.97841,
+        "pair_p": 0.99582,
+        "pair_r": 0.95173,
+        "singleton_frac": 0.0,
+        "singleton_acc": NaN
+      },
+      "singleton": {
+        "n": 1497.0,
+        "f05": 0.97528,
+        "pair_p": 0.0,
+        "pair_r": 1.0,
+        "singleton_frac": 1.0,
+        "singleton_acc": 0.97528
+      }
+    },
+    "val_by_has_indic_match": {
+      "False": {
+        "n": 22192.0,
+        "f05": 0.98733,
+        "pair_p": 0.99518,
+        "pair_r": 0.97396,
+        "singleton_frac": 0.06746,
+        "singleton_acc": 0.97528
+      },
+      "True": {
+        "n": 3940.0,
+        "f05": 0.92698,
+        "pair_p": 0.99658,
+        "pair_r": 0.83954,
+        "singleton_frac": 0.0,
+        "singleton_acc": NaN
+      }
+    },
+    "val_overall": {
+      "n": 26132.0,
+      "f05": 0.97823,
+      "pair_p": 0.99539,
+      "pair_r": 0.95173,
+      "singleton_frac": 0.05729,
+      "singleton_acc": 0.97528
+    }
+  }
+}

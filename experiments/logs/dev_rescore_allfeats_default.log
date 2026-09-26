@@ -1,0 +1,144 @@
+19:25:58 INFO  ber.rescore | === stage rescore | run dev | config 153fa82e7396 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/rescore
+19:25:58 WARNING ber.rescore | input features/features_train was built with config 872143370fe6 (current 153fa82e7396)
+19:25:58 INFO  ber.rescore | metric stage1_feats = 91
+19:25:58 INFO  ber.rescore | val: top-k ...
+19:25:58 WARNING ber.rescore | input features/features_train was built with config 872143370fe6 (current 153fa82e7396)
+19:25:58 WARNING ber.rescore | input scorer/scores_val was built with config e8af265c81e2 (current 153fa82e7396)
+19:26:02 WARNING ber.rescore | input normalize/records_train was built with config dd3c99359e39 (current 153fa82e7396)
+19:26:02 INFO  ber.rescore | val: top-k done in 4.1s (peak RSS 2.77 GB)
+19:26:02 INFO  ber.rescore | metric val_pairs = 366227
+19:26:02 INFO  ber.rescore | metric val_auc_stage1 = 0.999407
+19:26:02 INFO  ber.rescore | metric val_logloss_stage1 = 0.027041
+19:26:03 INFO  ber.rescore | round 0: features + 2-fold cross-fit ...
+19:26:21 INFO  ber.rescore | round 0: features + 2-fold cross-fit done in 18.4s (peak RSS 3.11 GB)
+19:26:21 INFO  ber.rescore | metric val_auc_rescore_r0 = 0.999868
+19:26:21 INFO  ber.rescore | metric val_logloss_rescore_r0 = 0.011791
+19:26:21 INFO  ber.rescore | round 0 rescore features by gain:
+               feature         gain
+              p_margin 2.514831e+06
+                     p 6.744023e+05
+               q_indic 2.251157e+04
+                 c_sum 1.454915e+04
+          s_n_assigned 1.324549e+04
+                  q_p1 1.226573e+04
+            m_addr_max 5.012411e+03
+                  q_p2 3.754495e+03
+           q_indic_oov 3.019062e+03
+            m_name_max 2.975545e+03
+            c_same_src 2.877183e+03
+             s_n_cands 2.496894e+03
+                 a_tsr 2.440787e+03
+              cos_addr 2.325614e+03
+              s_n_top1 2.232721e+03
+ n_nocity_ratio_margin 2.210174e+03
+      cos_combo_margin 2.090375e+03
+            n_len_diff 1.796393e+03
+               a_ratio 1.771544e+03
+       cos_name_margin 1.625419e+03
+             s_n_above 1.612787e+03
+              cos_name 1.602097e+03
+             cos_combo 1.574990e+03
+              num_jacc 1.467929e+03
+           q_vocab_oov 1.366040e+03
+                   c_n 1.314309e+03
+                  n_jw 1.252258e+03
+             a_partial 1.225972e+03
+             q_n_cands 1.142915e+03
+           n_jw_margin 1.056361e+03
+        n_nocity_ratio 1.045236e+03
+         cos_combo_gap 1.014441e+03
+                 n_lev 9.985531e+02
+            c_cap_room 9.936188e+02
+               n_ratio 9.924737e+02
+             n_partial 9.918766e+02
+                hn_rel 8.973568e+02
+            num_q_only 8.846092e+02
+       cos_addr_margin 8.504814e+02
+          a_tsr_margin 8.348678e+02
+               n_len_q 7.535713e+02
+         cos_name_rank 7.525392e+02
+                 m_dup 7.486686e+02
+               n_len_s 7.447470e+02
+                 n_tsr 7.218048e+02
+                 n_sub 6.348941e+02
+            hn_logdiff 6.115729e+02
+            n_tsr_rank 5.975903e+02
+ a_word_quality_margin 5.950655e+02
+            num_s_only 5.763682e+02
+             rank_name 5.524281e+02
+          n_tsr_margin 5.356779e+02
+         cos_addr_rank 5.166798e+02
+            a_tsr_rank 4.730272e+02
+         a_s_unmatched 4.650127e+02
+               n_tsort 4.557308e+02
+            hn_len_min 4.524446e+02
+             n_jw_rank 4.329537e+02
+          cos_name_gap 4.181166e+02
+          cos_addr_gap 3.678565e+02
+           s_name_freq 3.676365e+02
+        a_word_quality 3.670377e+02
+            n_first_eq 3.349444e+02
+      l_quality_margin 3.273274e+02
+         n_s_city_frac 3.167593e+02
+            rank_combo 3.015686e+02
+             n_tsr_gap 2.975775e+02
+             rank_addr 2.628523e+02
+     hn_quality_margin 2.451693e+02
+              n_jw_gap 2.394275e+02
+             a_tsr_gap 2.270243e+02
+             l_q_empty 2.235711e+02
+             a_q_empty 2.146043e+02
+             l_s_empty 2.065370e+02
+         a_q_unmatched 1.795191e+02
+                  l_eq 1.452660e+02
+            hn_quality 1.401978e+02
+        cos_combo_rank 1.368879e+02
+            num_common 1.213831e+02
+             l_quality 9.359063e+01
+             n_last_eq 8.684733e+01
+                  r_eq 8.658000e+01
+                  rank 6.481010e+01
+              q_source 6.419453e+01
+            l_conflict 4.939085e+01
+    n_shared_only_city 4.280389e+01
+      n_core_eq_margin 3.522344e+01
+                   m_n 1.975177e+01
+       a_word_conflict 1.667123e+01
+              n_transp 1.505034e+01
+                 box_q 5.556910e+00
+         hn_trunc_lead 5.284860e+00
+          n_compact_eq 4.408700e+00
+           q_is_domain 4.316760e+00
+             n_core_eq 4.295410e+00
+             n_q_short 1.966740e+00
+            r_conflict 0.000000e+00
+          n_alias_best 0.000000e+00
+       n_s_is_initials 0.000000e+00
+       n_q_is_initials 0.000000e+00
+           r_q_missing 0.000000e+00
+                 box_s 0.000000e+00
+           q_has_alias 0.000000e+00
+             a_s_empty 0.000000e+00
+              a_bag_eq 0.000000e+00
+n_q_is_initials_margin 0.000000e+00
+19:26:21 INFO  ber.rescore | metric val_auc_rescore = 0.999868
+19:26:21 INFO  ber.rescore | metric val_logloss_rescore = 0.011791
+19:26:21 INFO  ber.rescore | wrote importance.parquet: 106 rows x 2 cols
+19:26:21 INFO  ber.rescore | wrote scores_val.parquet: 366227 rows x 4 cols
+19:26:21 INFO  ber.rescore | === stage rescore ok in 23.0s (peak RSS 3.11 GB)
+19:26:22 INFO  ber.decide | === stage decide | run dev | config b48681aa9aed | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/decide
+19:26:22 WARNING ber.decide | input normalize/records_train was built with config dd3c99359e39 (current b48681aa9aed)
+19:26:22 INFO  ber.decide | metric val_s1 = {'n': 26132, 'singletons': 1497}
+19:26:22 WARNING ber.decide | input rescore/scores_val was built with config 153fa82e7396 (current b48681aa9aed)
+19:26:23 INFO  ber.decide | metric val_one_owner_precision_at_1 = 0.73348
+19:26:23 INFO  ber.decide | metric val_duplicates_retied = 0
+19:26:36 INFO  ber.decide | metric val_sweep = {0.02: {'threshold': 0.96378, 'expected_f_min_p': 0.9885}, 0.05: {'threshold': 0.97445, 'expected_f_min_p': 0.9885}, 0.1: {'threshold': 0.98017, 'expected_f_min_p': 0.98853}, 0.15: {'threshold': 0.98259, 'expected_f_min_p': 0.9885}, 0.2: {'threshold': 0.98408, 'expected_f_min_p': 0.98849}, 0.25: {'threshold': 0.98486, 'expected_f_min_p': 0.98849}, 0.3: {'threshold': 0.98579, 'expected_f_min_p': 0.98858}, 0.35: {'threshold': 0.98659, 'expected_f_min_p': 0.98858}, 0.4: {'threshold': 0.98716, 'expected_f_min_p': 0.98859}, 0.45: {'threshold': 0.98759, 'expected_f_min_p': 0.98859}, 0.5: {'threshold': 0.98795, 'expected_f_min_p': 0.98859}, 0.6: {'threshold': 0.98831, 'expected_f_min_p': 0.98854}, 0.7: {'threshold': 0.98811, 'expected_f_min_p': 0.98818}, 0.8: {'threshold': 0.98771, 'expected_f_min_p': 0.98771}}
+19:26:36 INFO  ber.decide | metric chosen = {'method': 'expected_f', 'threshold': 0.6, 'min_p': 0.4}
+19:26:37 INFO  ber.decide | wrote val_per_entity.parquet: 26132 rows x 8 cols
+19:26:37 INFO  ber.decide | wrote decisions_val.parquet: 88796 rows x 4 cols
+19:26:37 INFO  ber.decide | metric val_f05 = 0.98859
+19:26:37 INFO  ber.decide | metric val_by_country = {'India': {'n': 13022.0, 'f05': 0.9852, 'pair_p': 0.99409, 'pair_r': 0.97406, 'singleton_frac': 0.05905, 'singleton_acc': 0.97399}, 'US': {'n': 13110.0, 'f05': 0.99196, 'pair_p': 0.99692, 'pair_r': 0.98536, 'singleton_frac': 0.05553, 'singleton_acc': 0.98352}}
+19:26:37 INFO  ber.decide | metric val_by_segment = {'has_matches': {'n': 24635.0, 'f05': 0.9892, 'pair_p': 0.99589, 'pair_r': 0.97974, 'singleton_frac': 0.0, 'singleton_acc': nan}, 'singleton': {'n': 1497.0, 'f05': 0.97862, 'pair_p': 0.0, 'pair_r': 1.0, 'singleton_frac': 1.0, 'singleton_acc': 0.97862}}
+19:26:37 INFO  ber.decide | metric val_by_has_indic_match = {'False': {'n': 22192.0, 'f05': 0.99001, 'pair_p': 0.99599, 'pair_r': 0.98359, 'singleton_frac': 0.06746, 'singleton_acc': 0.97862}, 'True': {'n': 3940.0, 'f05': 0.98063, 'pair_p': 0.99307, 'pair_r': 0.96032, 'singleton_frac': 0.0, 'singleton_acc': nan}}
+19:26:37 INFO  ber.decide | metric val_overall = {'n': 26132.0, 'f05': 0.98859, 'pair_p': 0.99552, 'pair_r': 0.97974, 'singleton_frac': 0.05729, 'singleton_acc': 0.97862}
+19:26:37 INFO  ber.decide | === stage decide ok in 14.9s (peak RSS 0.78 GB)

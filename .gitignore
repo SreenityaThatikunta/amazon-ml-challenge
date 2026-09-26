@@ -53,4 +53,3 @@ htmlcov/
 experiments/logs/*.parquet
 experiments/logs/*.tsv
 experiments/logs/tmp/
-experiments/logs/

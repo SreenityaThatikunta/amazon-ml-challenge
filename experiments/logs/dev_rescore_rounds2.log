@@ -1,0 +1,89 @@
+19:07:39 INFO  ber.rescore | === stage rescore | run dev | config 94c921a64815 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/rescore
+19:07:39 INFO  ber.rescore | val: top-k ...
+19:07:39 WARNING ber.rescore | input features/features_train was built with config 872143370fe6 (current 94c921a64815)
+19:07:39 WARNING ber.rescore | input scorer/scores_val was built with config e8af265c81e2 (current 94c921a64815)
+19:07:41 WARNING ber.rescore | input normalize/records_train was built with config dd3c99359e39 (current 94c921a64815)
+19:07:41 INFO  ber.rescore | val: top-k done in 2.1s (peak RSS 1.20 GB)
+19:07:41 INFO  ber.rescore | metric val_pairs = 366227
+19:07:41 INFO  ber.rescore | metric val_auc_stage1 = 0.999407
+19:07:41 INFO  ber.rescore | metric val_logloss_stage1 = 0.027041
+19:07:41 INFO  ber.rescore | round 0: features + 2-fold cross-fit ...
+19:07:54 INFO  ber.rescore | round 0: features + 2-fold cross-fit done in 13.1s (peak RSS 1.69 GB)
+19:07:54 INFO  ber.rescore | metric val_auc_rescore_r0 = 0.999832
+19:07:54 INFO  ber.rescore | metric val_logloss_rescore_r0 = 0.013427
+19:07:54 INFO  ber.rescore | round 0 rescore features by gain:
+     feature         gain
+    p_margin 2.176165e+06
+           p 1.013182e+06
+       c_sum 2.183485e+04
+s_n_assigned 1.969422e+04
+        q_p1 1.352377e+04
+  m_addr_max 9.213151e+03
+   cos_combo 8.039764e+03
+        q_p2 7.708352e+03
+       a_tsr 7.492400e+03
+  m_name_max 7.252428e+03
+     n_ratio 6.095515e+03
+  c_same_src 4.779893e+03
+   s_n_above 3.259222e+03
+   l_quality 2.914599e+03
+      hn_rel 2.909680e+03
+       m_dup 1.006743e+03
+         c_n 9.353954e+02
+  c_cap_room 9.135779e+02
+    q_source 5.261452e+02
+   n_core_eq 2.589368e+02
+        rank 4.175437e+01
+         m_n 9.969220e+00
+19:07:54 INFO  ber.rescore | round 1: features + 2-fold cross-fit ...
+19:08:04 INFO  ber.rescore | round 1: features + 2-fold cross-fit done in 9.3s (peak RSS 1.69 GB)
+19:08:04 INFO  ber.rescore | metric val_auc_rescore_r1 = 0.999799
+19:08:04 INFO  ber.rescore | metric val_logloss_rescore_r1 = 0.013797
+19:08:04 INFO  ber.rescore | round 1 rescore features by gain:
+      feature         gain
+       p_prev 2.021797e+06
+p_prev_margin 1.245432e+06
+   m_name_max 4.431757e+03
+         q_p2 4.249256e+03
+        c_sum 3.696978e+03
+      n_ratio 2.973953e+03
+            p 2.833089e+03
+ s_n_assigned 2.529897e+03
+    cos_combo 2.357812e+03
+         q_p1 2.259489e+03
+        a_tsr 2.039339e+03
+   m_addr_max 1.844107e+03
+     p_margin 1.799355e+03
+       hn_rel 8.451632e+02
+   c_same_src 4.768041e+02
+    l_quality 4.227108e+02
+   c_cap_room 4.225668e+02
+    s_n_above 3.975376e+02
+     q_source 2.370087e+02
+          c_n 1.371300e+02
+        m_dup 7.190048e+01
+    n_core_eq 6.444503e+01
+    rank_prev 4.459074e+01
+         rank 2.891956e+01
+          m_n 1.604330e+01
+19:08:04 INFO  ber.rescore | metric val_auc_rescore = 0.999799
+19:08:04 INFO  ber.rescore | metric val_logloss_rescore = 0.013797
+19:08:04 INFO  ber.rescore | wrote importance.parquet: 25 rows x 2 cols
+19:08:04 INFO  ber.rescore | wrote scores_val.parquet: 366227 rows x 4 cols
+19:08:04 INFO  ber.rescore | === stage rescore ok in 25.0s (peak RSS 1.69 GB)
+19:08:05 INFO  ber.decide | === stage decide | run dev | config 241fc4476c59 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/decide
+19:08:05 WARNING ber.decide | input normalize/records_train was built with config dd3c99359e39 (current 241fc4476c59)
+19:08:05 INFO  ber.decide | metric val_s1 = {'n': 26132, 'singletons': 1497}
+19:08:05 WARNING ber.decide | input rescore/scores_val was built with config 94c921a64815 (current 241fc4476c59)
+19:08:05 INFO  ber.decide | metric val_one_owner_precision_at_1 = 0.73321
+19:08:06 INFO  ber.decide | metric val_duplicates_retied = 0
+19:08:20 INFO  ber.decide | metric val_sweep = {0.02: {'threshold': 0.95088, 'expected_f_min_p': 0.98521}, 0.05: {'threshold': 0.96434, 'expected_f_min_p': 0.98521}, 0.1: {'threshold': 0.97236, 'expected_f_min_p': 0.98524}, 0.15: {'threshold': 0.97581, 'expected_f_min_p': 0.98522}, 0.2: {'threshold': 0.97801, 'expected_f_min_p': 0.98523}, 0.25: {'threshold': 0.97997, 'expected_f_min_p': 0.98527}, 0.3: {'threshold': 0.98101, 'expected_f_min_p': 0.98527}, 0.35: {'threshold': 0.98203, 'expected_f_min_p': 0.98527}, 0.4: {'threshold': 0.98276, 'expected_f_min_p': 0.98523}, 0.45: {'threshold': 0.98338, 'expected_f_min_p': 0.98523}, 0.5: {'threshold': 0.98391, 'expected_f_min_p': 0.98539}, 0.6: {'threshold': 0.98443, 'expected_f_min_p': 0.98519}, 0.7: {'threshold': 0.98532, 'expected_f_min_p': 0.9856}, 0.8: {'threshold': 0.98496, 'expected_f_min_p': 0.98496}}
+19:08:20 INFO  ber.decide | metric chosen = {'method': 'expected_f', 'threshold': 0.7, 'min_p': 0.7}
+19:08:20 INFO  ber.decide | wrote val_per_entity.parquet: 26132 rows x 8 cols
+19:08:20 INFO  ber.decide | wrote decisions_val.parquet: 88675 rows x 4 cols
+19:08:20 INFO  ber.decide | metric val_f05 = 0.9856
+19:08:20 INFO  ber.decide | metric val_by_country = {'India': {'n': 13022.0, 'f05': 0.98021, 'pair_p': 0.9932, 'pair_r': 0.96996, 'singleton_frac': 0.05905, 'singleton_acc': 0.97269}, 'US': {'n': 13110.0, 'f05': 0.99096, 'pair_p': 0.9965, 'pair_r': 0.98558, 'singleton_frac': 0.05553, 'singleton_acc': 0.98077}}
+19:08:20 INFO  ber.decide | metric val_by_segment = {'has_matches': {'n': 24635.0, 'f05': 0.98614, 'pair_p': 0.9953, 'pair_r': 0.97781, 'singleton_frac': 0.0, 'singleton_acc': nan}, 'singleton': {'n': 1497.0, 'f05': 0.97662, 'pair_p': 0.0, 'pair_r': 1.0, 'singleton_frac': 1.0, 'singleton_acc': 0.97662}}
+19:08:20 INFO  ber.decide | metric val_by_has_indic_match = {'False': {'n': 22192.0, 'f05': 0.98891, 'pair_p': 0.99526, 'pair_r': 0.98371, 'singleton_frac': 0.06746, 'singleton_acc': 0.97662}, 'True': {'n': 3940.0, 'f05': 0.96696, 'pair_p': 0.99284, 'pair_r': 0.94806, 'singleton_frac': 0.0, 'singleton_acc': nan}}
+19:08:20 INFO  ber.decide | metric val_overall = {'n': 26132.0, 'f05': 0.9856, 'pair_p': 0.99487, 'pair_r': 0.97781, 'singleton_frac': 0.05729, 'singleton_acc': 0.97662}
+19:08:20 INFO  ber.decide | === stage decide ok in 15.6s (peak RSS 0.78 GB)

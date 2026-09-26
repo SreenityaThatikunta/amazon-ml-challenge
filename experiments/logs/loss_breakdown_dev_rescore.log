@@ -1,0 +1,19 @@
+dev: val F0.5 0.98593, loss/S1 0.01407
+loss share by kind:
+both                     0.067
+fn_only                  0.608
+fp_only                  0.194
+ok                       0.000
+singleton_given_match    0.131
+loss share by country:
+country
+India    0.696
+US       0.304
+
+missed true pairs: 2073 of 90220 (0.0230)
+why
+dropped_low_p           1381
+not_a_candidate          318
+assigned_to_other_S1     234
+not_in_scored_top_k      140
+p of dropped: {'mean': 0.413, '25%': 0.206, '50%': 0.447, '75%': 0.614}

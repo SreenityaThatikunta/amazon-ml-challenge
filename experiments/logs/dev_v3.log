@@ -1,0 +1,410 @@
+07:42:59 INFO  ber.normalize | === stage normalize | run devv3 | config d0a8591db249 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/devv3/normalize
+07:42:59 INFO  ber.normalize | learn Indic->Latin dictionary + S1 vocabulary ...
+07:43:35 INFO  ber.normalize | wrote translit_dict.parquet: 1164 rows x 5 cols
+07:43:35 INFO  ber.normalize | metric translit.train_pairs = 497404
+07:43:35 INFO  ber.normalize | metric translit.dictionary_size = 1164
+07:43:35 INFO  ber.normalize | metric translit.vocab_skeletons = 26981
+07:43:38 INFO  ber.normalize | metric translit.val_coverage = {'aligned_tokens': 197391, 'in_dictionary': 0.838, 'exact_match': 0.9582, 'exact_match_dict_rules': 0.8577, 'exact_match_rules_only': 0.2345}
+07:43:43 INFO  ber.normalize | wrote translit_dict_all.parquet: 1318 rows x 5 cols
+07:43:43 INFO  ber.normalize | metric translit.dictionary_size_all_pairs = 1318
+07:43:43 INFO  ber.normalize | learn Indic->Latin dictionary + S1 vocabulary done in 43.4s (peak RSS 2.68 GB)
+07:43:44 INFO  ber.normalize | normalize train source1 ...
+07:43:52 INFO  ber.normalize | train source1: 70506 records
+07:43:52 INFO  ber.normalize | normalize train source1 done in 8.6s (peak RSS 2.68 GB)
+07:43:52 INFO  ber.normalize | normalize train source2 ...
+07:44:12 INFO  ber.normalize | train source2: 167314 records
+07:44:12 INFO  ber.normalize | normalize train source2 done in 20.1s (peak RSS 2.78 GB)
+07:44:12 INFO  ber.normalize | normalize train source3 ...
+07:44:32 INFO  ber.normalize | train source3: 175662 records
+07:44:32 INFO  ber.normalize | normalize train source3 done in 19.8s (peak RSS 2.99 GB)
+07:44:32 INFO  ber.normalize | metric records_train = 413482
+07:44:32 INFO  ber.normalize | test split skipped (slice=dev, with_test=True)
+07:44:32 INFO  ber.normalize | === stage normalize ok in 93.0s (peak RSS 2.99 GB)
+07:44:34 INFO  ber.candidates | === stage candidates | run devv3 | config d0a8591db249 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/devv3/candidates
+07:44:34 INFO  ber.candidates | train India: 155,752 queries x 30,399 S1 ...
+07:44:34 INFO  ber.candidates |   top-k search on cpu
+07:44:34 INFO  ber.candidates |   index name : 30399 S1 x 7045 n-grams
+07:44:35 INFO  ber.candidates |   index addr : 30399 S1 x 10016 n-grams
+07:44:35 INFO  ber.candidates |   index combo: 30399 S1 x 11811 n-grams
+07:44:52 INFO  ber.candidates | train India: 155,752 queries x 30,399 S1 done in 17.9s (peak RSS 1.67 GB)
+07:44:52 INFO  ber.candidates | train US: 187,224 queries x 40,107 S1 ...
+07:44:52 INFO  ber.candidates |   top-k search on cpu
+07:44:52 INFO  ber.candidates |   index name : 40107 S1 x 7423 n-grams
+07:44:53 INFO  ber.candidates |   index addr : 40107 S1 x 6593 n-grams
+07:44:53 INFO  ber.candidates |   index combo: 40107 S1 x 9104 n-grams
+07:45:11 INFO  ber.candidates | train US: 187,224 queries x 40,107 S1 done in 18.4s (peak RSS 1.85 GB)
+07:45:11 INFO  ber.candidates | metric region_neighbors_merged = {'India': {'AN': ['AN', 'AP'], 'KA': ['AP', 'KA'], 'UK': ['AP', 'UK'], 'OD': ['AP', 'OD'], 'AP': ['AN', 'AP', 'AR', 'CG', 'CH', 'KA', 'OD', 'TG', 'UK'], 'CG': ['AP', 'CG'], 'AR': ['AP', 'AR'], 'CH': ['AP', 'CH'], 'TG': ['AP', 'TG']}, 'US': {'OK': ['KS', 'OK'], 'KS': ['KS', 'OK']}}
+07:45:11 INFO  ber.candidates | recall report ...
+07:45:11 INFO  ber.candidates | metric pair_recall = 0.99785
+07:45:11 INFO  ber.candidates | metric pair_recall_by_segment = {'India 2 False train': [0.99763, 22342], 'India 2 False val': [0.99741, 16627], 'India 2 True train': [0.99852, 6750], 'India 2 True val': [0.9847, 4901], 'India 3 False train': [0.9947, 27006], 'India 3 False val': [0.99631, 20323], 'India 3 True train': [0.999, 4011], 'India 3 True val': [0.98711, 3026], 'US 2 False train': [0.9994, 45076], 'US 2 False val': [0.99936, 21837], 'US 3 False train': [0.99946, 48111], 'US 3 False val': [0.99936, 23506]}
+07:45:11 INFO  ber.candidates | metric cluster_recall = 0.9928
+07:45:11 INFO  ber.candidates | metric recall_at_k = {1: {'name': 0.81793, 'addr': 0.82262, 'combo': 0.94372, 'union': 0.98497}, 3: {'name': 0.90872, 'addr': 0.8864, 'combo': 0.95009, 'union': 0.99307}, 5: {'name': 0.92627, 'addr': 0.90585, 'combo': 0.9516, 'union': 0.99507}, 10: {'name': 0.93985, 'addr': 0.92235, 'combo': 0.95298, 'union': 0.99667}}
+07:45:11 INFO  ber.candidates | metric candidates_per_query = {'mean': 25.83, 'p50': 23, 'p95': 28, 'max': 100, 'zero': 0}
+07:45:11 INFO  ber.candidates | metric candidate_pairs = 8858986
+07:45:11 INFO  ber.candidates | metric val_candidates_crossing_split = {'val_queries_with_train_candidate': 0.0345, 'val_candidates_on_train_side': 0.0793}
+07:45:11 INFO  ber.candidates | recall report done in 0.1s (peak RSS 1.85 GB)
+07:45:11 INFO  ber.candidates | === stage candidates ok in 37.0s (peak RSS 1.85 GB)
+07:45:11 INFO  ber.features | === stage features | run devv3 | config d0a8591db249 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/devv3/features
+07:45:11 INFO  ber.features | learn filler words ...
+07:45:12 INFO  ber.features | learn filler words done in 0.5s (peak RSS 0.24 GB)
+07:45:12 INFO  ber.features | metric fillers = african as automobiles avenue bakery bay bezons bnb center central consultations dijital downtown east eastgate electronics exports fauquier finesse francoeur furniture garments general greater group h hardware holdings hyderabad inaphrasatrakacar infratech injiniaring intaranaisanal janaral je jewelers jewellers jones kansatrakasan kansatrakasanaj l lakeside laujisatikas lndia m main mainejamaint medicals midtown motors norris north northside npx on one overseas pharmacy phaundesan prodiusar provijan provision public restaurant riverside s sadaran saravisij secunderabad service services soliusanaj south southside steel stores superior sweets sys ta taikanaloji taikanalojij textiles union uptown vaincaraj west westgate wozny
+07:45:12 INFO  ber.features | learn brand syllables ...
+07:45:12 INFO  ber.features | learn brand syllables done in 0.2s (peak RSS 0.37 GB)
+07:45:12 INFO  ber.features | metric brand_units = ar arc aria avi belo brix calo cira delta dova drex ecto evo faye flux gild halo iri jax kelo kor lum lyra mira nex novi nyla onyx orbi pyra quo riza sol syn tavo umbra vantage ve veo vera vio wex xylo yuma ze zeph zeta
+07:45:12 INFO  ber.features | train: per-S1 candidate context ...
+07:45:14 INFO  ber.features | train: per-S1 candidate context done in 1.9s (peak RSS 0.89 GB)
+07:45:14 INFO  ber.features | train India: records + extras ...
+07:45:18 INFO  ber.features | train India: records + extras done in 3.6s (peak RSS 0.89 GB)
+07:45:18 INFO  ber.features | train India: features ...
+07:46:37 DEBUG ber.features | features part-00000.parquet: 2185760 rows so far
+07:46:37 DEBUG ber.features | features part-00001.parquet: 2187029 rows so far
+07:46:38 DEBUG ber.features | features part-00002.parquet: 2187031 rows so far
+07:47:26 DEBUG ber.features | features part-00003.parquet: 3570525 rows so far
+07:47:26 DEBUG ber.features | features part-00004.parquet: 3571295 rows so far
+07:47:37 DEBUG ber.features | features part-00005.parquet: 4001510 rows so far
+07:47:37 INFO  ber.features | train India: features done in 139.0s (peak RSS 2.52 GB)
+07:47:37 INFO  ber.features | train US: records + extras ...
+07:47:41 INFO  ber.features | train US: records + extras done in 4.3s (peak RSS 2.52 GB)
+07:47:41 INFO  ber.features | train US: features ...
+07:47:43 DEBUG ber.features | features part-00006.parquet: 4070890 rows so far
+07:47:56 DEBUG ber.features | features part-00007.parquet: 4505578 rows so far
+07:48:16 DEBUG ber.features | features part-00008.parquet: 5200800 rows so far
+07:48:33 DEBUG ber.features | features part-00009.parquet: 5778561 rows so far
+07:49:44 DEBUG ber.features | features part-00010.parquet: 8181884 rows so far
+07:49:59 DEBUG ber.features | features part-00011.parquet: 8858986 rows so far
+07:49:59 INFO  ber.features | train US: features done in 138.0s (peak RSS 2.52 GB)
+07:49:59 INFO  ber.features | metric train_queries_selected = {'train': 220900, 'val': 122076}
+07:49:59 INFO  ber.features | metric train_pairs = 8858986
+07:49:59 INFO  ber.features | metric train_positive_rate = 0.0274
+07:49:59 INFO  ber.features | === stage features ok in 287.7s (peak RSS 2.52 GB)
+07:50:01 INFO  ber.scorer | === stage scorer | run devv3 | config d0a8591db249 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/devv3/scorer
+07:50:01 INFO  ber.scorer | load sampled train features ...
+07:50:08 INFO  ber.scorer | sampled 5721832 train rows, 3137154 early-stopping rows
+07:50:08 INFO  ber.scorer | load sampled train features done in 7.3s (peak RSS 2.97 GB)
+07:50:08 INFO  ber.scorer | metric rows = {'train': 5721832, 'val': 3137154, 'train_pos': 153033, 'val_pos': 89959}
+07:50:08 INFO  ber.scorer | metric n_features = 120
+07:50:08 INFO  ber.scorer | train LightGBM ...
+07:51:11 INFO  ber.scorer | train LightGBM done in 62.6s (peak RSS 4.69 GB)
+07:51:11 INFO  ber.scorer | wrote importance.parquet: 120 rows x 3 cols
+07:51:11 INFO  ber.scorer | top features by gain:
+          feature         gain  split
+ cos_combo_margin 8.541184e+06    462
+       num_q_only 6.774935e+05    426
+   cos_combo_rank 6.231464e+05    218
+    cos_combo_gap 4.788330e+05    256
+       num_s_only 1.735066e+05    349
+           hn_rel 1.316130e+05     69
+       n_len_diff 8.141621e+04    734
+         num_jacc 6.500997e+04    631
+     a_tsr_margin 5.928378e+04    467
+        a_tsr_gap 5.714162e+04    155
+      n_jw_margin 4.742021e+04    403
+ l_quality_margin 3.886431e+04    474
+ n_core_eq_margin 3.584666e+04    101
+            n_lev 3.480530e+04    459
+        l_quality 3.241464e+04    105
+            a_tsr 2.688633e+04    542
+k_idf_unmatched_q 2.332089e+04    707
+  k_n_unmatched_q 2.221679e+04    150
+       hn_len_min 2.026746e+04    397
+         n_jw_gap 2.010545e+04    155
+k_idf_unmatched_s 1.904161e+04    577
+       hn_logdiff 1.813706e+04    836
+      hn_best_rel 1.721745e+04    209
+      q_vocab_oov 1.513142e+04    432
+            n_sub 1.499057e+04    277
+  cos_name_margin 1.426875e+04    324
+       l_conflict 1.327927e+04    141
+      hn_diff_pos 1.317497e+04    159
+             n_jw 1.082364e+04    357
+       n_first_eq 1.074282e+04    333
+    a_q_unmatched 1.057990e+04     72
+        l_q_empty 9.674237e+03    234
+            k_tsr 9.297574e+03    343
+       k_idf_prec 9.205808e+03    424
+    k_idf_rec_gap 8.990586e+03    130
+        n_partial 8.451849e+03    389
+        n_jw_rank 7.951429e+03    183
+        a_partial 7.858267e+03    502
+ k_idf_rec_margin 7.694237e+03    309
+             l_eq 7.240281e+03    228
+07:51:11 INFO  ber.scorer | score all val pairs ...
+07:51:16 INFO  ber.scorer | score all val pairs done in 4.9s (peak RSS 4.69 GB)
+07:51:16 INFO  ber.scorer | metric best_iteration = 202
+07:51:16 INFO  ber.scorer | metric val_auc = 0.999949
+07:51:17 INFO  ber.scorer | metric val_logloss = 0.002929
+07:51:17 INFO  ber.scorer | wrote scores_val.parquet: 3137154 rows x 4 cols
+07:51:17 INFO  ber.scorer | === stage scorer ok in 75.9s (peak RSS 4.69 GB)
+[100]	val's binary_logloss: 0.00338688
+[200]	val's binary_logloss: 0.00293199
+[300]	val's binary_logloss: 0.00298347
+07:51:18 INFO  ber.rerank | === stage rerank | run devv3 | config d0a8591db249 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/devv3/rerank
+07:51:18 INFO  ber.rerank | load val pairs ...
+07:51:18 INFO  ber.rerank | metric filter_tradeoff = {0.0: {'pairs_per_query': 25.698, 'true_pairs_kept': 1.0}, 0.0003: {'pairs_per_query': 1.122, 'true_pairs_kept': 0.99982}, 0.001: {'pairs_per_query': 0.979, 'true_pairs_kept': 0.99946}, 0.003: {'pairs_per_query': 0.892, 'true_pairs_kept': 0.99879}, 0.01: {'pairs_per_query': 0.827, 'true_pairs_kept': 0.99742}, 0.03: {'pairs_per_query': 0.79, 'true_pairs_kept': 0.99516}}
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+/Users/sreenityathatikunta/Documents/Projects/student_resource/code/business_entity_resolution/src/ber/rerank/stage.py:158: PerformanceWarning: DataFrame is highly fragmented.  This is usually the result of calling `frame.insert` many times, which has poor performance.  Consider joining all columns at once using pd.concat(axis=1) instead. To get a de-fragmented frame, use `newframe = frame.copy()`
+  X[c] = raw[c].to_numpy(dtype=np.float32)
+07:51:20 INFO  ber.rerank | load val pairs done in 1.3s (peak RSS 2.49 GB)
+07:51:20 INFO  ber.rerank | metric val_pairs = {'kept': 119504, 'positives': 89910}
+07:51:20 INFO  ber.rerank | cross-fit 4 folds ...
+07:51:24 INFO  ber.rerank | fold 0: best iteration 225, held-out AUC 0.998971
+07:51:28 INFO  ber.rerank | fold 1: best iteration 252, held-out AUC 0.999083
+07:51:32 INFO  ber.rerank | fold 2: best iteration 225, held-out AUC 0.999088
+07:51:37 INFO  ber.rerank | fold 3: best iteration 260, held-out AUC 0.999012
+07:51:37 INFO  ber.rerank | cross-fit 4 folds done in 17.3s (peak RSS 2.64 GB)
+07:51:37 INFO  ber.rerank | metric val_auc_p1 = 0.995572
+07:51:37 INFO  ber.rerank | metric val_auc_p2_oof = 0.999035
+07:51:37 INFO  ber.rerank | metric val_logloss_p1 = 0.073388
+07:51:37 INFO  ber.rerank | metric val_logloss_p2_oof = 0.032712
+07:51:37 INFO  ber.rerank | wrote importance.parquet: 145 rows x 2 cols
+07:51:37 INFO  ber.rerank | stage-2 features by gain:
+               feature         gain
+              q_margin 2.263376e+06
+              p1_logit 1.927662e+05
+                    p1 1.919571e+05
+               q_indic 3.432368e+04
+           c_sum_other 1.075271e+04
+         ss_best_other 9.441141e+03
+              s_n_top1 9.435583e+03
+           s_sum_other 9.200877e+03
+          c_best_other 8.688302e+03
+         cs_best_other 8.479112e+03
+ n_nocity_ratio_margin 8.138871e+03
+           q_sum_other 7.320466e+03
+          ss_sum_other 7.298175e+03
+                   s_n 6.858245e+03
+            c_expected 6.500244e+03
+              s_margin 6.281834e+03
+             s_n_cands 5.917624e+03
+            k_idf_prec 5.657059e+03
+               a_ratio 5.274135e+03
+            n_len_diff 4.642340e+03
+      cos_combo_margin 4.510339e+03
+            num_q_only 4.447166e+03
+              cos_addr 4.220198e+03
+          s_best_other 4.196153e+03
+          q_best_other 4.154652e+03
+             k_idf_rec 3.884389e+03
+     k_idf_unmatched_s 3.850614e+03
+     k_idf_unmatched_q 3.814086e+03
+             a_partial 3.772822e+03
+             cos_combo 3.705570e+03
+                 a_tsr 3.510310e+03
+                 k_tsr 2.978318e+03
+       cos_name_margin 2.977311e+03
+              num_jacc 2.866337e+03
+           q_indic_oov 2.810707e+03
+         cos_combo_gap 2.795339e+03
+                 n_lev 2.730201e+03
+     a_idf_unmatched_s 2.723474e+03
+        k_idf_rec_rank 2.506199e+03
+         cos_addr_rank 2.366199e+03
+         cos_name_rank 2.328721e+03
+           n_jw_margin 2.310829e+03
+        n_nocity_ratio 2.290008e+03
+              cos_name 2.253439e+03
+                   q_n 2.161923e+03
+               n_len_s 2.156424e+03
+          a_tsr_margin 2.034296e+03
+                  n_jw 2.018265e+03
+            rank_combo 1.865483e+03
+            hn_logdiff 1.856715e+03
+               n_len_q 1.845169e+03
+       cos_addr_margin 1.840495e+03
+             q_n_cands 1.761914e+03
+             n_partial 1.704605e+03
+                hn_rel 1.699543e+03
+               n_ratio 1.663711e+03
+        k_ratio_margin 1.659724e+03
+                c_rank 1.612801e+03
+         k_idf_rec_gap 1.574503e+03
+            a_tsr_rank 1.559152e+03
+      k_idf_rec_margin 1.482380e+03
+            hn_len_min 1.482064e+03
+                s_rank 1.441604e+03
+               n_tsort 1.430240e+03
+          k_ratio_rank 1.287907e+03
+            n_tsr_rank 1.250323e+03
+                 n_sub 1.238329e+03
+        cos_combo_rank 1.232976e+03
+             n_jw_rank 1.218859e+03
+            a_idf_prec 1.188753e+03
+ a_word_quality_margin 1.181500e+03
+          n_tsr_margin 1.102831e+03
+          cos_name_gap 1.089041e+03
+             rank_name 1.076063e+03
+               k_ratio 1.061689e+03
+           s_name_freq 1.004727e+03
+              n_jw_gap 9.914654e+02
+         n_s_city_frac 9.861221e+02
+        a_word_quality 9.231291e+02
+           k_ratio_gap 8.863735e+02
+            num_s_only 8.858552e+02
+          cos_addr_gap 8.856666e+02
+                 k_lev 8.459140e+02
+                 n_tsr 8.425744e+02
+             a_idf_rec 8.172142e+02
+             l_s_empty 8.084368e+02
+             hn_s_in_q 7.372793e+02
+           q_vocab_oov 6.705490e+02
+          c_n_hi_other 6.574188e+02
+               ss_rank 6.431427e+02
+           hn_best_rel 6.029344e+02
+                q_rank 5.951758e+02
+                  l_eq 5.821948e+02
+            n_first_eq 5.805712e+02
+      l_quality_margin 5.576442e+02
+             a_tsr_gap 5.115244e+02
+     hn_quality_margin 4.915744e+02
+             n_tsr_gap 4.666692e+02
+       a_n_unmatched_s 4.284105e+02
+           hn_diff_pos 4.264650e+02
+         a_s_unmatched 4.094317e+02
+             rank_addr 4.085717e+02
+       k_n_unmatched_s 4.054839e+02
+       a_word_conflict 3.681281e+02
+     a_idf_unmatched_q 3.621656e+02
+              q_source 3.558004e+02
+          s_n_hi_other 3.130834e+02
+       k_n_unmatched_q 2.818448e+02
+            num_common 2.606296e+02
+             l_q_empty 2.507191e+02
+               q_brand 2.072499e+02
+             l_quality 1.871302e+02
+                hn_lev 1.853743e+02
+         a_q_unmatched 1.506428e+02
+            hn_quality 1.339582e+02
+         ss_n_hi_other 1.190638e+02
+             n_last_eq 1.145977e+02
+             hn_q_in_s 7.733108e+01
+      n_core_eq_margin 5.069346e+01
+         cs_n_hi_other 3.770463e+01
+       a_n_unmatched_q 3.681120e+01
+           q_is_domain 3.559922e+01
+         hn_trunc_lead 2.942949e+01
+            l_conflict 2.817093e+01
+          q_n_hi_other 2.744259e+01
+              a_bag_eq 2.018755e+01
+              n_transp 1.853838e+01
+    n_shared_only_city 1.653895e+01
+             n_core_eq 9.020250e+00
+                  k_eq 6.561750e+00
+          n_compact_eq 5.077440e+00
+                  r_eq 2.430770e+00
+                 box_q 1.172970e+00
+             a_q_empty 0.000000e+00
+           q_has_alias 0.000000e+00
+       n_s_is_initials 0.000000e+00
+n_q_is_initials_margin 0.000000e+00
+               s_brand 0.000000e+00
+             n_q_short 0.000000e+00
+             a_s_empty 0.000000e+00
+       n_q_is_initials 0.000000e+00
+            r_conflict 0.000000e+00
+          n_alias_best 0.000000e+00
+                 box_s 0.000000e+00
+           r_q_missing 0.000000e+00
+07:51:37 INFO  ber.rerank | wrote scores_val.parquet: 119504 rows x 10 cols
+07:51:37 INFO  ber.rerank | === stage rerank ok in 18.9s (peak RSS 2.64 GB)
+07:51:38 INFO  ber.decide | === stage decide | run devv3 | config d0a8591db249 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/devv3/decide
+07:51:38 INFO  ber.decide | metric val_s1 = {'n': 26132, 'singletons': 1497}
+07:51:38 INFO  ber.decide | metric val_one_owner_precision_at_1 = 0.82371
+07:51:38 INFO  ber.decide | metric val_duplicates_retied = 0
+07:51:52 INFO  ber.decide | metric val_sweep = {0.02: {'threshold': 0.97096, 'expected_f_min_p': 0.99049}, 0.05: {'threshold': 0.9789, 'expected_f_min_p': 0.99049}, 0.1: {'threshold': 0.98309, 'expected_f_min_p': 0.99049}, 0.15: {'threshold': 0.98506, 'expected_f_min_p': 0.99049}, 0.2: {'threshold': 0.98629, 'expected_f_min_p': 0.99049}, 0.25: {'threshold': 0.98724, 'expected_f_min_p': 0.99049}, 0.3: {'threshold': 0.9879, 'expected_f_min_p': 0.9905}, 0.35: {'threshold': 0.98829, 'expected_f_min_p': 0.99046}, 0.4: {'threshold': 0.98875, 'expected_f_min_p': 0.99046}, 0.45: {'threshold': 0.98896, 'expected_f_min_p': 0.99046}, 0.5: {'threshold': 0.98946, 'expected_f_min_p': 0.99046}, 0.6: {'threshold': 0.99009, 'expected_f_min_p': 0.99061}, 0.7: {'threshold': 0.99023, 'expected_f_min_p': 0.99035}, 0.8: {'threshold': 0.99005, 'expected_f_min_p': 0.99005}}
+07:51:53 INFO  ber.decide | metric val_expected_f_exact_at_best_min_p = 0.9906
+07:51:53 INFO  ber.decide | metric chosen = {'method': 'expected_f', 'threshold': 0.7, 'min_p': 0.6}
+07:51:54 INFO  ber.decide | wrote val_per_entity.parquet: 26132 rows x 8 cols
+07:51:54 INFO  ber.decide | wrote decisions_val.parquet: 88878 rows x 10 cols
+07:51:54 INFO  ber.decide | metric val_f05 = 0.99061
+07:51:54 INFO  ber.decide | metric val_by_country = {'India': {'n': 13022.0, 'f05': 0.98838, 'pair_p': 0.99598, 'pair_r': 0.97709, 'singleton_frac': 0.05905, 'singleton_acc': 0.98309}, 'US': {'n': 13110.0, 'f05': 0.99283, 'pair_p': 0.99744, 'pair_r': 0.98644, 'singleton_frac': 0.05553, 'singleton_acc': 0.98626}}
+07:51:54 INFO  ber.decide | metric val_by_segment = {'has_matches': {'n': 24635.0, 'f05': 0.99097, 'pair_p': 0.99698, 'pair_r': 0.98179, 'singleton_frac': 0.0, 'singleton_acc': nan}, 'singleton': {'n': 1497.0, 'f05': 0.98464, 'pair_p': 0.0, 'pair_r': 1.0, 'singleton_frac': 1.0, 'singleton_acc': 0.98464}}
+07:51:54 INFO  ber.decide | metric val_by_has_indic_match = {'False': {'n': 22192.0, 'f05': 0.992, 'pair_p': 0.99711, 'pair_r': 0.98567, 'singleton_frac': 0.06746, 'singleton_acc': 0.98464}, 'True': {'n': 3940.0, 'f05': 0.98275, 'pair_p': 0.99467, 'pair_r': 0.9622, 'singleton_frac': 0.0, 'singleton_acc': nan}}
+07:51:54 INFO  ber.decide | metric val_overall = {'n': 26132.0, 'f05': 0.99061, 'pair_p': 0.99671, 'pair_r': 0.98179, 'singleton_frac': 0.05729, 'singleton_acc': 0.98464}
+07:51:54 INFO  ber.decide | === stage decide ok in 16.3s (peak RSS 0.43 GB)

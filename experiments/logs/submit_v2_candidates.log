@@ -1,0 +1,6 @@
+22:19:16 INFO  ber.submit | === stage submit | run main | config 20d8088d346e | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/main/submit
+22:19:16 WARNING ber.submit | input normalize/records_test was built with config cdf71b156938 (current 20d8088d346e)
+22:19:21 WARNING ber.submit | input decide/decisions_test was built with config ac3914f27f39 (current 20d8088d346e)
+22:19:31 INFO  ber.submit | metric matched_pairs = 5973279
+22:19:31 INFO  ber.submit | candidate_pairs.tsv ...
+22:19:31 WARNING ber.submit | input candidates/candidates_test was built with config 494a68a1d5fd (current 20d8088d346e)

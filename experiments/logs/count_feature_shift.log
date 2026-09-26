@@ -1,0 +1,7 @@
+mean per pair:
+              val   train    test
+s_n_cands  364.37  363.17  575.65
+s_n_top1     5.66    5.62    9.12
+q_n_cands   26.05   25.34   24.68
+
+stage-1 gain share: {'s_n_cands': 0.001, 's_n_top1': 0.0012, 'q_n_cands': 0.0005}  rank of s_n_top1: 31

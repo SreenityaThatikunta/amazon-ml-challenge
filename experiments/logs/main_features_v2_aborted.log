@@ -1,0 +1,28 @@
+18:37:16 INFO  ber.features | === stage features | run main | config 4bbe14f61d74 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/main/features
+18:37:16 INFO  ber.features | train: load records + extras ...
+18:37:16 WARNING ber.features | input normalize/records_train was built with config cdf71b156938 (current 4bbe14f61d74)
+18:39:02 INFO  ber.features | metric train_queries_selected = {'train': 1855422, 'val': 1040865}
+18:39:02 INFO  ber.features | train: load records + extras done in 106.2s (peak RSS 5.37 GB)
+18:39:02 WARNING ber.features | input candidates/candidates_train was built with config 494a68a1d5fd (current 4bbe14f61d74)
+18:39:02 INFO  ber.features | train: per-S1 candidate context ...
+18:46:46 INFO  ber.features | train: per-S1 candidate context done in 464.7s (peak RSS 6.30 GB)
+18:46:47 INFO  ber.features | train: features ...
+time: command terminated abnormally
+     1405.96 real      1458.58 user       181.02 sys
+          8808955904  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+            49796113  page reclaims
+                1023  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+              163327  voluntary context switches
+             3218434  involuntary context switches
+      14191751118332  instructions retired
+       5326933097973  cycles elapsed
+         17943070552  peak memory footprint

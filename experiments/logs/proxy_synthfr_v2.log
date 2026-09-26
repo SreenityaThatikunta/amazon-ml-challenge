@@ -1,0 +1,123 @@
+18:09:41 INFO  ber.synth-france | === stage synth-france | run main | config f883a9db5700 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/main/synth-france
+18:09:50 INFO  ber.synth-france | background records ...
+18:12:29 INFO  ber.synth-france | background records done in 158.4s (peak RSS 4.17 GB)
+18:12:29 INFO  ber.synth-france | metric background_records = 37800
+18:12:32 INFO  ber.synth-france | metric records = {'s1': 259452, 's1_scored': 20000, 's2': 59277, 's3': 61767, 'true_pairs': 69335, 'singletons_scored': 1092}
+18:12:32 INFO  ber.synth-france | sample S2 records:
+    entity_id                           business_name                                       business_address country
+S2-9000036961                                Rizavera                        27 RUE BORIE, BORDEAUX, Gironde  France
+ S2-826541719 PROMOTION SARL INTERNATIONAL MATERNELLE                    82 BIS R. BOUCHER DE PERTHES, LILLE  France
+ S2-125879113          Tic Distribution SARL Services                     # 71 R DONISSAN, BORDEAUX, Gironde  France
+S2-9000035662                 Bordeaux Patrimoine SCI            18 ALLEE DES ROSES, BORDEAUX, Gironde, NULL  France
+ S2-912397333                   Public Jeunes Holding  235 RUE DU PRÉSIDENT COTY, TOURCOING, Hauts-de-France  France
+S2-9000007791                            Nylaveraxylo                 24 ALL DES AIGRETTES, LA TESTE-DE-BUCH  France
+S2-9000033676             Deltajax aka Pharmacie Fief                       34 R LACORDAIRE, PESSAC, Gironde  France
+S2-9000024489                 SCI FRANCASE GROUPEMENT                  15 RUE LOUIS BRAILLE, Pessac, Gironde  France
+ S2-734372140   École primaire de la Fàmilles Holding NO 75 AVENUE DU DOCTEUR NANCEL PENARD, PESSAC, Gironde  France
+ S2-998187883                   Fraternite Centre SCI             23 BIS ROUTE DU RADEAU, LA BAULE-ESCOUBLAC  France
+ S2-105915818      Francais College Distribution SARL                 64 RUE DU BOIS, LILLE, Hauts-de-France  France
+ S2-743984909     Nouvel & Frères Participations (SA)           59 RUE DU FONTENOY, ROUBAIX, Hauts-de-France  France
+18:12:32 INFO  ber.synth-france | sample S3 records:
+    entity_id                  business_name                                        business_address country
+S3-9000034580             SAS Petits Amicale        7 Bis R Ernest Legouvé, Nantes, Loire-Atlantique  France
+S3-9000006736                    kry amicale                  Gironde, Mérignac, 004 Rue André Ouley  France
+S3-9000017651               SASU Ti Sportvie                3 Esplanade de Pontac, Bordeaux, Gironde  France
+ S3-290512275 Event Groupe Distribution Sarl 33 R. Eugene Jacquet, Entree C2, Lille, Hauts-de-France  France
+S3-9000010158                It Amicale EURL                  2 Av. Caillé, Nantes, Loire-Atlantique  France
+S3-9000024819 Lycée Sainte Vincent Compagnîe                          27 R. Charles Martin, Bordeaux  France
+S3-9000001183         Pluri Service S.A.R.L.                      Bordeaux, 4 R de la Maison Daurade  France
+S3-9000003589              Emile Jeunes SARL                           63 R Edouard Anseele, Roubaix  France
+S3-9000038720              Divine Uniin SARL     Tourcoing, 30 Rue de la Boule d'Or, Hauts-de-France  France
+S3-9000020956               ((ecole franco))                               29 R. du Livran, Bordeaux  France
+S3-9000023156             Sino Club (France)                                Bd. Ernest Dalby, Nantes  France
+S3-9000016719    gymnastiquesportiveeurl.com                                    60 R Jordaens, Lille  France
+18:12:32 INFO  ber.synth-france | === stage synth-france ok in 170.6s (peak RSS 4.17 GB)
+18:12:32 INFO  ber.split | === stage split | run synthfr | config 165a91a67595 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/synthfr/split
+18:12:32 INFO  ber.split | read train sources + ground truth ...
+18:12:33 INFO  ber.split | read train sources + ground truth done in 0.6s (peak RSS 0.28 GB)
+18:12:33 INFO  ber.split | owner map ...
+18:12:33 INFO  ber.split | owner map done in 0.0s (peak RSS 0.29 GB)
+18:12:33 INFO  ber.split | detect regions for 380,496 addresses ...
+18:12:35 INFO  ber.split | detect regions for 380,496 addresses done in 2.1s (peak RSS 0.29 GB)
+18:12:35 INFO  ber.split | make split ...
+18:12:35 INFO  ber.split | make split done in 0.1s (peak RSS 0.35 GB)
+18:12:35 INFO  ber.split | metric France.regions = {'total': 3, 'val': 3, 'dev': 0}
+18:12:35 INFO  ber.split | metric France.val_regions = ['HDF', 'NAQ', 'PDL']
+18:12:35 INFO  ber.split | metric France.dev_regions = []
+18:12:35 INFO  ber.split | metric France.s1 = {'n': 259452, 'val_frac': 1.0, 'dev_train': 0, 'dev_val': 0, 'unknown_region_frac': 0.0}
+18:12:35 INFO  ber.split | metric France.S2 = {'n': 59277, 'val_frac': 1.0, 'dev': 0, 'unmatched': 25781, 'unmatched_basis': {'own_region': 17064, 'hash': 8717}, 'matched_own_region_agrees_with_owner': 1.0, 'matched_region_unknown_frac': 0.3211}
+18:12:35 INFO  ber.split | metric France.S3 = {'n': 61767, 'val_frac': 1.0, 'dev': 0, 'unmatched': 25928, 'unmatched_basis': {'own_region': 17329, 'hash': 8599}, 'matched_own_region_agrees_with_owner': 1.0, 'matched_region_unknown_frac': 0.3181}
+18:12:35 INFO  ber.split | wrote s1.parquet: 259452 rows x 6 cols
+18:12:35 INFO  ber.split | wrote queries.parquet: 121044 rows x 7 cols
+18:12:35 INFO  ber.split | wrote regions.parquet: 3 rows x 5 cols
+18:12:35 INFO  ber.split | === stage split ok in 3.0s (peak RSS 0.35 GB)
+18:12:36 INFO  ber.normalize | === stage normalize | run synthfr | config 165a91a67595 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/synthfr/normalize
+18:12:36 INFO  ber.normalize | learn Indic->Latin dictionary + S1 vocabulary ...
+18:12:38 INFO  ber.normalize | wrote translit_dict.parquet: 0 rows x 5 cols
+18:12:38 INFO  ber.normalize | metric translit.train_pairs = 0
+18:12:38 INFO  ber.normalize | metric translit.dictionary_size = 0
+18:12:38 INFO  ber.normalize | metric translit.vocab_skeletons = 10967
+18:12:38 INFO  ber.normalize | metric translit.val_coverage = {'aligned_tokens': 0, 'in_dictionary': 0.0, 'exact_match': 0.0, 'exact_match_dict_rules': 0.0, 'exact_match_rules_only': 0.0}
+18:12:38 INFO  ber.normalize | learn Indic->Latin dictionary + S1 vocabulary done in 2.0s (peak RSS 0.35 GB)
+18:12:38 INFO  ber.normalize | normalize train source1 ...
+18:12:42 INFO  ber.normalize | train source1: 259452 records
+18:12:42 INFO  ber.normalize | normalize train source1 done in 4.3s (peak RSS 0.58 GB)
+18:12:42 INFO  ber.normalize | normalize train source2 ...
+18:12:44 INFO  ber.normalize | train source2: 59277 records
+18:12:44 INFO  ber.normalize | normalize train source2 done in 1.7s (peak RSS 0.60 GB)
+18:12:44 INFO  ber.normalize | normalize train source3 ...
+18:12:46 INFO  ber.normalize | train source3: 61767 records
+18:12:46 INFO  ber.normalize | normalize train source3 done in 1.8s (peak RSS 0.60 GB)
+18:12:46 INFO  ber.normalize | metric records_train = 380496
+18:12:46 INFO  ber.normalize | test split skipped (slice=None, with_test=False)
+18:12:46 INFO  ber.normalize | === stage normalize ok in 10.0s (peak RSS 0.60 GB)
+18:12:47 INFO  ber.candidates | === stage candidates | run synthfr | config 165a91a67595 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/synthfr/candidates
+18:12:47 INFO  ber.candidates | metric region_neighbors_merged = {}
+18:12:49 INFO  ber.candidates | train France: 121,044 queries x 259,452 S1 ...
+18:12:51 INFO  ber.candidates |   index name : 259452 S1 x 13417 n-grams, query nnz/row 11.7
+18:12:54 INFO  ber.candidates |   index addr : 259452 S1 x 6965 n-grams, query nnz/row 11.4
+18:12:59 INFO  ber.candidates |   index combo: 259452 S1 x 15186 n-grams, query nnz/row 18.8
+18:13:18 INFO  ber.candidates | train France: 121,044 queries x 259,452 S1 done in 29.0s (peak RSS 1.65 GB)
+18:13:18 INFO  ber.candidates | recall report ...
+18:13:18 INFO  ber.candidates | metric pair_recall = 0.99303
+18:13:18 INFO  ber.candidates | metric pair_recall_by_segment = {'France 2 False val': [0.99289, 33496], 'France 3 False val': [0.99316, 35839]}
+18:13:18 INFO  ber.candidates | metric cluster_recall = 0.97535
+18:13:18 INFO  ber.candidates | metric recall_at_k = {1: {'name': 0.5261, 'addr': 0.78375, 'combo': 0.93083, 'union': 0.97089}, 3: {'name': 0.6648, 'addr': 0.88143, 'combo': 0.94596, 'union': 0.98314}, 5: {'name': 0.71535, 'addr': 0.90198, 'combo': 0.95167, 'union': 0.98634}, 10: {'name': 0.77508, 'addr': 0.9265, 'combo': 0.95934, 'union': 0.99022}}
+18:13:18 INFO  ber.candidates | metric candidates_per_query = {'mean': 25.03, 'p50': 25, 'p95': 29, 'max': 30, 'zero': 0}
+18:13:18 INFO  ber.candidates | metric candidate_pairs = 3029923
+18:13:18 INFO  ber.candidates | metric val_candidates_crossing_split = {'val_queries_with_train_candidate': 0.0, 'val_candidates_on_train_side': 0.0}
+18:13:18 INFO  ber.candidates | recall report done in 0.0s (peak RSS 1.65 GB)
+18:13:18 INFO  ber.candidates | === stage candidates ok in 30.2s (peak RSS 1.65 GB)
+18:13:18 INFO  ber.features | === stage features | run synthfr | config 165a91a67595 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/synthfr/features
+18:13:18 INFO  ber.features | train: load records + extras ...
+18:13:20 INFO  ber.features | metric train_queries_selected = {'train': 0, 'val': 121044}
+18:13:20 INFO  ber.features | train: load records + extras done in 1.4s (peak RSS 0.53 GB)
+18:13:20 INFO  ber.features | train: per-S1 candidate context ...
+18:13:21 INFO  ber.features | train: per-S1 candidate context done in 1.2s (peak RSS 0.73 GB)
+18:13:21 INFO  ber.features | train: features ...
+18:14:46 INFO  ber.features | train: features done in 85.6s (peak RSS 5.04 GB)
+18:14:46 INFO  ber.features | metric train_pairs = 3029923
+18:14:46 INFO  ber.features | metric train_positive_rate = 0.0227
+18:14:46 INFO  ber.features | === stage features ok in 88.2s (peak RSS 5.04 GB)
+18:14:48 INFO  ber.scorer | === stage scorer | run synthfr | config 165a91a67595 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/synthfr/scorer
+18:14:48 INFO  ber.scorer | load sampled train features ...
+18:14:49 INFO  ber.scorer | sampled 0 train rows, 608977 early-stopping rows
+18:14:49 INFO  ber.scorer | load sampled train features done in 0.9s (peak RSS 2.35 GB)
+18:14:49 INFO  ber.scorer | metric rows = {'train': 0, 'val': 608977, 'train_pos': 0, 'val_pos': 13939}
+18:15:07 INFO  ber.scorer | metric val_auc = 0.999183
+18:15:08 INFO  ber.scorer | wrote scores_val.parquet: 3029923 rows x 4 cols
+18:15:08 INFO  ber.scorer | === stage scorer ok in 19.6s (peak RSS 3.39 GB)
+18:15:08 INFO  ber.decide | === stage decide | run synthfr | config 165a91a67595 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/synthfr/decide
+18:15:09 INFO  ber.decide | metric val_s1 = {'n': 20000, 'singletons': 1092}
+18:15:10 INFO  ber.decide | metric val_one_owner_precision_at_1 = 0.56298
+18:15:11 INFO  ber.decide | metric val_duplicates_retied = 0
+18:15:22 INFO  ber.decide | metric val_sweep = {0.02: {'threshold': 0.85293, 'expected_f_min_p': 0.87492}, 0.05: {'threshold': 0.85647, 'expected_f_min_p': 0.87492}, 0.1: {'threshold': 0.85971, 'expected_f_min_p': 0.87492}, 0.15: {'threshold': 0.8618, 'expected_f_min_p': 0.87491}, 0.2: {'threshold': 0.86378, 'expected_f_min_p': 0.87492}, 0.25: {'threshold': 0.86539, 'expected_f_min_p': 0.8749}, 0.3: {'threshold': 0.86667, 'expected_f_min_p': 0.87492}, 0.35: {'threshold': 0.86776, 'expected_f_min_p': 0.87492}, 0.4: {'threshold': 0.86908, 'expected_f_min_p': 0.8749}, 0.45: {'threshold': 0.87032, 'expected_f_min_p': 0.87486}, 0.5: {'threshold': 0.87119, 'expected_f_min_p': 0.87514}, 0.6: {'threshold': 0.8725, 'expected_f_min_p': 0.8752}, 0.7: {'threshold': 0.87414, 'expected_f_min_p': 0.87541}, 0.8: {'threshold': 0.87597, 'expected_f_min_p': 0.87597}}
+18:15:22 INFO  ber.decide | metric chosen = {'method': 'expected_f', 'threshold': 0.8, 'min_p': 0.8}
+18:15:23 INFO  ber.decide | wrote val_per_entity.parquet: 20000 rows x 8 cols
+18:15:23 INFO  ber.decide | wrote decisions_val.parquet: 73819 rows x 4 cols
+18:15:23 INFO  ber.decide | metric val_f05 = 0.87597
+18:15:23 INFO  ber.decide | metric val_by_country = {'France': {'n': 20000.0, 'f05': 0.87597, 'pair_p': 0.8821, 'pair_r': 0.93687, 'singleton_frac': 0.0546, 'singleton_acc': 0.64011}}
+18:15:23 INFO  ber.decide | metric val_by_segment = {'has_matches': {'n': 18908.0, 'f05': 0.88959, 'pair_p': 0.8874, 'pair_r': 0.93687, 'singleton_frac': 0.0, 'singleton_acc': nan}, 'singleton': {'n': 1092.0, 'f05': 0.64011, 'pair_p': 0.0, 'pair_r': 1.0, 'singleton_frac': 1.0, 'singleton_acc': 0.64011}}
+18:15:23 INFO  ber.decide | metric val_by_has_indic_match = {'False': {'n': 20000.0, 'f05': 0.87597, 'pair_p': 0.8821, 'pair_r': 0.93687, 'singleton_frac': 0.0546, 'singleton_acc': 0.64011}}
+18:15:23 INFO  ber.decide | metric val_overall = {'n': 20000.0, 'f05': 0.87597, 'pair_p': 0.8821, 'pair_r': 0.93687, 'singleton_frac': 0.0546, 'singleton_acc': 0.64011}
+18:15:23 INFO  ber.decide | === stage decide ok in 14.4s (peak RSS 0.96 GB)

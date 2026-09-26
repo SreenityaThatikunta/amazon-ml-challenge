@@ -1,0 +1,389 @@
+  part 0/160
+  part 100/160
+  part 120/160
+  part 140/160
+# 07 France error dump + proxy realism (T7.1)
+
+(US: 20% sample of queries)
+## Realism: real test vs proxy (query = S2/S3 record, top1 = best candidate)
+run                      test US   test France  proxy France
+queries              763978.0000  1.434967e+06    83388.0000
+S1                   663106.0000  2.594520e+05    20000.0000
+p1<.05                    0.3672  3.037000e-01        0.0254
+p1 .05-.5                 0.0392  5.570000e-02        0.0385
+p1 .5-.95                 0.0221  2.860000e-02        0.1016
+p1>.95                    0.5715  6.120000e-01        0.8345
+ambiguous                 0.0024  7.900000e-03        0.0032
+pred/S1                   3.3706  3.483800e+00        3.8008
+empty S1                  0.0559  4.850000e-02        0.0102
+top1 name_exact           0.4440  5.107000e-01        0.6054
+top1 legal_conflict       0.0734  5.630000e-02        0.0643
+top1 num_shifted          0.3219  2.343000e-01        0.0676
+top1 num_truncated        0.0347  1.570000e-02        0.0276
+top1 q_gibberish          0.0509  5.580000e-02        0.0745
+top1 initials             0.0009  1.670000e-02        0.0168
+top1 q_addr_empty         0.0290  3.000000e-02        0.0290
+s_name_freq med           1.0000  1.000000e+00        1.0000
+s_name_freq p90          33.0000  3.800000e+01        4.0000
+
+## A. Real test: runner-ups of ambiguous queries (p1 > 0.5, p2 > 0.2)
+
+France: 11379 ambiguous queries; runner-up S1 has the same core name as the winner: 0.401
+
+France ambiguous runner-ups  (n=11379)
+                      France ambiguous runner-ups  baseline     lift
+legal_conflict                             0.0530    0.1984   0.2672
+street_diff_same_num                       0.2259    0.1165   1.9389
+num_shifted                                0.0583    0.3536   0.1648
+num_truncated                              0.0469    0.1338   0.3509
+num_different                              0.0286    0.2112   0.1352
+initials_match                             0.0222    0.0017  12.8909
+initials_mismatch                          0.0792    0.0149   5.3003
+q_gibberish                                0.2406    0.0558   4.3132
+city_in_s1_name                            0.4824    0.2101   2.2963
+q_addr_empty                               0.1658    0.0300   5.5275
+name_exact                                 0.3991    0.1288   3.0991
+
+US: 1821 ambiguous queries; runner-up S1 has the same core name as the winner: 0.759
+
+US ambiguous runner-ups  (n=1821)
+                      US ambiguous runner-ups  baseline     lift
+legal_conflict                         0.0000    0.1253   0.0000
+street_diff_same_num                   0.0198    0.0427   0.4635
+num_shifted                            0.0016    0.1360   0.0121
+num_truncated                          0.0137    0.0408   0.3363
+num_different                          0.0159    0.6740   0.0236
+initials_match                         0.0005    0.0000  69.9229
+initials_mismatch                      0.0044    0.0008   5.1955
+q_gibberish                            0.1384    0.0509   2.7194
+city_in_s1_name                        0.0099    0.0447   0.2211
+q_addr_empty                           0.8369    0.0290  28.9035
+name_exact                             0.5761    0.0648   8.8933
+
+--- France ambiguous / legal_conflict: 603 pairs; examples
+Q S3-313868528: ROUBAIX INSTITUT SAS | 13 - Rue Du General Chanzy, Roubaix, Nord
+   winner p=0.999 S1-675223672: Roubaix Institut SAS | Roubaix, 13 RUE du General Chanzy, Hauts-de-France, 6 Cour Dubar
+   runner-up p=0.563 S1-770524966: Roubaix Institut SARL | 13 Impasse du Sud, 27 rue de la perche, Roubaix, Hauts-de-France   [hn_rel=1 l_conf=1]
+Q S3-713584891: Nantes Comite S.A.S | Nantes, Rue De La Martinière
+   winner p=0.984 S1-529736464: Nantes Comite SAS | 8 Rue de la Martinière, Nantes, Pays de la Loire
+   runner-up p=0.352 S1-64336006: Nantes Comite EURL | 3 Rue de la Martinière, Nantes, Pays de la Loire   [hn_rel=0 l_conf=1]
+Q S3-248868702: Calais Collge-SA | 56 R Pierre Brossolette, Calais
+   winner p=0.997 S1-453744453: Calais Collège SA | 56 Rue Pierre Brossolette, Calais, Hauts-de-France
+   runner-up p=0.213 S1-123526751: Calais College SARL | 56 Rue Pierre Brossolette, Calais, Hauts-de-France   [hn_rel=1 l_conf=1]
+Q S2-741050864: Sarl Lille Amis | 97 R TURGOT, Lille, Nord
+   winner p=1.000 S1-407145351: Lille Amis SARL | 97 Rue Turgot, Lille, Hauts-de-France
+   runner-up p=0.631 S1-958077807: Lille Amis EURL | 97 Rue Turgot, Lille, Hauts-de-France   [hn_rel=1 l_conf=1]
+Q S2-982889269: Pessac Primaire SARL | R AVIGDOR, PESSAC, Gironde
+   winner p=0.999 S1-391603872: Pessac Primaire SARL | 23 Rue Avigdor, Pessac, Nouvelle-Aquitaine
+   runner-up p=0.250 S1-810086024: Pessac Primaire EI | 57 Rue Avigdor, Pessac, Nouvelle-Aquitaine   [hn_rel=0 l_conf=1]
+Q S2-172946946: Nantes Pharmacie SARL | N° 43 RUE FCLIBIEN, NANTES, Loire-Atlantique
+   winner p=0.979 S1-645554807: Nantes Sportive SARL | 43 Rue Félibien, Nantes, Pays de la Loire
+   runner-up p=0.519 S1-646831533: Nantes Pharmacie SAS | 43 Rue Bouchaud, Nantes, Pays de la Loire   [hn_rel=1 l_conf=1]
+Q S2-406086282: Lille Centre S.A.S. | 58 RUE DU PORT, LILLE, Hauts-de-France
+   winner p=0.999 S1-61494110: Lille Centre SAS | 58 RUE du Port, Lille, Hauts-de-France
+   runner-up p=0.871 S1-27426641: Lille Centre SARL | 58 RUE du port, Lille, Hauts-de-France   [hn_rel=1 l_conf=1]
+Q S3-426048915: Bordeaux Societe SASU | R. Mercière, Bordeaux
+   winner p=0.951 S1-734846234: Bordeaux Societe SASU | 24 Rue Mercière, Bordeaux, Nouvelle-Aquitaine
+   runner-up p=0.749 S1-794988646: Bordeaux Societe SARL | 4 Rue Mercière, Bordeaux, Nouvelle-Aquitaine   [hn_rel=0 l_conf=1]
+
+--- France ambiguous / street_diff_same_num: 2571 pairs; examples
+Q S3-584881192: Fédération du Developpement (SCI) | 4 Rue De Lile Aux Oiesaux, La Teste-de-buch, Nouvelle-Aquitaine
+   winner p=0.996 S1-774354616: Fédération du Developpement | Nouvelle-Aquitaine, La Teste-de-Buch, 4 RUE de lIle aux Oiseaux
+   runner-up p=0.499 S1-297974818: Fédération du Developpement | 4 Avenue des Canaris, La Teste-de-Buch, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S2-105441858: Dunkerque Sportive Sarl | 109 R. DE L’ÉALITÉ, DUNKERQUE
+   winner p=1.000 S1-260021588: Dunkerque Sportive SARL | 109 Rue de l’Égalité, Dunkerque, Hauts-de-France
+   runner-up p=0.359 S1-580906950: Dunkerque Sportive SARL | 109 Rue Pierre Léostic, Dunkerque, Hauts-de-France   [hn_rel=1 l_conf=0]
+Q S3-742911580: Bordeaux Primaire | 6 Impase De L'hermitage, Bordeaux
+   winner p=1.000 S1-469274099: Bordeaux Primaire SARL | Nouvelle-Aquitaine, Bordeaux, 6 Impasse de l'Hermitage
+   runner-up p=0.893 S1-360456753: Bordeaux Primaire | 6 Rue de l'Hermitage, Bordeaux, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S3-226258897: MS | 69 - R Raspail, Dunkerque, Nord
+   winner p=0.998 S1-295419124: Maison Sarthoise | 69 Rue Raspail, Dunkerque, Hauts-de-France
+   runner-up p=0.228 S1-948479816: Survie Maison SARL | Lille, Hauts-de-France, 69 Rue Raspail   [hn_rel=1 l_conf=0]
+Q S2-713668986: Institut Vanchnt | # 89 AV DE SAINT-NAZAIRE, ST-NAZAIRE
+   winner p=0.998 S1-818428932: Institut Vincent | 89 Avenue de Saint-Nazaire, Saint-Nazaire, Pays de la Loire
+   runner-up p=0.300 S1-377015183: Institut Jean | 89 BD Saint-Aignan, Nantes, Pays de la Loire   [hn_rel=1 l_conf=0]
+Q S3-790063190: EP | 13 Route des Fréchets, Saint-Nazaire, Pays de la Loire
+   winner p=0.999 S1-433881363: Ets Parti SAS | 13 Route des Fréchets, Saint-Nazaire, Pays de la Loire
+   runner-up p=0.265 S1-121671723: Ep & Cie SARL | 13 Avenue de la Milletière, Nantes, Pays de la Loire   [hn_rel=1 l_conf=0]
+Q S2-913366180: Seniors Club Sas | #4 RUE DAJNOU, BORDEAUX
+   winner p=0.998 S1-631163909: Seniors Club SAS | 4 Rue Danjou, Bordeaux, Nouvelle-Aquitaine
+   runner-up p=0.869 S1-884915116: Seniors Lycee SAS | 4 RUE Menou, Nantes, Pays de la Loire   [hn_rel=1 l_conf=0]
+Q S3-697495232: Pharmacie | 16 Rue Fernand de Magellan, Saint-Nazaire, Pays de la Loire
+   winner p=0.998 S1-613632115: Pharmacie Sainte Demployeurs | 16 Rue Fernand de Magellan, Saint-Nazaire, Pays de la Loire
+   runner-up p=0.290 S1-941389643: Pharmacie Mr | 16 Route de Saint-Sébastien, Saint-Nazaire, Pays de la Loire   [hn_rel=1 l_conf=0]
+
+--- France ambiguous / initials_mismatch: 901 pairs; examples
+Q S2-867534053: CMSC | 53 RUE AUBER, Calais, Pas-de-Calais
+   winner p=0.700 S1-322196410: Centre Médical Sainte Chorale | 53 Rue Auber, Calais, Hauts-de-France
+   runner-up p=0.670 S1-194245269: Ets Cms SARL | 53 Avenue des Bains, Dunkerque, Hauts-de-France   [hn_rel=1 l_conf=0]
+Q S2-357079555: MP | Nouvelle-Aquitaine, 17 ALLEE DU GREPIN, Lège-Cap-Ferret
+   winner p=0.837 S1-90129393: Midi Parents SAS | 17 Allee du Grepin, Lège-Cap-Ferret, Nouvelle-Aquitaine
+   runner-up p=0.373 S1-573151928: Club de Mp | Nouvelle-Aquitaine, Lège-Cap-Ferret, 8 Allee du Grepin   [hn_rel=5 l_conf=0]
+Q S3-765774172: AC | 12 Rue Coli, Mérignac, Nouvelle-Aquitaine
+   winner p=0.997 S1-499858614: As Clinique SARL | 12 Rue Coli, Nouvelle-Aquitaine, Mérignac
+   runner-up p=0.880 S1-150092658: Mérignac Societe | 12 Rue Coli, Mérignac, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S3-428518638: CT | 11 Rue Martin Saugeres, La Teste-de-Buch, Nouvelle-Aquitaine
+   winner p=0.998 S1-949244387: Cattp Travaux SARL | 11 Rue Martin Saugeres, La Teste-de-Buch, Nouvelle-Aquitaine
+   runner-up p=0.479 S1-419204389: CT Societe | 11 Avenue de Biscarrosse, La Teste-de-Buch, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S2-96772611: ED | 281 BD GAMBETTA, Tourcoing, Nord
+   winner p=1.000 S1-210964095: EHPAD Diane | 281 BD Gambetta, Hauts-de-France, Tourcoing
+   runner-up p=0.287 S1-377313844: Maison Familiale SARL | Hauts-de-France, Tourcoing, 281 Boulevard Gambetta   [hn_rel=1 l_conf=0]
+Q S2-781527361: BS | 113 AVENUE DU GÉNÉRAL DE GAULLE, La Baule-Escoublac
+   winner p=0.857 S1-642651823: La Baule-Escoublac Club SASU | 113 Avenue du Général De Gaulle, La Baule-Escoublac, Pays de la Loire
+   runner-up p=0.237 S1-837449061: La Baule-Escoublac Sportive SARL | 113 Avenue du Général De Gaulle, La Baule-Escoublac, Pays de la Loire   [hn_rel=1 l_conf=0]
+Q S2-549589906: DP | 28 RUE JUDE, Bordeaux
+   winner p=1.000 S1-449955980: Dart Parents SARL | 28 Rue Jude, Bordeaux, Nouvelle-Aquitaine
+   runner-up p=0.218 S1-145064620: DP Amicale SA | 225 RUE Judaique, Bordeaux, Nouvelle-Aquitaine   [hn_rel=5 l_conf=0]
+Q S3-719727842: PD | Hauts-de-France, Lille, 60 Bis Rue Du Port
+   winner p=0.748 S1-783230073: PD Sante SARL | 60 rue Monseigneur Piedfort, Calais, Hauts-de-France
+   runner-up p=0.501 S1-139102330: Pink Danse (France) | Hauts-de-France, Lille, 60 BIS Rue du Port   [hn_rel=1 l_conf=0]
+
+--- France ambiguous / num_shifted: 663 pairs; examples
+Q S2-130586358: Sas Saint-Herblain Culturel | 8 AVENUE DE CHAILLE, Saint-Herblain, Pays de la Loire
+   winner p=0.999 S1-951674904: Saint-Herblain Culturel SAS | 8 Avenue de Chaville, Saint-Herblain, Pays de la Loire
+   runner-up p=0.399 S1-988257571: Saint-Herblain Culturel SAS | 9 Avenue de Rambouillet, Saint-Herblain, Pays de la Loire   [hn_rel=4 l_conf=0]
+Q S3-22758477: Nantes  Primaire | 9 Rue Arthur Rimbaud, Nantes
+   winner p=0.999 S1-519026083: Nantes Primaire SARL | Pays de la Loire, 9 Rue Arthur Rimbaud, Nantes
+   runner-up p=0.341 S1-30880354: Nantes Primaire SARL | 2 Rue Arthur Rimbaud, Nantes, Pays de la Loire   [hn_rel=4 l_conf=0]
+Q S2-84481427: #lgecapferretgroupement | 39 BIS R DES GOELANDS, Lège-Cap-Ferret
+   winner p=0.998 S1-240915915: Lège-Cap-Ferret Groupement SARL | 39 bis Rue des Goelands, Lège-Cap-Ferret, Nouvelle-Aquitaine
+   runner-up p=0.212 S1-158053577: Lège-Cap-Ferret Groupement SAS | 68 Rue des Goelands Cap Ferret, Lège-Cap-Ferret, Nouvelle-Aquitaine   [hn_rel=4 l_conf=0]
+Q S3-153853438: Pornic Club | 32T La Brahiniere, Pornic, Loire-Atlantique
+   winner p=0.992 S1-889808686: Pornic Club SARL | 32 ter La Brahinière, Pornic, Pays de la Loire
+   runner-up p=0.636 S1-747665954: Pornic Club SASU | Pays de la Loire, 10 La Brahinière, Pornic   [hn_rel=4 l_conf=0]
+Q S2-192653808: VDP | 10 RUE DES ROSES, Nantes, Pays de la Loire
+   winner p=0.662 S1-357781177: Vivre Deleves Pharmacie | 10 Rue des Roses, Nantes, Pays de la Loire
+   runner-up p=0.296 S1-472200064: VDP Club SARL | Pays de la Loire, 16 Impasse de la Terre Adélie, Nantes   [hn_rel=4 l_conf=0]
+Q S3-963189658: La Baule-Escoublac Club | 1 Avenue Du Capitaine David, La Baule-escoublac, Pays de la Loire
+   winner p=1.000 S1-225613779: La Baule-Escoublac Club SA | 1 Avenue du Capitaine David, La Baule-Escoublac, Pays de la Loire
+   runner-up p=0.718 S1-706554260: La Baule-Escoublac Club | 7 Avenue du Capitaine David, La Baule-Escoublac, Pays de la Loire   [hn_rel=4 l_conf=0]
+Q S3-636948749: La Sante Baule-Escoublac | 47 Av Du Maréchal De Lattre De Tassigny, La Baule-escoublac, Loire-Atlantique
+   winner p=0.961 S1-975745854: La Baule-Escoublac Agricole SAS | 47 Avenue du Maréchal de Lattre de Tassigny, La Baule-Escoublac, Pays de la Loire
+   runner-up p=0.243 S1-644853628: La Baule-Escoublac Club | 49 Avenue du Maréchal de Lattre de Tassigny, La Baule-Escoublac, Pays de la Loire   [hn_rel=4 l_conf=0]
+Q S2-960112123: La Baule-Escoublac Sportive SARL | 43 ALL. CAVALIERE, LA BAULE-ESCOUBLAC, Pays de la Loire
+   winner p=0.982 S1-141051500: La Baule-Escoublac Amicale SARL | 43 Allée Cavalière, La Baule-Escoublac, Pays de la Loire
+   runner-up p=0.473 S1-151456274: La Baule-Escoublac Sportive SARL | 28 Allée Cavalière, La Baule-Escoublac, Pays de la Loire   [hn_rel=4 l_conf=0]
+
+--- France ambiguous / num_truncated: 534 pairs; examples
+Q S3-794730120: Bordeaux Amicale | Gironde, Bordeaux, 42B R Arago
+   winner p=0.990 S1-797829822: Bordeaux Amicale SAS | 42 B Rue Arago, Nouvelle-Aquitaine, Bordeaux
+   runner-up p=0.845 S1-628276562: Bordeaux Amicale SASU | 4 Rue Arago, Bordeaux, Nouvelle-Aquitaine   [hn_rel=3 l_conf=0]
+Q S3-783698366: S.A.R.L. Dunkerque Club | No 103 Boulevard De La République François Mitterrand, Dunkerque, Nord
+   winner p=1.000 S1-823508515: Dunkerque Club SARL | 103 Boulevard de la République François Mitterrand, Dunkerque, Hauts-de-France
+   runner-up p=0.410 S1-23256511: Dunkerque Club SARL | 10 Boulevard de la République François Mitterrand, Dunkerque, Hauts-de-France   [hn_rel=3 l_conf=0]
+Q S2-570921951: lprimaire.com | 11 RUE JACQUES ELLUL, Bordeaux, Nouvelle-Aquitaine
+   winner p=0.997 S1-738121025: Laurore Primaire SARL | 11 Rue Jacques Ellul, Bordeaux, Nouvelle-Aquitaine
+   runner-up p=0.401 S1-811651055: École primaire Saint Demain | 1 RUE Jacques Ellul, Bordeaux, Nouvelle-Aquitaine   [hn_rel=3 l_conf=0]
+Q S3-675318190: Lège-Cap-Ferret Ecole Sarl | # 17 Rue Des Tourterelles Cap Ferre, Lège-cap-ferret, Nouvelle-Aquitaine
+   winner p=1.000 S1-714177681: Lège-Cap-Ferret Ecole SARL | 17 Rue des Tourterelles Cap Ferre, Lège-Cap-Ferret, Nouvelle-Aquitaine
+   runner-up p=0.865 S1-115289587: Lège-Cap-Ferret Ecole | 7 Rue des Tourterelles Cap Ferre, Lège-Cap-Ferret, Nouvelle-Aquitaine   [hn_rel=3 l_conf=0]
+Q S3-185874822: Lille Amicale SARL | N° 13 Rue Du Vaisseau Le Vengeur, Lille, Hauts-de-France
+   winner p=1.000 S1-506526528: Lille Amicale SARL | 13 Rue du Vaisseau Le Vengeur, Lille, Hauts-de-France
+   runner-up p=0.987 S1-298724053: Lille Amicale SARL | 3 Rue du Vaisseau Le Vengeur, Lille, Hauts-de-France   [hn_rel=3 l_conf=0]
+Q S2-293898672: Orbiviocalo | 33 RUE PAUL BOURGET, Lille
+   winner p=0.995 S1-672820365: Rugby Maison SARL | 33 Rue Paul Bourget, Lille, Hauts-de-France
+   runner-up p=0.258 S1-252518343: Lille Maison SARL | 3 Rue Paul Bourget, Lille, Hauts-de-France   [hn_rel=3 l_conf=0]
+Q S2-324118234: SÀRL DUNKERQUE CLUB | N° 10 BOULEVARD DE LA RÉPUBLIQUE FRANÇOIS MITTERRAND, Dunkerque, Nord
+   winner p=0.999 S1-23256511: Dunkerque Club SARL | 10 Boulevard de la République François Mitterrand, Dunkerque, Hauts-de-France
+   runner-up p=0.797 S1-823508515: Dunkerque Club SARL | 103 Boulevard de la République François Mitterrand, Dunkerque, Hauts-de-France   [hn_rel=3 l_conf=0]
+Q S3-267238453: Nantes Màternelle SARL | No. 49 Boulevard Des Américains, Nantes
+   winner p=1.000 S1-650355935: Nantes Maternelle SARL | 49 Boulevard des Américains, Nantes, Pays de la Loire
+   runner-up p=0.731 S1-601586988: Nantes Maternelle SARL | 4 Boulevard des Américains, Nantes, Pays de la Loire   [hn_rel=3 l_conf=0]
+
+--- France ambiguous / q_gibberish: 2738 pairs; examples
+Q S3-662148153: dunkerqueclub.com | Rue Belle Rade, Dunkerque, Nord
+   winner p=0.988 S1-773395310: Dunkerque Club SA | 17 Rue Belle Rade, Dunkerque, Hauts-de-France
+   runner-up p=0.964 S1-287385748: Dunkerque Club SAS | 29 bis Rue Belle Rade, Dunkerque, Hauts-de-France   [hn_rel=0 l_conf=0]
+Q S3-792079197: Viokelo | 34 - Rue La Fayette, Lille, Nord
+   winner p=0.724 S1-166998849: Rabelais Jeunes | 34 Rue la Fayette, Lille, Hauts-de-France
+   runner-up p=0.419 S1-364829914: Maison de Santé Dentreprises | 34 Rue la Fayette, Lille, Hauts-de-France   [hn_rel=1 l_conf=0]
+Q S3-19680579: Beloiricira | 82 RUE de la Croix Blanche, Bordeaux, Nouvelle-Aquitaine
+   winner p=0.582 S1-296260652: Idel & Frères SARL | 82 Rue de la Croix Blanche, Bordeaux, Nouvelle-Aquitaine
+   runner-up p=0.389 S1-91100323: Omega Culturelle (France) SA | 82 Rue de la Croix Blanche, Bordeaux, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S3-436551649: Fluxwex | 217 Route Du Cap Ferret, Lège-Cap-Ferret, Gironde
+   winner p=0.995 S1-161889258: Centre Hospitalier Jean | 217 Route du Cap Ferret, Lège-Cap-Ferret, Nouvelle-Aquitaine
+   runner-up p=0.338 S1-352779123: Lège-Cap-Ferret Sportive SARL | 217 Route de Cap Ferret Canon, Lège-Cap-Ferret, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S2-485791035: Lyraxyloumbra | 016 R CAILLETTE, Calais
+   winner p=0.680 S1-249351169: Editions Fete Ecole | 16 Rue Caillette, Calais, Hauts-de-France
+   runner-up p=0.441 S1-591874091: Developpement Danse SAS | 16 rue caillette, Calais, Hauts-de-France   [hn_rel=2 l_conf=0]
+Q S2-994070272: drsport.com | 27 AV DU PRESIDENT JOHN FITZGERALD KENNEDY, Pessac
+   winner p=0.991 S1-931456778: Sports & Cie SARL | 27 AV du President John Fitzgerald Kennedy, Pessac, Nouvelle-Aquitaine
+   runner-up p=0.873 S1-674090906: Departemental Relais Sport SAS | Pessac, Nouvelle-Aquitaine, 27 AV du President John Fitzgerald Kennedy   [hn_rel=1 l_conf=0]
+Q S2-693993787: Veozeta | 31 RUE DE LA PELOUSE DE DOUET, Bordeaux
+   winner p=0.748 S1-956250673: Établissements Team SARL | 31 Rue de la Pelouse de Douet, Bordeaux, Nouvelle-Aquitaine
+   runner-up p=0.270 S1-491520994: Centre Médical Sainte Notre | 31 Rue de la Pelouse de Douet, Bordeaux, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S2-539172993: WEXARC | 22 ALL. DE LOCTUDY, Nantes
+   winner p=0.998 S1-51346848: Quartier & Fils EI | Pays de la Loire, Nantes, 22 Allée de Loctudy
+   runner-up p=0.301 S1-99854343: Nantes Collège SARL | 2 Allée de Loctudy, Nantes, Pays de la Loire   [hn_rel=3 l_conf=0]
+
+--- France ambiguous / city_in_s1_name: 5489 pairs; examples
+Q S3-383483692: SARL Dunkerque Conseil | 17 Bis Rue Lamrtine, Dunkerque
+   winner p=1.000 S1-424676787: Dunkerque Conseil SARL | 17 bis Rue Lamartine, Dunkerque, Hauts-de-France
+   runner-up p=0.663 S1-759458495: Dunkerque Conseil SARL | 17 Rue Henri Terquem, Dunkerque, Hauts-de-France   [hn_rel=1 l_conf=0]
+Q S2-198927976: LILLE ÇENTRE | N°103 RUE BALZC, LILLE, Nord
+   winner p=0.999 S1-595761790: Lille Centre | 103 Rue Balzac, Lille, Hauts-de-France
+   runner-up p=0.270 S1-710075044: Lille Musique | 103 Rue Balzac, Lille, Hauts-de-France   [hn_rel=1 l_conf=0]
+Q S2-134761124: Lille Smfane  SARL | 12 R DE LA PAIX D'UTRECHT, LILLE, Hauts-de-France
+   winner p=0.998 S1-618622063: Lille Sante SARL | 12 Rue de la Paix d'Utrecht, Lille, Hauts-de-France
+   runner-up p=0.229 S1-656357809: Lille Sante SAS | 12 Rue de la Paix d'Utrecht, Lille, Hauts-de-France   [hn_rel=1 l_conf=1]
+Q S3-985951331: Nantes Club Sàrl | 7 Rue Rene Siegfried, Nantes, Pays de la Loire
+   winner p=0.999 S1-496143232: Nantes Club SARL | 7 RUE Rene Siegfried, Nantes, Pays de la Loire
+   runner-up p=0.609 S1-835742750: Nantes Sport SARL | Nantes, 7 RUE Rene Siegfried, Pays de la Loire   [hn_rel=1 l_conf=0]
+Q S3-944404625: Bordeaux Club SCI | Rue Bigot, Bordeaux
+   winner p=0.937 S1-66179645: Bordeaux Club | 25 Rue Bigot, Bordeaux, Nouvelle-Aquitaine
+   runner-up p=0.905 S1-396783345: Bordeaux Club | Bordeaux, Nouvelle-Aquitaine, 27 Rue Bigot   [hn_rel=0 l_conf=0]
+Q S2-517068271: LA TESTE-DE-BUCH | 39 RUE MARTIN SAUGÈRES CAZAUX, LA TESTE-DE-BUCH
+   winner p=1.000 S1-189019429: La Teste-de-Buch Amis | 39 Rue Martin Saugères Cazaux, La Teste-de-Buch, Nouvelle-Aquitaine
+   runner-up p=0.327 S1-891894831: La Teste-de-Buch Institut SASU | La Teste-de-Buch, 39 Rue Martin Saugeres, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S2-598904256: Lille Lycee | N°103 RUE BALZAC, LILLE, Nord
+   winner p=0.996 S1-595761790: Lille Centre | 103 Rue Balzac, Lille, Hauts-de-France
+   runner-up p=0.516 S1-710075044: Lille Musique | 103 Rue Balzac, Lille, Hauts-de-France   [hn_rel=1 l_conf=0]
+Q S2-548877928: Tourcoing-Club S.A.S | RUE DU CHENE HOUPLINE, Hauts-de-France, TOURCOING
+   winner p=0.984 S1-325621863: Tourcoing Club SAS | 72 bis Rue du Chêne Houpline, Tourcoing, Hauts-de-France
+   runner-up p=0.444 S1-218573902: Tourcoing Comite SAS | 57 Rue du Chêne Houpline, Tourcoing, Hauts-de-France   [hn_rel=0 l_conf=0]
+
+--- France ambiguous / name_exact: 4541 pairs; examples
+Q S3-208388247: SARL Nantes Sportive | 29 Boulevard De Longchamp, Nantes, Pays de la Loire
+   winner p=0.998 S1-652568285: Nantes Sportive SARL | 29 Boulevard de Longchamp, Nantes, Pays de la Loire
+   runner-up p=0.911 S1-211273408: Nantes Sportive SAS | Nantes, 29 Boulevard de Longchamp, Pays de la Loire   [hn_rel=1 l_conf=1]
+Q S2-702502723: LA BAULE-ESCOUBLAC CLUB | LA BAULE-ESCOUBLAC, Pays de la Loire, Nº 8 AVNUE DE PROVENCE
+   winner p=1.000 S1-882619860: La Baule-Escoublac Club SAS | 8 Avenue de Provence, La Baule-Escoublac, Pays de la Loire
+   runner-up p=0.571 S1-122486272: La Baule-Escoublac Club SAS | Pays de la Loire, 8 Allée des Troves, La Baule-Escoublac   [hn_rel=1 l_conf=0]
+Q S2-535446792: ELITE SPORTIVE EURL | 
+   winner p=0.708 S1-428123248: Elite Sportive EURL | 10 Rue Gounod, Lille, Hauts-de-France
+   runner-up p=0.468 S1-420373340: Elite Sportive EURL | 32 RTE de la Joneliere, Nantes, Pays de la Loire   [hn_rel=0 l_conf=0]
+Q S3-194710780: Wake élémentaire Sas | 
+   winner p=0.596 S1-590606838: Wake Élémentaire SAS | 152 ter Grande Rue, Roubaix, Hauts-de-France
+   runner-up p=0.590 S1-913078823: Wake Élémentaire SAS | RUE des Terres Nobles, Pornic, Pays de la Loire   [hn_rel=0 l_conf=0]
+Q S3-842896800: Lille Çomite | Rue Pierre Mauroy, Lille, Nord
+   winner p=0.971 S1-592447867: Lille Comite | 34 Rue Pierre Mauroy, Lille, Hauts-de-France
+   runner-up p=0.945 S1-255247858: Lille Comite SAS | 15 Rue Pierre Mauroy, Lille, Hauts-de-France   [hn_rel=0 l_conf=0]
+Q S2-779349425: sasu nantes federation | 45 R. DU TRANSVAAL, Nantes
+   winner p=1.000 S1-971982664: Nantes Federation SASU | 45 Rue du Transvaal, Nantes, Pays de la Loire
+   runner-up p=0.617 S1-760830181: Nantes Federation SAS | 45 Rue du Transvaal, Nantes, Pays de la Loire   [hn_rel=1 l_conf=1]
+Q S3-400188690: PORNIC SPORTIVE SARL | 001 Avenue Des Soprts, Pornic, Pays de la Loire
+   winner p=0.998 S1-378557128: Pornic Sportive SARL | 1 Avenue des Sports, Pornic, Pays de la Loire
+   runner-up p=0.819 S1-385850852: Pornic Sportive SARL | 14 Avenue des Sports, Pornic, Pays de la Loire   [hn_rel=3 l_conf=0]
+Q S2-868991609: EHPAD Nôtre | 13 R CLAUDE TAFAFNEL, BORDEAUX
+   winner p=1.000 S1-658692291: EHPAD Notre | 13 Rue Claude Taffanel, Bordeaux, Nouvelle-Aquitaine
+   runner-up p=0.421 S1-526523044: EHPAD Notre | 13 Impasse des Tanneries, Bordeaux, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+
+## B. Proxy errors (labelled)
+proxy F0.5 0.88768; S1 20000; singletons 310
+loss share by kind:
+both                     0.138
+fn_only                  0.071
+fp_only                  0.729
+ok                       0.000
+singleton_given_match    0.063
+
+FP pairs by query kind:
+kind
+distractor          9132
+copy_of_other_S1      38
+
+proxy FP pairs  (n=9170)
+                      proxy FP pairs  baseline    lift
+legal_conflict                0.0617    0.0643  0.9597
+street_diff_same_num          0.0012    0.0012  1.0104
+num_shifted                   0.3349    0.0676  4.9541
+num_truncated                 0.0208    0.0276  0.7548
+num_different                 0.0631    0.0139  4.5586
+initials_match                0.0040    0.0141  0.2856
+initials_mismatch             0.0017    0.0027  0.6495
+q_gibberish                   0.0363    0.0745  0.4876
+city_in_s1_name               0.1301    0.1295  1.0048
+q_addr_empty                  0.0258    0.0290  0.8917
+name_exact                    0.5159    0.6054  0.8523
+
+--- proxy FP / legal_conflict: 566 pairs; examples
+Q S3-900037486: Arz Collectif EURL | 24 QUAI du danube, Calais
+   cand p=0.989 S1-924398518: Arz Collectif SARL | 24 QUAI du danube, Calais, Hauts-de-France   [hn_rel=1 l_conf=1]
+Q S2-900004994: Combattants Say Jeunes SARL | Nord, DUNKERQUE, 24 BIS RUE PASTEUR
+   cand p=0.994 S1-90597350: Combattants Say Jeunes EURL | 24 bis Rue Pasteur, Dunkerque, Hauts-de-France   [hn_rel=1 l_conf=1]
+Q S3-900005687: Ws Groupement SA | 59 R Marceau, Bordeaux
+   cand p=0.981 S1-474162372: Ws Groupement SARL | Bordeaux, Nouvelle-Aquitaine, 59 Rue Marceau   [hn_rel=1 l_conf=1]
+Q S3-900032498: CGM Atelier SASU | 58 Rue Croix de Seguey, Bordeaux, Gironde
+   cand p=0.982 S1-906379057: CGM Atelier EURL | 58 Rue Croix de Seguey, Bordeaux, Nouvelle-Aquitaine   [hn_rel=1 l_conf=1]
+Q S3-900000872: Ets Personnel SA | 12 R. Dampierre, Dunkerque, Nord
+   cand p=0.991 S1-847618411: Ets Personnel SAS | 12 Rue Dampierre, Dunkerque, Hauts-de-France   [hn_rel=1 l_conf=1]
+
+--- proxy FP / num_shifted: 3071 pairs; examples
+Q S2-900034973: comité du vehicules | 78 BLVD D’ARCACHON, La Teste-de-Buch
+   cand p=0.988 S1-970208759: Comité du Vehicules | 81 Boulevard d’Arcachon, La Teste-de-Buch, Nouvelle-Aquitaine   [hn_rel=4 l_conf=0]
+Q S2-900012656: EHPÀD Employeurs | 12 R DU HAVRE, Roubaix
+   cand p=0.988 S1-614284106: EHPAD Employeurs | 15 Rue du Havre, Roubaix, Hauts-de-France   [hn_rel=4 l_conf=0]
+Q S2-900012949: Clnique de Gupards | 19 CH DE TRÉBÉZY, SAINT-NAZAIRE, Pays de la Loire
+   cand p=0.767 S1-832391188: Clinique de Guepards | 17 Chemin de Trébézy, Saint-Nazaire, Pays de la Loire   [hn_rel=4 l_conf=0]
+Q S3-900004878: bonheurs ancîens sas | 15 R Schubert, Lille, Hauts-de-France
+   cand p=0.814 S1-160780350: Bonheurs Anciens SAS | 11 Rue Schubert, Lille, Hauts-de-France   [hn_rel=4 l_conf=0]
+Q S3-900020654: Cabaret Anciens SAS | Pays de la Loire, Nantes, 434 Route de Saint Joseph
+   cand p=0.842 S1-176125854: Cabaret Anciens SAS | 428 Route de Saint Joseph, Nantes, Pays de la Loire   [hn_rel=4 l_conf=0]
+
+--- proxy FP / num_truncated: 191 pairs; examples
+Q S2-900027150: FRANCINE CENTRE | 1 R. D'HAUBOURDIN, Tourcoing, Hauts-de-France
+   cand p=0.981 S1-794990241: Francine Centre SARL | 12 Rue d'Haubourdin, Tourcoing, Hauts-de-France   [hn_rel=3 l_conf=0]
+Q S2-900039493: Mots (Frhnce) Culture | DUNKERQUE, 174 AVENUE DE PETITE-SYNTHE
+   cand p=0.986 S1-451329078: Mots (France) Culture | 1741 Avenue de Petite-Synthe, Dunkerque, Hauts-de-France   [hn_rel=3 l_conf=0]
+Q S2-900033139: Centre Médica1 de Team | 1 IMPASSE GOURDIN, BORDEAUX, Nouvelle-Aquitaine
+   cand p=0.994 S1-837930371: Centre Médical de Team | Nouvelle-Aquitaine, Bordeaux, 14 Impasse Gourdin   [hn_rel=3 l_conf=0]
+Q S3-900015879: Ailes Secmion SARL | 1 R du Lieutenant Princeteau, Hauts-de-France, Lille
+   cand p=0.964 S1-424569064: Ailes Section SARL | 11 Rue du Lieutenant Princeteau, Lille, Hauts-de-France   [hn_rel=3 l_conf=0]
+Q S2-900034470: Saint-Nazasre Patrimoine SA | 4 RUE FERDINAND BUISSON, SAINT-NAZAIRE
+   cand p=0.993 S1-389390805: Saint-Nazaire Patrimoine SA | Saint-Nazaire, Pays de la Loire, 48 Rue Ferdinand Buisson   [hn_rel=3 l_conf=0]
+
+--- proxy FP / name_exact: 4731 pairs; examples
+Q S2-900021483: Club de Rg SAS | BORDEAUX, Gironde, Nº99 COURS DE L'YSER
+   cand p=0.998 S1-336344576: Club de Rg | 99 Cours de l'Yser, Bordeaux, Nouvelle-Aquitaine   [hn_rel=1 l_conf=0]
+Q S3-900034461: Association des Grenadines | 20 All. des Albizzias, La Teste-de-Buch, BP 5579
+   cand p=0.911 S1-648944196: Association des Grenadines | 17 Allée des Albizzias, La Teste-de-Buch, Nouvelle-Aquitaine   [hn_rel=4 l_conf=0]
+Q S3-900042941: Squash Maison SARL | Hauts-de-France, Lille, 6 R. Hippolyte Lefebvre
+   cand p=1.000 S1-14352070: Squash Maison SARL | 6 Rue Hippolyte Lefebvre, Lille, Hauts-de-France   [hn_rel=1 l_conf=0]
+Q S3-900042844: Fédération des Socio EI | R. de Menin, Tourcoing, Hauts-de-France
+   cand p=0.997 S1-711508648: Fédération des Socio | 18 Rue de Menin, Tourcoing, Hauts-de-France   [hn_rel=0 l_conf=0]
+Q S2-900015309: Comité des Chasse | 148 RUE DU CAPITAINE MICHEL, DUNKERQUE, BP 1912
+   cand p=0.920 S1-304380100: Comité des Chasse | 142 Rue du Capitaine Michel, Dunkerque, Hauts-de-France   [hn_rel=4 l_conf=0]
+
+--- proxy FP / q_gibberish: 333 pairs; examples
+Q S2-900015969: fataservicesarl.fr | Gironde, 06 PL GÉNÉRAL SARRAIL, Bordeaux, BP 809
+   cand p=0.899 S1-170318453: Fata Service SARL | 4 Place Général Sarrail, Bordeaux, Nouvelle-Aquitaine   [hn_rel=4 l_conf=0]
+Q S2-900012464: Latelirr Cie EI | 161 AV DE LA MER, DUNKERQUE, Hauts-de-France
+   cand p=0.975 S1-926073498: Latelier Cie EI | 161 Avenue de la Mer, Dunkerque, Hauts-de-France   [hn_rel=1 l_conf=0]
+Q S3-900005518: Xylozeph | 1 Avenue Michel Lecointre, Nantes, Loire-Atlantique
+   cand p=0.996 S1-315255169: Inventaire Club | 1 Avenue Michel Lecointre, Nantes, Pays de la Loire   [hn_rel=1 l_conf=0]
+Q S3-900012881: alliancejeunessci.fr | 18 Rue d'Artagnan, Nouvelle-Aquitaine, Bordeaux, BP 8556
+   cand p=0.978 S1-643547604: Alliance Jeunes SCI | 10 Rue d'Artagnan, Bordeaux, Nouvelle-Aquitaine   [hn_rel=4 l_conf=0]
+Q S2-900017085: VSS | 9 BIS R LESTIBOUDOIS, LILLE, Hauts-de-France, BP 1775
+   cand p=0.995 S1-275831607: Vexin Secouristes Sportive SAS | 1 BIS Rue Lestiboudois, Lille, Hauts-de-France   [hn_rel=4 l_conf=0]
+
+missed true pairs: 2596 of 69441
+why
+dropped_low_p           2396
+not_in_candidates        173
+assigned_to_other_S1      27
+p of dropped: count    2396.000
+mean        0.377
+std         0.248
+min         0.000
+25%         0.135
+50%         0.395
+75%         0.608
+max         0.779
+      596.07 real       572.85 user        31.54 sys
+          5718409216  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             5648787  page reclaims
+                2572  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                3800  voluntary context switches
+              615476  involuntary context switches
+       8927640770153  instructions retired
+       2022969066184  cycles elapsed
+         11024935448  peak memory footprint

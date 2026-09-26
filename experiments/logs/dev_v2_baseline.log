@@ -1,0 +1,147 @@
+19:01:31 INFO  ber.features | === stage features | run dev | config 872143370fe6 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/features
+19:01:31 INFO  ber.features | metric workers = 2
+19:01:31 INFO  ber.features | train: load records + extras ...
+19:01:31 WARNING ber.features | input normalize/records_train was built with config dd3c99359e39 (current 872143370fe6)
+19:01:34 INFO  ber.features | metric train_queries_selected = {'train': 220900, 'val': 122076}
+19:01:34 INFO  ber.features | train: load records + extras done in 3.0s (peak RSS 0.65 GB)
+19:01:34 WARNING ber.features | input candidates/candidates_train was built with config 6577142419fa (current 872143370fe6)
+19:01:34 INFO  ber.features | train: per-S1 candidate context ...
+19:01:35 INFO  ber.features | train: per-S1 candidate context done in 1.7s (peak RSS 1.18 GB)
+19:01:35 INFO  ber.features | train: features ...
+19:02:18 DEBUG ber.features | features part-00000.parquet: 2186843 rows so far
+19:02:19 DEBUG ber.features | features part-00001.parquet: 2188113 rows so far
+19:02:20 DEBUG ber.features | features part-00002.parquet: 2188115 rows so far
+19:02:48 DEBUG ber.features | features part-00003.parquet: 3571415 rows so far
+19:02:50 DEBUG ber.features | features part-00004.parquet: 3572187 rows so far
+19:02:53 DEBUG ber.features | features part-00005.parquet: 3730263 rows so far
+19:02:55 DEBUG ber.features | features part-00006.parquet: 3799498 rows so far
+19:03:04 DEBUG ber.features | features part-00007.parquet: 4233751 rows so far
+19:03:16 DEBUG ber.features | features part-00008.parquet: 4927997 rows so far
+19:03:26 DEBUG ber.features | features part-00009.parquet: 5505446 rows so far
+19:04:07 DEBUG ber.features | features part-00010.parquet: 7906192 rows so far
+19:04:11 DEBUG ber.features | features part-00011.parquet: 8124339 rows so far
+19:04:11 INFO  ber.features | train: features done in 155.4s (peak RSS 3.85 GB)
+19:04:11 INFO  ber.features | metric train_pairs = 8124339
+19:04:11 INFO  ber.features | metric train_positive_rate = 0.0299
+19:04:11 INFO  ber.features | === stage features ok in 160.1s (peak RSS 3.85 GB)
+19:04:12 INFO  ber.scorer | === stage scorer | run dev | config e8af265c81e2 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/scorer
+19:04:12 WARNING ber.scorer | input features/features_train was built with config 872143370fe6 (current e8af265c81e2)
+19:04:12 INFO  ber.scorer | load sampled train features ...
+19:04:18 INFO  ber.scorer | sampled 5259013 train rows, 2865326 early-stopping rows
+19:04:18 INFO  ber.scorer | load sampled train features done in 5.4s (peak RSS 3.28 GB)
+19:04:18 INFO  ber.scorer | metric rows = {'train': 5259013, 'val': 2865326, 'train_pos': 152974, 'val_pos': 89902}
+19:04:18 WARNING ber.scorer | input normalize/records_train was built with config dd3c99359e39 (current e8af265c81e2)
+19:04:18 INFO  ber.scorer | train LightGBM ...
+19:05:12 INFO  ber.scorer | train LightGBM done in 53.9s (peak RSS 3.28 GB)
+19:05:12 INFO  ber.scorer | wrote importance.parquet: 91 rows x 3 cols
+19:05:12 INFO  ber.scorer | top features by gain:
+              feature         gain  split
+     cos_combo_margin 6.640054e+06    418
+           rank_combo 2.261738e+06    138
+           num_q_only 6.494347e+05    393
+        cos_combo_gap 4.859435e+05    210
+           num_s_only 1.657354e+05    376
+               hn_rel 1.140762e+05    191
+         a_tsr_margin 1.108961e+05    466
+           n_len_diff 8.491701e+04    750
+     l_quality_margin 7.753068e+04    483
+             num_jacc 6.007478e+04    685
+          n_jw_margin 5.593158e+04    418
+           hn_logdiff 4.294390e+04    988
+                n_lev 4.041428e+04    513
+     n_core_eq_margin 3.625867e+04    116
+            a_tsr_gap 3.445267e+04    107
+                a_tsr 3.210766e+04    584
+          q_vocab_oov 3.025086e+04    786
+      cos_name_margin 2.506874e+04    461
+                n_sub 2.338707e+04    335
+             cos_name 2.327332e+04    739
+           n_first_eq 1.824988e+04    456
+n_nocity_ratio_margin 1.511860e+04    468
+           hn_len_min 1.473523e+04    505
+        a_q_unmatched 1.440513e+04    137
+            l_q_empty 1.423500e+04    221
+19:05:12 INFO  ber.scorer | metric train_countries = ['India', 'US']
+19:05:12 INFO  ber.scorer | score all val pairs ...
+19:05:17 INFO  ber.scorer | score all val pairs done in 5.1s (peak RSS 3.28 GB)
+19:05:17 INFO  ber.scorer | metric best_iteration = 178
+19:05:17 INFO  ber.scorer | metric val_auc = 0.999929
+19:05:18 INFO  ber.scorer | metric val_logloss = 0.003673
+19:05:18 INFO  ber.scorer | wrote scores_val.parquet: 2865326 rows x 4 cols
+19:05:18 INFO  ber.scorer | === stage scorer ok in 65.5s (peak RSS 3.28 GB)
+[100]	val's binary_logloss: 0.00419062
+[200]	val's binary_logloss: 0.00371635
+19:05:19 INFO  ber.decide | === stage decide | run dev | config 539249b843a1 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/decide
+19:05:19 WARNING ber.decide | input normalize/records_train was built with config dd3c99359e39 (current 539249b843a1)
+19:05:19 INFO  ber.decide | metric val_s1 = {'n': 26132, 'singletons': 1497}
+19:05:19 WARNING ber.decide | input scorer/scores_val was built with config e8af265c81e2 (current 539249b843a1)
+19:05:20 INFO  ber.decide | metric val_one_owner_precision_at_1 = 0.73153
+19:05:21 INFO  ber.decide | metric val_duplicates_retied = 0
+19:05:34 INFO  ber.decide | metric val_sweep = {0.02: {'threshold': 0.93367, 'expected_f_min_p': 0.97823}, 0.05: {'threshold': 0.9559, 'expected_f_min_p': 0.97823}, 0.1: {'threshold': 0.96646, 'expected_f_min_p': 0.97822}, 0.15: {'threshold': 0.9716, 'expected_f_min_p': 0.97821}, 0.2: {'threshold': 0.97455, 'expected_f_min_p': 0.97817}, 0.25: {'threshold': 0.97624, 'expected_f_min_p': 0.97816}, 0.3: {'threshold': 0.97699, 'expected_f_min_p': 0.97814}, 0.35: {'threshold': 0.97761, 'expected_f_min_p': 0.97817}, 0.4: {'threshold': 0.97809, 'expected_f_min_p': 0.97807}, 0.45: {'threshold': 0.97826, 'expected_f_min_p': 0.97796}, 0.5: {'threshold': 0.97826, 'expected_f_min_p': 0.97773}, 0.6: {'threshold': 0.97763, 'expected_f_min_p': 0.97714}, 0.7: {'threshold': 0.97619, 'expected_f_min_p': 0.97618}, 0.8: {'threshold': 0.97323, 'expected_f_min_p': 0.97323}}
+19:05:34 INFO  ber.decide | metric chosen = {'method': 'expected_f', 'threshold': 0.45, 'min_p': 0.02}
+19:05:35 INFO  ber.decide | wrote val_per_entity.parquet: 26132 rows x 8 cols
+19:05:35 INFO  ber.decide | wrote decisions_val.parquet: 86409 rows x 4 cols
+19:05:35 INFO  ber.decide | metric val_f05 = 0.97823
+19:05:35 INFO  ber.decide | metric val_by_country = {'India': {'n': 13022.0, 'f05': 0.96658, 'pair_p': 0.99426, 'pair_r': 0.92582, 'singleton_frac': 0.05905, 'singleton_acc': 0.96619}, 'US': {'n': 13110.0, 'f05': 0.9898, 'pair_p': 0.99645, 'pair_r': 0.97737, 'singleton_frac': 0.05553, 'singleton_acc': 0.98489}}
+19:05:35 INFO  ber.decide | metric val_by_segment = {'has_matches': {'n': 24635.0, 'f05': 0.97841, 'pair_p': 0.99582, 'pair_r': 0.95173, 'singleton_frac': 0.0, 'singleton_acc': nan}, 'singleton': {'n': 1497.0, 'f05': 0.97528, 'pair_p': 0.0, 'pair_r': 1.0, 'singleton_frac': 1.0, 'singleton_acc': 0.97528}}
+19:05:35 INFO  ber.decide | metric val_by_has_indic_match = {'False': {'n': 22192.0, 'f05': 0.98733, 'pair_p': 0.99518, 'pair_r': 0.97396, 'singleton_frac': 0.06746, 'singleton_acc': 0.97528}, 'True': {'n': 3940.0, 'f05': 0.92698, 'pair_p': 0.99658, 'pair_r': 0.83954, 'singleton_frac': 0.0, 'singleton_acc': nan}}
+19:05:35 INFO  ber.decide | metric val_overall = {'n': 26132.0, 'f05': 0.97823, 'pair_p': 0.99539, 'pair_r': 0.95173, 'singleton_frac': 0.05729, 'singleton_acc': 0.97528}
+19:05:35 INFO  ber.decide | === stage decide ok in 16.4s (peak RSS 1.12 GB)
+19:05:36 INFO  ber.rescore | === stage rescore | run dev | config 539249b843a1 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/rescore
+19:05:36 INFO  ber.rescore | val: top-k + features ...
+19:05:36 WARNING ber.rescore | input features/features_train was built with config 872143370fe6 (current 539249b843a1)
+19:05:36 WARNING ber.rescore | input scorer/scores_val was built with config e8af265c81e2 (current 539249b843a1)
+19:05:38 WARNING ber.rescore | input normalize/records_train was built with config dd3c99359e39 (current 539249b843a1)
+19:05:40 INFO  ber.rescore | val: top-k + features done in 3.9s (peak RSS 1.78 GB)
+19:05:40 INFO  ber.rescore | metric val_pairs = 366227
+19:05:40 INFO  ber.rescore | val: 2-fold cross-fit ...
+19:05:48 INFO  ber.rescore | val: 2-fold cross-fit done in 7.3s (peak RSS 1.78 GB)
+19:05:48 INFO  ber.rescore | metric val_auc_stage1 = 0.999407
+19:05:48 INFO  ber.rescore | metric val_auc_rescore = 0.999832
+19:05:48 INFO  ber.rescore | metric val_logloss_stage1 = 0.027041
+19:05:48 INFO  ber.rescore | metric val_logloss_rescore = 0.013427
+19:05:48 INFO  ber.rescore | wrote scores_val.parquet: 366227 rows x 4 cols
+19:05:48 INFO  ber.rescore | train final model on all val ...
+19:05:52 INFO  ber.rescore | train final model on all val done in 3.8s (peak RSS 1.78 GB)
+19:05:52 INFO  ber.rescore | wrote importance.parquet: 22 rows x 2 cols
+19:05:52 INFO  ber.rescore | rescore features by gain:
+     feature         gain
+    p_margin 2.176165e+06
+           p 1.013182e+06
+       c_sum 2.183485e+04
+s_n_assigned 1.969422e+04
+        q_p1 1.352377e+04
+  m_addr_max 9.213151e+03
+   cos_combo 8.039764e+03
+        q_p2 7.708352e+03
+       a_tsr 7.492400e+03
+  m_name_max 7.252428e+03
+     n_ratio 6.095515e+03
+  c_same_src 4.779893e+03
+   s_n_above 3.259222e+03
+   l_quality 2.914599e+03
+      hn_rel 2.909680e+03
+       m_dup 1.006743e+03
+         c_n 9.353954e+02
+  c_cap_room 9.135779e+02
+    q_source 5.261452e+02
+   n_core_eq 2.589368e+02
+        rank 4.175437e+01
+         m_n 9.969220e+00
+19:05:52 INFO  ber.rescore | === stage rescore ok in 15.3s (peak RSS 1.78 GB)
+19:05:52 INFO  ber.decide | === stage decide | run dev | config ecbbb155ce79 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/decide
+19:05:52 WARNING ber.decide | input normalize/records_train was built with config dd3c99359e39 (current ecbbb155ce79)
+19:05:53 INFO  ber.decide | metric val_s1 = {'n': 26132, 'singletons': 1497}
+19:05:53 WARNING ber.decide | input rescore/scores_val was built with config 539249b843a1 (current ecbbb155ce79)
+19:05:53 INFO  ber.decide | metric val_one_owner_precision_at_1 = 0.73338
+19:05:54 INFO  ber.decide | metric val_duplicates_retied = 0
+19:06:07 INFO  ber.decide | metric val_sweep = {0.02: {'threshold': 0.95399, 'expected_f_min_p': 0.98559}, 0.05: {'threshold': 0.96761, 'expected_f_min_p': 0.98563}, 0.1: {'threshold': 0.9748, 'expected_f_min_p': 0.98566}, 0.15: {'threshold': 0.97821, 'expected_f_min_p': 0.98566}, 0.2: {'threshold': 0.98014, 'expected_f_min_p': 0.9857}, 0.25: {'threshold': 0.98153, 'expected_f_min_p': 0.98572}, 0.3: {'threshold': 0.98271, 'expected_f_min_p': 0.98575}, 0.35: {'threshold': 0.98366, 'expected_f_min_p': 0.98575}, 0.4: {'threshold': 0.98408, 'expected_f_min_p': 0.98576}, 0.45: {'threshold': 0.98452, 'expected_f_min_p': 0.98576}, 0.5: {'threshold': 0.98495, 'expected_f_min_p': 0.9859}, 0.6: {'threshold': 0.98543, 'expected_f_min_p': 0.98593}, 0.7: {'threshold': 0.98536, 'expected_f_min_p': 0.98554}, 0.8: {'threshold': 0.98505, 'expected_f_min_p': 0.98505}}
+19:06:07 INFO  ber.decide | metric chosen = {'method': 'expected_f', 'threshold': 0.6, 'min_p': 0.6}
+19:06:08 INFO  ber.decide | wrote val_per_entity.parquet: 26132 rows x 8 cols
+19:06:08 INFO  ber.decide | wrote decisions_val.parquet: 88591 rows x 4 cols
+19:06:08 INFO  ber.decide | metric val_f05 = 0.98593
+19:06:08 INFO  ber.decide | metric val_by_country = {'India': {'n': 13022.0, 'f05': 0.98034, 'pair_p': 0.99305, 'pair_r': 0.9686, 'singleton_frac': 0.05905, 'singleton_acc': 0.96099}, 'US': {'n': 13110.0, 'f05': 0.99148, 'pair_p': 0.99697, 'pair_r': 0.98536, 'singleton_frac': 0.05553, 'singleton_acc': 0.97527}}
+19:06:08 INFO  ber.decide | metric val_by_segment = {'has_matches': {'n': 24635.0, 'f05': 0.98702, 'pair_p': 0.99558, 'pair_r': 0.97702, 'singleton_frac': 0.0, 'singleton_acc': nan}, 'singleton': {'n': 1497.0, 'f05': 0.96794, 'pair_p': 0.0, 'pair_r': 1.0, 'singleton_frac': 1.0, 'singleton_acc': 0.96794}}
+19:06:08 INFO  ber.decide | metric val_by_has_indic_match = {'False': {'n': 22192.0, 'f05': 0.98923, 'pair_p': 0.99553, 'pair_r': 0.98402, 'singleton_frac': 0.06746, 'singleton_acc': 0.96794}, 'True': {'n': 3940.0, 'f05': 0.96731, 'pair_p': 0.99244, 'pair_r': 0.94169, 'singleton_frac': 0.0, 'singleton_acc': nan}}
+19:06:08 INFO  ber.decide | metric val_overall = {'n': 26132.0, 'f05': 0.98593, 'pair_p': 0.99503, 'pair_r': 0.97702, 'singleton_frac': 0.05729, 'singleton_acc': 0.96794}
+19:06:08 INFO  ber.decide | === stage decide ok in 15.5s (peak RSS 0.79 GB)

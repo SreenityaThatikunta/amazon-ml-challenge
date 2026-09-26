@@ -1,0 +1,27 @@
+18:57:16 INFO  ber.features | === stage features | run dev | config 539249b843a1 | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/dev/features
+18:57:16 INFO  ber.features | metric workers = 4
+18:57:16 INFO  ber.features | train: load records + extras ...
+18:57:16 WARNING ber.features | input normalize/records_train was built with config dd3c99359e39 (current 539249b843a1)
+18:57:19 INFO  ber.features | metric train_queries_selected = {'train': 220900, 'val': 122076}
+18:57:19 INFO  ber.features | train: load records + extras done in 3.1s (peak RSS 0.66 GB)
+18:57:19 WARNING ber.features | input candidates/candidates_train was built with config 6577142419fa (current 539249b843a1)
+18:57:19 INFO  ber.features | train: per-S1 candidate context ...
+18:57:21 INFO  ber.features | train: per-S1 candidate context done in 2.2s (peak RSS 0.96 GB)
+18:57:21 INFO  ber.features | train: features ...
+18:57:52 DEBUG ber.features | features part-00000.parquet: 2186843 rows so far
+18:57:53 DEBUG ber.features | features part-00001.parquet: 2188113 rows so far
+18:57:54 DEBUG ber.features | features part-00002.parquet: 2188115 rows so far
+18:58:12 DEBUG ber.features | features part-00003.parquet: 3571415 rows so far
+18:58:13 DEBUG ber.features | features part-00004.parquet: 3572187 rows so far
+18:58:16 DEBUG ber.features | features part-00005.parquet: 3730263 rows so far
+18:58:18 DEBUG ber.features | features part-00006.parquet: 3799498 rows so far
+18:58:24 DEBUG ber.features | features part-00007.parquet: 4233751 rows so far
+18:58:32 DEBUG ber.features | features part-00008.parquet: 4927997 rows so far
+18:58:39 DEBUG ber.features | features part-00009.parquet: 5505446 rows so far
+18:59:07 DEBUG ber.features | features part-00010.parquet: 7906192 rows so far
+18:59:10 DEBUG ber.features | features part-00011.parquet: 8124339 rows so far
+18:59:10 INFO  ber.features | train: features done in 109.1s (peak RSS 2.84 GB)
+18:59:10 INFO  ber.features | metric train_pairs = 8124339
+18:59:10 INFO  ber.features | metric train_positive_rate = 0.0299
+18:59:10 INFO  ber.features | === stage features ok in 114.5s (peak RSS 2.84 GB)
+.venv/bin/ber features -c code/business_entity_resolution/configs/dev.yaml  293.99s user 43.41s system 291% cpu 1:55.55 total

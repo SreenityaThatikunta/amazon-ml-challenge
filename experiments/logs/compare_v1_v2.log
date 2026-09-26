@@ -1,0 +1,5 @@
+             S1  old pairs/S1  new pairs/S1  old empty  new empty     kept  removed   added  reassigned q
+country                                                                                                  
+India    809986        3.3288        3.4398     0.0558     0.0554  2682501    13806  103686           939
+US       663106        3.3706        3.4630     0.0559     0.0556  2230998     4094   65310           702
+France   259452        3.4838        3.4333     0.0485     0.0526   882383    21502    8401           437

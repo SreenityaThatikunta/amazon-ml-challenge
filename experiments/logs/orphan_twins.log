@@ -1,0 +1,19 @@
+{'set': 'US val orphans (p1<.05)', 'n': 157121, 'twin>=0.9': 0.0228, 'twin>=0.8': 0.0714, 'twin>=0.7': 0.1318}
+{'set': 'US val truly unmatched', 'n': 164914, 'twin>=0.9': 0.0191, 'twin>=0.8': 0.0642, 'twin>=0.7': 0.1184}
+{'set': 'US test orphans (p1<.05), 6 regions', 'n': 166836, 'twin>=0.9': 0.2289, 'twin>=0.8': 0.4972, 'twin>=0.7': 0.7016}
+{'set': 'US control: val matched copies', 'n': 191970, 'twin>=0.9': 0.4662, 'twin>=0.8': 0.7203, 'twin>=0.7': 0.8692}
+US: orphans per query val 0.247, test 0.375
+{'set': 'India val orphans (p1<.05)', 'n': 101759, 'twin>=0.9': 0.0238, 'twin>=0.8': 0.0811, 'twin>=0.7': 0.1494}
+{'set': 'India val truly unmatched', 'n': 105783, 'twin>=0.9': 0.0163, 'twin>=0.8': 0.0704, 'twin>=0.7': 0.1331}
+{'set': 'India test orphans (p1<.05), 2 regions', 'n': 452137, 'twin>=0.9': 0.1799, 'twin>=0.8': 0.4823, 'twin>=0.7': 0.6439}
+{'set': 'India control: val matched copies', 'n': 123962, 'twin>=0.9': 0.5497, 'twin>=0.8': 0.7542, 'twin>=0.7': 0.8643}
+India: orphans per query val 0.251, test 0.379
+                                   set      n  twin>=0.9  twin>=0.8  twin>=0.7
+               US val orphans (p1<.05) 157121     0.0228     0.0714     0.1318
+                US val truly unmatched 164914     0.0191     0.0642     0.1184
+   US test orphans (p1<.05), 6 regions 166836     0.2289     0.4972     0.7016
+        US control: val matched copies 191970     0.4662     0.7203     0.8692
+            India val orphans (p1<.05) 101759     0.0238     0.0811     0.1494
+             India val truly unmatched 105783     0.0163     0.0704     0.1331
+India test orphans (p1<.05), 2 regions 452137     0.1799     0.4823     0.6439
+     India control: val matched copies 123962     0.5497     0.7542     0.8643

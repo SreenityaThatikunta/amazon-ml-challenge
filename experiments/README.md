@@ -12,9 +12,20 @@ Heavy stages run **one at a time** (16 GB RAM).
 
 | File | What |
 |---|---|
-| `ab_dev_france.sh` | Dev A/B for the France work: new features (B1), + synthetic French training (B2); each scored on dev val and on the France proxy |
-| `top1_by_country.py` | Best candidate per test query with its house-number relation and p, by country (writes `logs/top1.parquet`) |
-| `logs/` | Stage and script logs (text tracked; parquet ignored) |
+| `ab_dev_france.sh` | *(main only)* Dev A/B for the France work: new features (B1), + synthetic French training (B2) (E6) |
+| `run_main_v2.sh` | *(main only)* full-scale main v2 chain (E11) |
+| `sweep_rescore_dev.sh` | *(main only)* rescore k × conf sweep on dev (E10) |
+| `top1_by_country.py` | Best candidate per test query with its house-number relation and p, by country (E3) |
+| `loss_breakdown.py` | Where the val loss is: fn-only / fp-only / singletons, per country (E14) |
+| `candidate_misses.py` | True pairs never retrieved as candidates, by segment (E16) |
+| `compact_features.py` | Rewrite feature parts as float32/int32 + zstd (E18, E21) |
+| `compare_submissions.py` | Two `matching_results.tsv` files per country: pairs/S1, empty rate, added/removed (E25) |
+| `make_probe.py` | LB probe files: empty or swap one country's predictions (E20) |
+| `run_dev_v3.sh` | v3 pipeline on the dev slice, run `devv3` (E19, E24) |
+| `run_v3_full.sh` | Full v3 run, two passes (E25) |
+| `profile_features.py` | cProfile of `build_features` on a dev chunk (E24) |
+| `orphan_twins.py` | H-test: do test's no-match records come in near-identical copy groups? (E26) |
+| `logs/` | Stage and script logs (text tracked since 2026-09-26; parquet/tsv ignored) |
 
 Related scripts elsewhere: `eda/07_france_errors.py` (France error dump + proxy realism;
 report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_france_proxy.txt`).
@@ -310,4 +321,37 @@ report in `eda/reports/07_france_errors.txt`, proxy-only report `eda/reports/07_
 - vs main v1 (pairs/S1, empty rate): India 3.33 → 3.40, 5.6% → 5.7%; US 3.37 → 3.42, 5.6% → 5.7%;
   France 3.48 → 3.42, 4.9% → 5.5% (France v2.1: 3.44).
 - **Public LB: pending** (the user uploads).
+
+### E26. v3 public LB, and the H-test (orphan copy groups)
+- **v3 public LB 0.9805** (v2.2: 0.980, +0.0005 ≈ its val gain +0.0006). Val → LB gap still ~0.009 = the gap
+  to the top (0.990).
+- `.venv/bin/python experiments/orphan_twins.py` (log `logs/orphan_twins.log`, ~6 min). Orphan = S2/S3 record
+  whose best stage-1 p1 < 0.05. For each record: cosine (char 3-gram TF-IDF, core name + address) to its
+  nearest *other* orphan. Test orphans come from whole test regions with about as many orphans as val.
+  Control: val records that have an owner (near twins = S2/S3 copies of one S1).
+
+| Set | n | twin ≥ 0.9 | twin ≥ 0.8 | twin ≥ 0.7 |
+|---|---|---|---|---|
+| US val orphans | 157,121 | 0.023 | 0.071 | 0.132 |
+| US val truly unmatched | 164,914 | 0.019 | 0.064 | 0.118 |
+| **US test orphans** (6 regions) | 166,836 | **0.229** | **0.497** | **0.702** |
+| US control: val matched copies | 191,970 | 0.466 | 0.720 | 0.869 |
+| India val orphans | 101,759 | 0.024 | 0.081 | 0.149 |
+| India val truly unmatched | 105,783 | 0.016 | 0.070 | 0.133 |
+| **India test orphans** (2 regions) | 452,137 | **0.180** | **0.482** | **0.644** |
+| India control: val matched copies | 123,962 | 0.550 | 0.754 | 0.864 |
+
+- Orphans per S2/S3 record: US val 0.247 → test **0.375**; India 0.251 → **0.379**.
+- **H-test holds, for both countries.** Val orphans almost never have a near twin (7% at ≥ 0.8), test
+  orphans do half the time, close to how often real copies of one S1 find each other (72–75%).
+  Share of test orphans that belong to a copy group of an entity with **no S1 in the test pool**:
+  ≈ (0.497 − 0.071) / (0.720 − 0.071) ≈ **0.66** (US), ≈ 0.60 (India, whose test sample is 4× denser,
+  so an upper bound). This holds in India too, even though its S1 pool is 92% of train's: the test generator
+  keeps S2/S3 copies of entities whose S1 is absent, whatever the pool size.
+- Consequences: (1) val_ts = drop a fraction of val S1 and keep their copies (this is the test process, not
+  an approximation); rate chosen so orphans per record go 0.25 → ~0.375. (2) Training never saw
+  "copy of a missing entity" negatives. Only the ones the model already rejects are counted here (p1 < .05);
+  the ones it links to a lookalike S1 are **false positives on test that val cannot show**. (3) Such records
+  have a near-identical sibling among the other records (S2↔S3) that points to no S1, or to a different S1:
+  a **query–query consistency feature** can detect this on test with no labels.
 

@@ -1,0 +1,39 @@
+08:30:10 INFO  ber.features | === stage features | run devv3s | config 239eb1bb791e | /Users/sreenityathatikunta/Documents/Projects/student_resource/artifacts/devv3s/features
+08:30:10 INFO  ber.features | metric workers = 1
+08:30:10 INFO  ber.features | learn filler words ...
+08:30:10 WARNING ber.features | input normalize/records_train was built with config d0a8591db249 (current 239eb1bb791e)
+08:30:10 INFO  ber.features | learn filler words done in 0.5s (peak RSS 0.23 GB)
+08:30:10 INFO  ber.features | metric fillers = african as automobiles avenue bakery bay bezons bnb center central consultations dijital downtown east eastgate electronics exports fauquier finesse francoeur furniture garments general greater group h hardware holdings hyderabad inaphrasatrakacar infratech injiniaring intaranaisanal janaral je jewelers jewellers jones kansatrakasan kansatrakasanaj l lakeside laujisatikas lndia m main mainejamaint medicals midtown motors norris north northside npx on one overseas pharmacy phaundesan prodiusar provijan provision public restaurant riverside s sadaran saravisij secunderabad service services soliusanaj south southside steel stores superior sweets sys ta taikanaloji taikanalojij textiles union uptown vaincaraj west westgate wozny
+08:30:10 INFO  ber.features | learn brand syllables ...
+08:30:10 WARNING ber.features | input normalize/records_train was built with config d0a8591db249 (current 239eb1bb791e)
+08:30:11 INFO  ber.features | learn brand syllables done in 0.2s (peak RSS 0.37 GB)
+08:30:11 INFO  ber.features | metric brand_units = ar arc aria avi belo brix calo cira delta dova drex ecto evo faye flux gild halo iri jax kelo kor lum lyra mira nex novi nyla onyx orbi pyra quo riza sol syn tavo umbra vantage ve veo vera vio wex xylo yuma ze zeph zeta
+08:30:11 WARNING ber.features | input normalize/records_train was built with config d0a8591db249 (current 239eb1bb791e)
+08:30:11 WARNING ber.features | input candidates/candidates_train was built with config d0a8591db249 (current 239eb1bb791e)
+08:30:11 INFO  ber.features | train: per-S1 candidate context ...
+08:30:13 INFO  ber.features | train: per-S1 candidate context done in 1.8s (peak RSS 0.87 GB)
+08:30:13 WARNING ber.features | input candidates/parts_train was built with config d0a8591db249 (current 239eb1bb791e)
+08:30:13 INFO  ber.features | train India: records + extras ...
+08:30:16 INFO  ber.features | train India: records + extras done in 3.5s (peak RSS 0.87 GB)
+08:30:16 INFO  ber.features | train India: features ...
+08:31:38 DEBUG ber.features | features part-00000.parquet: 2185760 rows so far
+08:31:39 DEBUG ber.features | features part-00001.parquet: 2187029 rows so far
+08:31:40 DEBUG ber.features | features part-00002.parquet: 2187031 rows so far
+08:32:35 DEBUG ber.features | features part-00003.parquet: 3570525 rows so far
+08:32:35 DEBUG ber.features | features part-00004.parquet: 3571295 rows so far
+08:32:47 DEBUG ber.features | features part-00005.parquet: 4001510 rows so far
+08:32:47 INFO  ber.features | train India: features done in 150.6s (peak RSS 2.87 GB)
+08:32:47 INFO  ber.features | train US: records + extras ...
+08:32:51 INFO  ber.features | train US: records + extras done in 4.3s (peak RSS 2.87 GB)
+08:32:51 INFO  ber.features | train US: features ...
+08:32:53 DEBUG ber.features | features part-00006.parquet: 4070890 rows so far
+08:33:10 DEBUG ber.features | features part-00007.parquet: 4505578 rows so far
+08:33:33 DEBUG ber.features | features part-00008.parquet: 5200800 rows so far
+08:33:54 DEBUG ber.features | features part-00009.parquet: 5778561 rows so far
+08:35:03 DEBUG ber.features | features part-00010.parquet: 8181884 rows so far
+08:35:19 DEBUG ber.features | features part-00011.parquet: 8858986 rows so far
+08:35:19 INFO  ber.features | train US: features done in 147.9s (peak RSS 3.74 GB)
+08:35:19 INFO  ber.features | metric train_queries_selected = {'train': 220900, 'val': 122076}
+08:35:19 INFO  ber.features | metric train_pairs = 8858986
+08:35:19 INFO  ber.features | metric train_positive_rate = 0.0274
+08:35:19 INFO  ber.features | === stage features ok in 308.9s (peak RSS 3.74 GB)
