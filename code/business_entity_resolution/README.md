@@ -32,27 +32,29 @@ Run them one at a time: heavy stages in parallel swap on a 16 GB machine
 
 ```bash
 B=.venv/bin/ber            # Windows: .venv\Scripts\ber.exe (set PYTHONUTF8=1)
-$B split       --run main  # geographic train/val split + dev slice            (~3 min)
-$B normalize   --run main  # normalise 24M records, learn Indic dictionary     (~7 min)
-$B candidates  --run main  # region-blocked TF-IDF top-k + recall report       (~1.5 h GPU / ~4 h CPU, train+test)
-$B features    --run main  # 102 pair + context features                       (~4 h, train+test)
-$B scorer      --run main  # stage-1 LightGBM, scores val + test pairs         (~20 min)
-$B rerank      --run main  # stage-2 re-ranker (cross-fitted on val) + test    (~15 min)
-$B decide      --run main  # one owner per record + expected F0.5; val F0.5     (~10 min)
-$B submit      --run main  # output/matching_results.tsv + candidate_pairs.tsv + official validator
+$B split       --run v3    # geographic train/val split + dev slice            (~3 min)
+$B normalize   --run v3    # normalise 24M records, learn Indic dictionaries   (~7 min)
+$B candidates  --run v3    # region-blocked TF-IDF top-k + recall report       (~1.5 h GPU / ~4 h CPU, train+test)
+$B features    --run v3    # pair + context + key + lookalike features         (~4 h, train+test)
+$B scorer      --run v3    # stage-1 LightGBM, scores val + test pairs         (~20 min)
+$B rerank      --run v3    # stage-2 re-ranker (cross-fitted on val) + test    (~15 min)
+$B decide      --run v3    # one owner per record + expected F0.5; val F0.5     (~10 min)
+$B submit      --run v3    # output/matching_results.tsv + candidate_pairs.tsv + official validator
 ```
 
 The train/val side and the test side can also run as two passes (the test pass reuses
 the model, region neighbourhoods and decision parameters of the train pass):
 
 ```bash
-for s in candidates features scorer rerank decide; do $B $s --run main --set data.phase=train; done
-for s in candidates features scorer rerank decide submit; do $B $s --run main --set data.phase=test; done
+for s in candidates features scorer rerank decide; do $B $s --run v3 --set data.phase=train; done
+for s in candidates features scorer rerank decide submit; do $B $s --run v3 --set data.phase=test; done
 ```
 
 `output/candidate_pairs.tsv` is the input of the final model: the pairs that passed the
 stage-1 filter (`rerank.min_p1`), ~1 per S2/S3 record. `decide.scores_stage=scorer` gives
 the stage-1-only pipeline (then candidate_pairs.tsv holds every TF-IDF candidate, ~3 GB).
+`ber rescore` + `decide.scores_stage=rescore` is main's alternative stage 2 (M8).
+What each change adds, with the measured gains, is logged in `../../experiments/README.md`.
 
 LLM stage (optional, on Kaggle; see [kaggle/README.md](kaggle/README.md)):
 
@@ -70,12 +72,14 @@ Fast iteration on a small slice of states (whole pipeline in minutes):
 $B normalize -c code/business_entity_resolution/configs/dev.yaml   # likewise for every stage
 ```
 
-France validation proxy (synthetic labelled French data, scored with the main model):
+France validation proxy (synthetic labelled French data, scored with the main model's
+unseen-country model; every test S1 France is indexed, 20k of them are scored):
 
 ```bash
 $B synth-france --run main
 P=code/business_entity_resolution/configs/france_proxy.yaml
-for s in split normalize candidates features scorer decide; do $B $s -c $P; done
+for s in split normalize candidates features; do $B $s -c $P; done
+$B scorer -c $P -s scorer.model_from_run=main && $B decide -c $P
 ```
 
 Debugging: `$B explain <entity_id> --run main` traces one record through every
@@ -90,12 +94,13 @@ stage. `$B config` prints the resolved configuration.
 | `src/ber/features/` | Stage 2: pair + context features |
 | `src/ber/scorer/` | Stage 2: stage-1 LightGBM scorer (also the learned candidate filter) |
 | `src/ber/rerank/` | Stage 2b: re-ranker with S1/record group context, cross-fitted on val |
+| `src/ber/cluster/` | Stage 2b alternative (main's M8): rescore with cluster context, cross-fitted on val |
 | `src/ber/llm/` | Stage 3: routing, select-prompts, LLM score import/blend |
 | `src/ber/decide/` | Stage 4: one-owner assignment, expected-F0.5 selection, val metrics |
-| `src/ber/france/` | Synthetic French labelled data (validation proxy / LLM training) |
+| `src/ber/france/` | Synthetic French labelled data (validation proxy; training pairs for the unseen-country model) |
 | `src/ber/eval/` | Metrics (same as `utils/score.py`), geographic split |
 | `src/ber/{config,artifacts,io,log,cli,submit,explain}.py` | Infrastructure |
-| `configs/` | `default.yaml` (every key documented), `dev.yaml`, `france_proxy.yaml` |
+| `configs/` | `default.yaml` (every key documented), `dev.yaml`, `france_proxy.yaml`, `france_train.yaml` |
 | `kaggle/` | LoRA training / inference scripts for Kaggle GPUs |
 | `tools/` | License check |
 | `tests/` | pytest suite |

@@ -60,6 +60,8 @@ class NormalizeConfig:
     chunk_size: int = 100_000     # records per worker task
     dict_min_count: int = 2       # translit dictionary: min aligned occurrences
     dict_min_share: float = 0.6   # translit dictionary: min share of the dominant spelling
+    test_dict_all_pairs: bool = True  # test records: dictionary from all train pairs (not
+                                      # only train-side ones; val regions hold all Gurmukhi)
 
 
 @dataclass
@@ -111,7 +113,9 @@ class ScorerConfig:
     model_from_run: str | None = None  # apply that run's model instead of training
     train_query_frac: float = 0.1   # share of featurised train-side queries used for training
     es_query_frac: float = 0.05     # share of val-side queries used for early stopping
-    drop_features: list[str] = field(default_factory=list)  # ablations: names or "prefix*"
+    drop_features: list[str] = field(default_factory=list)  # ablations: names or "prefix*";
+                                    # E18 candidate: [s_n_cands, s_n_top1] (per-S1 counts that
+                                    # shift between val and test), off until measured on val_ts
 
 
 @dataclass
@@ -130,6 +134,17 @@ class RerankConfig:
 
 
 @dataclass
+class RescoreConfig:
+    k: int = 3                 # top-k stage-1 candidates per query that get rescored
+    conf: float = 0.5          # stage-1 p for a query to count as a confident cluster member
+    folds: int = 2             # cross-fitting folds on val (by the query's best S1)
+    rounds: int = 1            # rescore rounds; round r+1 rebuilds clusters from round-r p
+    stage1_feats: list[str] = field(default_factory=list)  # stage-1 features joined in;
+                                                           # [] = the default short list
+    model_from_run: str | None = None  # apply that run's rescore model to val (France proxy)
+
+
+@dataclass
 class DecideConfig:
     method: str = "expected_f"      # "threshold" | "expected_f"
     threshold: float | None = None  # threshold method: None = best on val sweep
@@ -137,7 +152,9 @@ class DecideConfig:
     empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
     tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
     prior_shift: str = "none"       # "none" | "segment_em" (test: EM prior correction per segment)
-    scores_stage: str = "rerank"    # "scorer" (stage 1 only), "rerank" (stage 2) or "llm-import"
+    scores_stage: str = "rerank"    # "scorer" (stage 1), "rerank" (stage 2), "rescore" (main's M8)
+                                    # or "llm-import"
+    eval_s1: str | None = None      # TSV (entity_id) restricting val scoring to these S1
     sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
                                                         0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])
 
@@ -159,6 +176,10 @@ class LlmConfig:
 class FranceConfig:
     n_entities: int = 20_000        # test S1 France records to synthesise S2/S3 for
     distractor_rate: float = 0.35   # per S1 and source: chance of one lookalike distractor
+    background_run: str | None = "main"  # run whose test scores pick unmatched background records
+    background_max_p: float = 0.01  # background: best candidate p below this
+    background_frac: float = 0.45   # background records per synthetic query
+    exclude: str | None = None      # TSV (entity_id) of S1 never to synthesise (e.g. proxy eval S1)
 
 
 @dataclass
@@ -179,6 +200,7 @@ class Config:
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
     scorer: ScorerConfig = field(default_factory=ScorerConfig)
     rerank: RerankConfig = field(default_factory=RerankConfig)
+    rescore: RescoreConfig = field(default_factory=RescoreConfig)
     decide: DecideConfig = field(default_factory=DecideConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
     france: FranceConfig = field(default_factory=FranceConfig)

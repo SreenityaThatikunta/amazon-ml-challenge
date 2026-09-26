@@ -31,8 +31,25 @@ def test_generate_ground_truth_consistent():
                        "business_address": ["1 Rue X, Lille, Hauts-de-France",
                                             "2 Avenue Y, Nantes, Pays de la Loire"],
                        "country": "France"})
-    s1_, s2, s3, gt = generate(s1, np.array([1, 2]), np.array([0, 1]), 1.0, 0)
+    s1_, s2, s3, gt = generate(s1, np.array([[1, 0], [2, 1]]), 1.0, 0)
     ids = set(s2.entity_id) | set(s3.entity_id)
     matched = [i for x in gt.matched_entity_ids for i in x.split(",") if i]
     assert set(matched) <= ids and len(matched) == len(set(matched))
     assert len(ids) > len(matched)  # distractors exist and are unmatched
+
+
+def test_generate_sampled_and_background():
+    s1 = pd.DataFrame({"entity_id": ["S1-1", "S1-2"], "business_name": ["A Club SAS", "B Ecole"],
+                       "business_address": ["1 Rue X, Lille, Hauts-de-France",
+                                            "2 Avenue Y, Nantes, Pays de la Loire"],
+                       "country": "France"})
+    bg = pd.DataFrame({"entity_id": ["S2-123456789", "S3-987654321"], "business_name": ["Z", "W"],
+                       "business_address": ["", ""], "country": "France"})
+    s1_, s2, s3, gt = generate(s1, np.array([[0, 0], [1, 1]]), 0.0, 0,
+                               sampled=pd.Index(["S1-2"]), background=bg)
+    assert len(s1_) == 2                                  # every S1 is indexed
+    assert gt.set_index("source1_entity_id").matched_entity_ids["S1-1"] == ""
+    assert "S2-123456789" in set(s2.entity_id) and "S3-987654321" in set(s3.entity_id)
+    matched = {i for x in gt.matched_entity_ids for i in x.split(",") if i}
+    assert not matched & set(bg.entity_id)                # background stays unmatched
+    assert all(len(i) == 13 for i in matched)             # 10-digit synthetic ids

@@ -48,3 +48,9 @@ htmlcov/
 .vscode/
 *.swp
 .DS_Store
+
+# --- Experiments (scripts, README and text logs are tracked) ---
+experiments/logs/*.parquet
+experiments/logs/*.tsv
+experiments/logs/tmp/
+experiments/logs/

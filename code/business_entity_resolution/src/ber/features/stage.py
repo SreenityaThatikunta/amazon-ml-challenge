@@ -20,7 +20,8 @@ from ..artifacts import StageError, StageRun, load_manifest
 from ..config import Config
 from ..eval.split import stable_unit
 from ..log import timed
-from .build import KeyIndex, address_key, build_features, initials
+from .build import (KeyIndex, addr_words, address_key, build_features, house_number, initials,
+                    name_city)
 
 REC_COLS = ["entity_id", "source", "country", "name_core", "name_compact", "name_legal",
             "name_pre_core", "name_alt_core", "name_is_domain", "name_has_alias", "name_indic",
@@ -111,10 +112,14 @@ def record_extras(recs: pd.DataFrame, fillers: list[str] | None = None,
                   brand_units: list[str] | None = None) -> pd.DataFrame:
     """Per-record extras: initials, share of name tokens unknown to the S1 name
     vocabulary of the country (gibberish brand names score high), for S1 how
-    many S1 of the country share the exact core name (ambiguity), and (v2) the
-    filler-free name key and the made-up-brand flag."""
+    many S1 of the country share the exact core name (ambiguity), (v2) the
+    filler-free name key and the made-up-brand flag, and address words / house
+    number / city words in the name (lookalike features)."""
     recs = recs.copy()
     recs["initials"] = initials(recs.name_core)
+    recs["addr_words"] = [addr_words(a) for a in recs.addr_norm]
+    recs["house"] = [house_number(x) for x in recs.addr_numbers]
+    recs["name_city"] = [name_city(n, a) for n, a in zip(recs.name_core, recs.addr_norm)]
     if fillers is not None:
         recs["name_key"] = name_key(recs.name_core, frozenset(fillers))
     if brand_units is not None:
@@ -163,6 +168,19 @@ def join_records(chunk: pd.DataFrame, rec: pd.DataFrame, ctx: pd.DataFrame) -> p
     sf = rec.reindex(chunk.s1_id.to_numpy()).add_prefix("s_").reset_index(drop=True)
     c = ctx.reindex(chunk.s1_id.to_numpy()).fillna(0).reset_index(drop=True)
     return pd.concat([chunk.reset_index(drop=True), qf, sf, c], axis=1)
+
+
+def compact(df: pd.DataFrame) -> pd.DataFrame:
+    """float64 -> float32 and int64/uint32 -> int32 before writing (the models cast
+    every feature to float32 anyway); with zstd this halves the features on disk
+    (29 GB -> ~13 GB at full scale)."""
+    for c in df.columns:
+        t = df[c].dtype
+        if t == np.float64:
+            df[c] = df[c].astype(np.float32)
+        elif t in (np.int64, np.uint32):
+            df[c] = df[c].astype(np.int32)
+    return df
 
 
 def _has_output(st: StageRun, stage: str, name: str) -> bool:
@@ -261,8 +279,9 @@ def run_features(cfg: Config) -> None:
                                 keys["y"] = (d.s1_id == d.q_owner).astype(np.int8)
                                 keys["side"] = d.q_side.to_numpy()
                                 n_pos += int(keys.y.sum())
-                            out = pd.concat([keys, feats], axis=1)
-                            out.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False)
+                            out = compact(pd.concat([keys, feats], axis=1))
+                            out.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False,
+                                           compression="zstd")
                             n_parts += 1
                             n_rows += len(out)
                             del d, feats, out

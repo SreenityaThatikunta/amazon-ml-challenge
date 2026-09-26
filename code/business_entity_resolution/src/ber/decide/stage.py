@@ -100,6 +100,9 @@ def _decide_val(st: StageRun, cfg: Config) -> dict:
                                               "owner", "name_indic"],
                            filters=[("side", "==", "val")])
     s1 = recs[(recs.source == 1) & slice_mask(recs, cfg, "val")]
+    if dc.eval_s1:  # e.g. France proxy: every S1 indexed, only the sampled ones scored
+        ev = pd.read_csv(cfg.resolve(dc.eval_s1), sep="\t", dtype=str).entity_id
+        s1 = s1[s1.entity_id.isin(set(ev))]
     s1_meta = s1.set_index("entity_id")[["country"]]
     q = recs[(recs.source != 1) & recs.owner.isin(s1_meta.index)]
     truth = q.groupby("owner").entity_id.apply(list).to_dict()
