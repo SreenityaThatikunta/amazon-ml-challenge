@@ -122,18 +122,21 @@ COUNT_COLS = ["s_n", "s_sum_other", "s_n_hi_other", "ss_sum_other", "ss_n_hi_oth
               "q_sum_other", "q_n_hi_other", "s_n_cands", "s_n_top1", "s_name_freq",
               "q_n_cands"]
 IDF_COLS = ["k_idf_unmatched_q", "k_idf_unmatched_s", "a_idf_unmatched_q", "a_idf_unmatched_s"]
+# second-round group features (rerank.rounds = 2): the same columns computed from p2
+G2 = "g2_"
 
 
 def domain_normalize(M: np.ndarray, cols: list[str], groups: np.ndarray | None = None) -> np.ndarray:
     """Count-like columns / their mean, IDF-like columns / their 99th percentile of
     non-zero values, within each group (country) of the rows of the float32 matrix
-    ``M`` whose columns are ``cols`` (in place; returns M)."""
-    idx = {c: j for j, c in enumerate(cols)}
+    ``M`` whose first columns are named ``cols`` (in place; returns M). Columns named
+    "" (or beyond ``cols``) are left alone; second-round copies (``g2_`` prefix) are
+    normalised like their first-round column."""
     groups = np.zeros(len(M), dtype=np.int8) if groups is None else groups
     ug = np.unique(groups)
-    for c in COUNT_COLS + IDF_COLS:
-        j = idx.get(c)
-        if j is None:
+    for j, name in enumerate(cols):
+        c = name.removeprefix(G2)
+        if c not in COUNT_COLS and c not in IDF_COLS:
             continue
         v = np.ascontiguousarray(M[:, j])  # contiguous float32 copy of the column
         for g in ug:
@@ -168,11 +171,11 @@ def group_columns() -> list[str]:
 
 
 def _fill_group(M: np.ndarray, q: np.ndarray, s: np.ndarray, src: np.ndarray,
-                p: np.ndarray) -> None:
-    """Write the group features into the first columns of M (in place)."""
+                p: np.ndarray, col0: int = 0) -> None:
+    """Write the group features into M[:, col0:] (in place)."""
     G = group_features(q, s, src, p)
     for j, c in enumerate(G.columns):
-        M[:, j] = G[c].to_numpy()
+        M[:, col0 + j] = G[c].to_numpy()
 
 
 def _fill_raw(M: np.ndarray, row: int, col0: int, table: pa.Table, raw_cols: list[str],
@@ -195,11 +198,13 @@ def _params(cfg: Config) -> dict:
 
 
 # (stage 2) where each side's pairs come from: (scores stage, output), (features stage, output)
-def _read_pairs(st: StageRun, cfg: Config, raw_cols: list[str], sides: list[str]):
+def _read_pairs(st: StageRun, cfg: Config, raw_cols: list[str], sides: list[str],
+                n_extra: int = 0):
     """Pairs with p1 >= min_p1 of the given sides (val, and hold if
     ``rerank.hold_frac`` > 0) as (keys: q_id, s1_id, y, p, side; M: float32 matrix
     with the stage-1 features in the columns after the group features, which are
-    still empty; cols). Only the kept rows are materialised, straight into M.
+    still empty, and ``n_extra`` empty columns at the end; cols = the names of the
+    group + stage-1 columns). Only the kept rows are materialised, straight into M.
 
     val: ``scores_val`` was written by streaming the val rows of the features_train
     parts in order, so the two line up row by row (checked part by part on the
@@ -217,7 +222,7 @@ def _read_pairs(st: StageRun, cfg: Config, raw_cols: list[str], sides: list[str]
                       for f in hold_parts)
     gcols = group_columns()
     cols = gcols + raw_cols
-    M = np.empty((n_keep, len(cols)), dtype=np.float32)
+    M = np.empty((n_keep, len(cols) + n_extra), dtype=np.float32)
     row, keys = 0, []
     if sv is not None:
         p, y = sv.column("p").to_numpy(), sv.column("y").to_numpy()
@@ -282,6 +287,25 @@ def _query_countries(st: StageRun, cfg: Config, sides: list[str]) -> pd.Series:
     return pd.concat(out)
 
 
+def complete_groups(st: StageRun, cfg: Config, s1_ids: pd.Series, sides: list[str]) -> np.ndarray:
+    """Per pair: whether its S1's group is complete, i.e. the S1 lies in a region whose
+    records stage 2 loads (val side, or a hold region), so every true copy and every
+    other record of the region that claims it is present. Val and hold records also
+    list S1 of the other train regions (cross-region candidates, whole-country
+    searches); those S1's own copies are never loaded, so their groups look empty and
+    rejecting such a pair is trivially easy, which never happens at test time, where
+    every group is complete (v2.4 finding: 16 % of the kept val pairs)."""
+    s1 = st.read_input("split", "s1", run=cfg.data.split_run,
+                       columns=["entity_id", "country", "geo", "side"])
+    loaded = (s1.side == "val").to_numpy()
+    if "hold" in sides:
+        hold = st.read_input("features_hold", "hold_regions")
+        loaded |= pd.MultiIndex.from_frame(s1[["country", "geo"]]).isin(
+            pd.MultiIndex.from_frame(hold[["country", "geo"]])).to_numpy()
+    flag = pd.Series(loaded, index=s1.entity_id.to_numpy())
+    return flag.reindex(s1_ids.astype(str).to_numpy()).fillna(False).to_numpy(dtype=bool)
+
+
 def _raw_columns(st: StageRun, wanted: list[str]) -> list[str]:
     """Stage-1 features passed to stage 2; ["all"] = every stage-1 feature."""
     if list(wanted) != ["all"]:
@@ -289,6 +313,47 @@ def _raw_columns(st: StageRun, wanted: list[str]) -> list[str]:
     first = sorted(st.input_path("features", "features_train").glob("*.parquet"))[0]
     return [c for c in pq.ParquetFile(first).schema_arrow.names
             if c not in ("q_id", "s1_id", "y", "side")]
+
+
+def _cross_fit(st: StageRun, cfg: Config, M: np.ndarray, cols: list[str], y: np.ndarray,
+               folds: tuple, is_val: np.ndarray, tag: str) -> tuple[np.ndarray, np.ndarray]:
+    """Cross-fitted stage-2 models on the first ``len(cols)`` columns of M: fold k's
+    model trains on the trainable rows of the other folds (early stopping on 10 % of
+    their groups, never the held-out fold) and predicts fold k. Saves
+    ``model{tag}_fold{k}.txt``; returns (out-of-fold p, gain importance over folds)."""
+    rc = cfg.rerank
+    fold, u, trainable, w = folds
+    nc = len(cols)
+    oof = np.zeros(len(M), dtype=np.float64)
+    imp = np.zeros(nc)
+    for k in range(rc.folds):
+        tr, te = (fold != k) & trainable, fold == k
+        es = tr & (u * 10 % 1 < 0.1)
+        fit = tr & ~es
+        dtr = lgb.Dataset(M[fit, :nc], y[fit], feature_name=cols, free_raw_data=True,
+                          weight=None if w is None else w[fit])
+        des = lgb.Dataset(M[es, :nc], y[es], reference=dtr,
+                          weight=None if w is None else w[es])
+        m = lgb.train(_params(cfg), dtr, num_boost_round=rc.num_boost_round,
+                      valid_sets=[des], valid_names=["es"],
+                      callbacks=[lgb.early_stopping(rc.early_stopping, verbose=False)])
+        del dtr, des
+        oof[te] = m.predict(M[te, :nc], num_iteration=m.best_iteration)
+        imp += m.feature_importance("gain")
+        m.save_model(str(st.path(f"model{tag}_fold{k}.txt")))
+        tv = te & is_val
+        st.log.info("fold %d%s: best iteration %d, held-out val AUC %.6f", k, tag,
+                    m.best_iteration, roc_auc_score(y[tv], oof[tv]))
+    return oof, imp
+
+
+def _predict_mean(models: list, M: np.ndarray, nc: int, step: int = 500_000) -> np.ndarray:
+    """Mean of the fold models' predictions on the first ``nc`` columns of M."""
+    p = np.zeros(len(M), dtype=np.float64)
+    for a in range(0, len(M), step):
+        p[a:a + step] = np.mean([m.predict(M[a:a + step, :nc], num_iteration=m.best_iteration)
+                                 for m in models], axis=0)
+    return p
 
 
 def run_rerank(cfg: Config) -> None:
@@ -303,21 +368,34 @@ def run_rerank(cfg: Config) -> None:
             if not set(rc.train_sides) <= set(sides) or not rc.train_sides:
                 raise ValueError(f"rerank.train_sides {rc.train_sides} must be a non-empty "
                                  f"subset of the loaded sides {sides} (hold needs hold_frac > 0)")
+            if rc.rounds not in (1, 2):
+                raise ValueError(f"rerank.rounds must be 1 or 2, got {rc.rounds}")
+            g2cols = [G2 + c for c in group_columns()] if rc.rounds == 2 else []
+            for old in st.dir.glob("model_r2_fold*.txt"):  # a test pass must never pick up
+                old.unlink()                                # round-2 models of another run
             with timed(st.log, f"load pairs ({'+'.join(sides)})"):
-                keys, M, cols = _read_pairs(st, cfg, raw_cols, sides)
+                keys, M, cols = _read_pairs(st, cfg, raw_cols, sides, n_extra=len(g2cols))
                 q = pd.factorize(keys.q_id)[0]
                 s = pd.factorize(keys.s1_id)[0]
-                _fill_group(M, q, s, M[:, cols.index("q_source")], keys.p.to_numpy())
+                src = M[:, cols.index("q_source")].copy()
+                _fill_group(M, q, s, src, keys.p.to_numpy())
                 y = keys.y.to_numpy()
+                groups = None
                 if rc.domain_norm:
                     cty = _query_countries(st, cfg, sides)
                     groups = pd.factorize(cty.reindex(keys.q_id.astype(str)).fillna(""))[0]
                     domain_normalize(M, cols, groups)
             is_val = (keys.side == "val").to_numpy()
             trainable = keys.side.isin(rc.train_sides).to_numpy()
+            complete = complete_groups(st, cfg, keys.s1_id, sides)
             st.metric("pairs", {sd: {"kept": int((keys.side == sd).sum()),
-                                     "positives": int(y[(keys.side == sd).to_numpy()].sum())}
+                                     "positives": int(y[(keys.side == sd).to_numpy()].sum()),
+                                     "incomplete_group": int((~complete[(keys.side == sd).to_numpy()]).sum()),
+                                     "incomplete_positives": int(y[(keys.side == sd).to_numpy()
+                                                                   & ~complete].sum())}
                                 for sd in sides})
+            if rc.train_complete:
+                trainable &= complete
 
             # folds grouped by the query's top S1 (keeps most S1 groups in one fold)
             top = keys.assign(q=q).sort_values(["q", "p"], ascending=[True, False]
@@ -343,8 +421,6 @@ def run_rerank(cfg: Config) -> None:
                 fold = np.array([fold_of[r] for r in top_reg.reindex(q).to_numpy()])
                 st.metric("fold_regions", {k: sorted(r for r, f in fold_of.items() if f == k)
                                            for k in range(rc.folds)})
-            oof = np.zeros(len(M), dtype=np.float64)
-            imp = np.zeros(M.shape[1])
             w = None
             if rc.weights_file:  # e.g. adversarial-validation weights (val rows made test-shaped)
                 wf = pd.read_parquet(rc.weights_file)
@@ -353,26 +429,22 @@ def run_rerank(cfg: Config) -> None:
                      .w.fillna(1.0).to_numpy(dtype=np.float64))
                 st.metric("train_weights", {"file": rc.weights_file,
                                             "q": np.quantile(w, [0.01, 0.5, 0.99]).round(3).tolist()})
+            folds = (fold, u, trainable, w)
             with timed(st.log, f"cross-fit {rc.folds} folds (train on {'+'.join(rc.train_sides)})"):
-                for k in range(rc.folds):
-                    tr, te = (fold != k) & trainable, fold == k
-                    # early stopping on 10% of the training groups (never the held-out fold)
-                    es = tr & (u * 10 % 1 < 0.1)
-                    fit = tr & ~es
-                    dtr = lgb.Dataset(M[fit], y[fit], feature_name=cols, free_raw_data=True,
-                                      weight=None if w is None else w[fit])
-                    des = lgb.Dataset(M[es], y[es], reference=dtr,
-                                      weight=None if w is None else w[es])
-                    m = lgb.train(_params(cfg), dtr, num_boost_round=rc.num_boost_round,
-                                  valid_sets=[des], valid_names=["es"],
-                                  callbacks=[lgb.early_stopping(rc.early_stopping, verbose=False)])
-                    del dtr, des
-                    oof[te] = m.predict(M[te], num_iteration=m.best_iteration)
-                    imp += m.feature_importance("gain")
-                    m.save_model(str(st.path(f"model_fold{k}.txt")))
-                    tv = te & is_val
-                    st.log.info("fold %d: best iteration %d, held-out val AUC %.6f", k,
-                                m.best_iteration, roc_auc_score(y[tv], oof[tv]))
+                oof, imp = _cross_fit(st, cfg, M, cols, y, folds, is_val, "")
+            p_r1 = None
+            if g2cols:
+                # round 2: the group context again, from the round-1 out-of-fold p2 (sharper
+                # claims and competition than p1), next to the round-1 columns
+                with timed(st.log, "round 2: group features from p2 + cross-fit"):
+                    n1 = len(cols)
+                    _fill_group(M, q, s, src, oof, col0=n1)
+                    if groups is not None:
+                        domain_normalize(M, [""] * n1 + g2cols, groups)
+                    st.metric("val_auc_p2_round1", round(float(roc_auc_score(y[is_val], oof[is_val])), 6))
+                    p_r1 = oof
+                    oof, imp = _cross_fit(st, cfg, M, cols + g2cols, y, folds, is_val, "_r2")
+                    cols = cols + g2cols
             st.register("models", st.dir)
             yv, pv, ov = y[is_val], keys.p.to_numpy()[is_val], oof[is_val]
             st.metric("val_auc_p1", round(float(roc_auc_score(yv, pv)), 6))
@@ -389,6 +461,8 @@ def run_rerank(cfg: Config) -> None:
             st.log.info("stage-2 features by gain:\n%s", imp_df.to_string(index=False))
             out = keys[["q_id", "s1_id", "y"]].assign(p=oof.astype(np.float32),
                                                       p1=keys.p.to_numpy())
+            if p_r1 is not None:
+                out["p_r1"] = p_r1.astype(np.float32)
             for c in SEGMENT_COLS:  # kept for the prior-shift corrections in decide
                 if c in cols:
                     out[c] = M[:, cols.index(c)]
@@ -414,11 +488,14 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
     del rt
     models = [lgb.Booster(model_file=str(st.path(f"model_fold{k}.txt")))
               for k in range(rc.folds)]
+    models2 = [lgb.Booster(model_file=str(st.path(f"model_r2_fold{k}.txt")))
+               for k in range(rc.folds)] if rc.rounds == 2 else []
     gcols = group_columns()
     cols = gcols + raw_cols
-    if models[0].feature_name() != cols:
+    g2cols = [G2 + c for c in gcols] if models2 else []
+    if models[0].feature_name() != cols or (models2 and models2[0].feature_name() != cols + g2cols):
         raise RuntimeError("the stage-2 models were trained on other features than "
-                           "rerank.raw_features gives now")
+                           "rerank.raw_features / rerank.rounds give now")
     sc_dir = st.input_path("scorer", "scores_test")
     ft_dir = st.input_path("features", "features_test")
     by_country: dict[str, list] = {}
@@ -435,7 +512,7 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
         with timed(st.log, f"test {country}: {len(files)} parts"):
             n = sum(int((pq.read_table(f, columns=["p"]).column("p").to_numpy()
                          >= rc.min_p1).sum()) for f in files)
-            M = np.empty((n, len(cols)), dtype=np.float32)
+            M = np.empty((n, len(cols) + len(g2cols)), dtype=np.float32)
             qs, ss, ps = [], [], []
             row = 0
             for f in files:
@@ -455,19 +532,24 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
             s_ids = pa.chunked_array(ss, type=pa.large_string())
             p1 = np.concatenate(ps)
             del qs, ss, ps
-            _fill_group(M, _arrow_codes(q_ids), _arrow_codes(s_ids),
-                        M[:, cols.index("q_source")], p1)
+            qc, sc_ = _arrow_codes(q_ids), _arrow_codes(s_ids)
+            src = M[:, cols.index("q_source")].copy()
+            _fill_group(M, qc, sc_, src, p1)
             if rc.domain_norm:  # this matrix is one country of the test split
                 domain_normalize(M, cols)
-            p2 = np.zeros(n, dtype=np.float64)
-            step = 500_000
-            for a in range(0, n, step):
-                p2[a:a + step] = np.mean([m.predict(M[a:a + step], num_iteration=m.best_iteration)
-                                          for m in models], axis=0)
+            p2 = _predict_mean(models, M, len(cols))
+            extra = {}
+            if models2:  # round 2: group features from the round-1 p2
+                _fill_group(M, qc, sc_, src, p2, col0=len(cols))
+                if rc.domain_norm:
+                    domain_normalize(M, [""] * len(cols) + g2cols)
+                extra["p_r1"] = p2.astype(np.float32)
+                p2 = _predict_mean(models2, M, len(cols) + len(g2cols))
+            del qc, sc_, src
             seg = {c: M[:, cols.index(c)].copy() for c in SEGMENT_COLS if c in cols}
             del M
             out = pa.table({"q_id": q_ids, "s1_id": s_ids, "p": p2.astype(np.float32),
-                            "p1": p1, **seg})
+                            "p1": p1, **extra, **seg})
             pq.write_table(out, out_dir / f"part-{country}.parquet")
             n_total += n
             st.metric(f"test_pairs_kept.{country}", n)

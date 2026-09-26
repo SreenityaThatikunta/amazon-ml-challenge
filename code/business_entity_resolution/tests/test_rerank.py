@@ -23,3 +23,27 @@ def test_group_features_query_and_s1_context():
     # claims: every query's best S1 is 10 -> S1 10 has 3 claims, S1 11 none
     np.testing.assert_allclose(f.c_expected, [2.2, 0.0, 2.2, 2.2], atol=1e-6)
     assert f.dtypes.map(lambda d: d == np.float32).all()
+
+
+def test_domain_normalize_per_group_and_second_round_columns():
+    from ber.rerank.stage import G2, domain_normalize
+    # columns: a count column, an untouched one, its second-round copy, an IDF column,
+    # and one column beyond the names (e.g. still empty)
+    M = np.array([[2, 5, 4, 0.0, 7],
+                  [4, 5, 8, 2.0, 7],
+                  [10, 5, 1, 4.0, 7],
+                  [30, 5, 3, 8.0, 7]], dtype=np.float32)
+    cols = ["s_n", "p1", G2 + "s_n", "k_idf_unmatched_q"]
+    groups = np.array([0, 0, 1, 1])
+    out = domain_normalize(M.copy(), cols, groups)
+    np.testing.assert_allclose(out[:, 0], [2 / 3, 4 / 3, 0.5, 1.5], rtol=1e-6)   # / group mean
+    np.testing.assert_allclose(out[:, 1], 5)                                     # not a count
+    np.testing.assert_allclose(out[:, 2], [4 / 6, 8 / 6, 0.5, 1.5], rtol=1e-6)   # g2_ copy too
+    q0 = np.quantile([2.0], 0.99)
+    q1 = np.quantile([4.0, 8.0], 0.99)
+    np.testing.assert_allclose(out[:, 3], [0, 2 / q0, 4 / q1, 8 / q1], rtol=1e-6)  # / 99th pct of non-zero
+    np.testing.assert_allclose(out[:, 4], 7)                                     # beyond cols
+    # "" placeholders skip columns: only the second-round copy is normalised
+    out2 = domain_normalize(M.copy(), ["", "", G2 + "s_n"], groups)
+    np.testing.assert_allclose(out2[:, 0], M[:, 0])
+    np.testing.assert_allclose(out2[:, 2], out[:, 2], rtol=1e-6)

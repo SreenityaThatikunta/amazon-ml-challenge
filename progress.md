@@ -328,6 +328,52 @@ new stage 1 keeps 1 % more); links per S1 France 3.420 / India 3.397 / US 3.420 
 5.1 %, US 3.5 %. **Public LB 0.980973** (2026-09-26 ~14:00; the board shows 6 decimals,
 not 3 as assumed above, so small differences are visible).
 
+### v2.5 (2026-09-26 evening, third session): more hold regions, complete hold groups
+
+**1. The hold records were picked by the wrong region.** v2.4's `features-hold` took the
+train-side S2/S3 records whose *own* address is in a hold region (`D:\aml\analysis\
+hold_check.py`). The val split instead puts a matched record where its *owner* is. The
+own-region rule missed 78,428 true copies of hold S1 (5.0 % of them; mostly the
+4–5 % of true copies whose address names no region, i.e. exactly the records that search
+the whole country, like 35 % of France's) and took in 35,894 copies of S1 outside the
+hold regions (whose groups are then incomplete). New option `rerank.hold_by`:
+`query_region` (v2.4, still the default until v2.5 is chosen) | `owner` (the val rule:
+owner's region if matched, own region if not). Unit test in `tests/test_split.py`.
+
+**2. France's region-less records.** In train, a record with no detectable region is a
+true copy 95.5 % (India) / 97.7 % (US) of the time vs 73 % otherwise (the noise drops the
+state from 4–5 % of true copies and from 0.3–0.6 % of decoys). Test US/India look the same
+(2.6–2.9 % region-less). **France: 34–36 % of S2/S3 records have no region** (S1: 0 %):
+its S2/S3 addresses often end at the city (`77 AV LEON JOUHAUX, LILLE`). The explicit
+region features have almost no gain in the models (`r_q_missing` rank 95/102 in stage 1,
+116/131 in stage 2), so the direct effect should be small; `D:\aml\analysis\fr_region.py`
+checks whether the model treats France's region-less records differently (to run).
+
+**3. New stage-2 options (off by default, unit-tested):**
+- `rerank.train_complete` ("fix B"): train stage 2 only on pairs whose S1 lies in a
+  loaded region (val side or a hold region), i.e. whose group is complete; the rest are
+  still scored. The rerank log now reports incomplete-group pairs per side.
+- `rerank.rounds = 2`: a second cross-fitted round whose group features (`g2_*`) are
+  recomputed from the first round's out-of-fold p2 instead of p1 (sharper claims and
+  competition), next to all round-1 columns; test = round-1 fold mean → g2 features →
+  round-2 fold mean. `rounds = 1` is unchanged (same code path, same columns).
+- Fair comparison across hold sets: `D:\aml\analysis\clean_eval.py` scores val F0.5 also
+  on the "clean" val S1 (none of their kept pairs involves a record with a kept pair to a
+  non-val S1), which every variant sees with complete groups.
+
+**4. Run `v25`** (junctions to v2's normalize/candidates/features): `features-hold` with
+`hold_frac 0.4, hold_by owner` → 3,990,154 hold records (v2.4: 2,087,204); hold regions
+India AP GJ HR MH OD RJ (39.4 % of India's S1), US AL AR AZ CO CT IA ID IN LA MD MO MT NY
+OK TN UT WY (38 %). Stage 1 then trains on ~51 % of the S1 regions; `scorer.
+train_query_frac` 0.14 keeps its sample at ~3.5 M rows as in v2.4. Experiments:
+`D:\aml\run_v25.sh`.
+
+**LB probe prepared:** `D:\aml\submissions\probe_v24_france_empty\` = the v2.4 file with
+all 259,452 French S1 (14.98 % of test S1) left empty (v2.4 left 5.35 % of them empty).
+LB(v2.4) − LB(probe) = 0.1498 × (F_France − s_France), so F_France ≈ Δ / 0.1498 +
+s_France (French singleton rate, ~0.055 ± 0.01): tells whether France explains the
+val → LB gap. Only if the user wants to spend an upload on it.
+
 ### Memory: stage 2 and the scorer without the big in-RAM copies (2026-09-26)
 
 The laptop has ~4–5 GB free while the user works (Windows' page file is on D:, 18.6 GB,

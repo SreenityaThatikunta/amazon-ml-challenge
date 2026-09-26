@@ -123,8 +123,15 @@ class RerankConfig:
     domain_norm: bool = True        # size-dependent features / their per-country-split scale
     hold_frac: float = 0.0          # v2.4: share of each country's S1 in extra held-out train regions
                                     # (ber features-hold; stage 1 trains without them)
+    hold_by: str = "query_region"   # which queries belong to a hold region: "query_region" (v2.4: the
+                                    # query's own region) | "owner" (v2.5: the owner's region if
+                                    # matched, as in the val split; complete hold S1 groups)
     train_sides: list[str] = field(default_factory=lambda: ["val"])  # stage-2 training pairs:
                                     # val and/or hold; a side not trained on is scored by the fold mean
+    train_complete: bool = False    # v2.5: train only on pairs whose S1 group is complete (S1 in a val
+                                    # or hold region); the others are still scored
+    rounds: int = 1                 # v2.5: 2 = a second stage-2 round whose group features are
+                                    # recomputed from the first round's (out-of-fold) p2
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200

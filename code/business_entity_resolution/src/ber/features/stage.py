@@ -238,7 +238,7 @@ def run_features_hold(cfg: Config) -> None:
     all S1 of the country and the full candidate set. Only the records needed are
     loaded: every S1 of the country and the hold queries (about a third of the
     memory of the full stage). Output ``features_hold/`` has side = "hold"."""
-    from ..eval.split import hold_regions
+    from ..eval.split import hold_queries, hold_regions
     fc = cfg.features
     with StageRun(cfg, "features_hold") as st:
         regions = st.read_input("split", "regions", run=cfg.data.split_run)
@@ -248,11 +248,12 @@ def run_features_hold(cfg: Config) -> None:
         st.write_parquet(hold, "hold_regions")
         st.metric("hold_regions", {c: sorted(g.geo) for c, g in hold.groupby("country")})
         qs = st.read_input("split", "queries", run=cfg.data.split_run,
-                           columns=["entity_id", "country", "geo", "side"])
-        hq = qs[(qs.side == "train").to_numpy()].merge(hold[["country", "geo"]],
-                                                        on=["country", "geo"])
-        st.write_parquet(hq[["entity_id", "country", "geo"]], "hold_queries")
-        del qs
+                           columns=["entity_id", "country", "geo", "side", "owner"])
+        s1s = st.read_input("split", "s1", run=cfg.data.split_run, columns=["entity_id", "geo"])
+        hq = hold_queries(qs, s1s, hold, cfg.rerank.hold_by)
+        st.write_parquet(hq, "hold_queries")
+        st.metric("hold_by", cfg.rerank.hold_by)
+        del qs, s1s
         fillers = brand_units = None
         if fc.name_key:
             with open(st.input_path("features", "fillers"), encoding="utf-8") as fh:
