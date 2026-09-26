@@ -414,6 +414,28 @@ On unseen regions the larger, owner-ruled hold set adds +0.0003 on the clean S1 
 3 of 4 folds stopped at the 2,000-round cap (1662/1998/2000/1995): with 5.4 M rows stage 2
 is capacity-limited.
 
+**6. v2.5 test file** (`D:\aml\run_v25_test.sh v2.5_hold04_complete --set
+rerank.train_complete=true`, 2026-09-26 21:27): decision sweep flat (0.98916–0.98923 for
+min_p 0.02–0.5; 0.02 chosen); `D:\aml\submissions\v2.5_hold04_complete\` = `output\`,
+validator PASS, 5,885,129 links, `candidate_pairs.tsv` 9,582,745 pairs = **5.53 per S1**
+(v2.4 5.63; the new stage 1 keeps fewer pairs at p1 ≥ 0.001: 1.069 vs 1.078 per val
+record, 99.974 % of the retrieved true pairs). Anchor: again only France's generic swaps
+(π 0.805 vs mean p2 0.392, de-biased odds ratio 5.40, applied); every US/India kind
+0.91–1.74. Links per S1 France 3.445 / India 3.380 / US 3.399 (v2.4 3.420 / 3.397 /
+3.420); S1 changed vs v2.4: France 10.0 %, India 5.0 %, US 3.8 %. Default config, README
+and methodology updated, zip rebuilt (CRC OK), pushed (8a81125). LB: to be uploaded.
+
+**7. France's region-less records are not a problem** (`D:\aml\analysis\fr_region.py`,
+`fr_region.txt`, v2.5 scores). In France, 34.9 % of the records with a kept pair have no
+region; on their same-street, equal-key top pairs the house-number anchor gives a
+true-copy share of 0.869 vs the model's mean p 0.873 (odds ratio 0.97; region present:
+0.860 vs 0.858), with the same hn profile (equal 77 %, shifted 11 %). In US/India "no
+region" is mostly an *empty address* (their top pairs are never on the same street; val
+precision of the top pair 0.67–0.70 vs 0.85), a different population; France's are
+addresses that stop at the city. They are more often uncertain (8.6 % in p2 0.2–0.9 vs
+5.3 %; 12 % have their best candidate on another street, as whole-country searchers),
+but nothing says the model misjudges them. No change.
+
 **LB probe prepared:** `D:\aml\submissions\probe_v24_france_empty\` = the v2.4 file with
 all 259,452 French S1 (14.98 % of test S1) left empty (v2.4 left 5.35 % of them empty).
 LB(v2.4) − LB(probe) = 0.1498 × (F_France − s_France), so F_France ≈ Δ / 0.1498 +
