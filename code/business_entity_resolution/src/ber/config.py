@@ -134,6 +134,8 @@ class RerankConfig:
                                     # recomputed from the first round's (out-of-fold) p2
     norm_complete: bool = False     # domain_norm: S1-group counts take their training scale from
                                     # complete-group pairs only (as every test group is complete)
+    bags: int = 1                   # > 1: repeat the cross-fit with other fold splits and seeds;
+                                    # val = mean of the bags' out-of-fold p2, test = mean of all models
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200

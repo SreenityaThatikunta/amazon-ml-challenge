@@ -496,6 +496,39 @@ addresses that stop at the city. They are more often uncertain (8.6 % in p2 0.2�
 5.3 %; 12 % have their best candidate on another street, as whole-country searchers),
 but nothing says the model misjudges them. No change.
 
+### v2.6 → next (2026-09-27 morning): where the remaining loss is
+
+**Val errors of v2.6** (`D:\aml\analysis\errors_v2.py v25b`, `errors_v26.txt`): 97.14 % of
+true pairs kept; dropped (p2 too low, median 0.50) 1.10 %, not a candidate / filtered
+0.97 %, another S1 won 0.79 %. Records with an **empty address** keep only 57 % of their
+true pairs (about 60 % of all missed pairs; shared names, unresolvable without an
+address). 2,990 false links of 751,142.
+
+**Self-estimate** (`selfest.py v25b`, expected F0.5 under the model's own p2, min_p 0.02):
+val actual 0.98918 vs expected 0.99471 (optimism 0.0055: US 0.0049, India 0.0065); test
+expected US 0.99266, India 0.98921, **France 0.98448**, all 0.98982 → minus val's optimism
+≈ 0.9843 vs LB 0.98234: ~0.002 of the gap is invisible to the model (~0.005 in the v2.3 era).
+
+**Where the model is unsure** (`fr_uncertainty.py`, per record's top pair, uncertainty
+p(1−p), raw p2 before the anchor correction): per record France 0.0176, India 0.0123, US
+0.0090 (val 0.0064–0.0076). France: generic swaps 38 % of its uncertainty (anchor-corrected
+×6 in decide), same-street "other" name changes 22 %, empty-address exact names 14 %. On
+val every segment is calibrated (mean p2 = true rate within 0.01). On test the biggest
+segment, same-street records with an equal name key, has a much lower mean p2 (US 0.762 vs
+val 0.865, India 0.791 vs 0.877): test has about twice the same-street lookalikes.
+
+**Is the model calibrated there? Label-free check** (`calib_anchor.py`): given the match
+status the house-number relation profile does not depend on the segment, so the true-copy
+(h1) and decoy (h0) profiles are taken from *labelled* val and each test country's
+histogram is fit as π·h1 + (1−π)·h0 (sanity: on val it recovers the true rate exactly).
+**US: π 0.756 vs mean p2 0.762 (odds ratio 0.97), and the mixture reproduces the test
+histogram** → the model is calibrated on the US's largest test segment despite twice the
+lookalikes; the val→LB gap is not a global over-confidence. India and France cannot be
+judged this way: their house-number formats differ from val's (India test has 11 % missing
+house numbers vs 20 % in val's true copies; French decoys are 11 % shifted vs 82 % in the US).
+**France's blocking** is not losing matches: records with and without a detected region
+(the latter search all of France) have a kept candidate equally often (78.7 % vs 78.9 %).
+
 **LB probe prepared:** `D:\aml\submissions\probe_v24_france_empty\` = the v2.4 file with
 all 259,452 French S1 (14.98 % of test S1) left empty (v2.4 left 5.35 % of them empty).
 LB(v2.4) − LB(probe) = 0.1498 × (F_France − s_France), so F_France ≈ Δ / 0.1498 +

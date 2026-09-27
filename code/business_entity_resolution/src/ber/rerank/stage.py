@@ -334,7 +334,8 @@ def _raw_columns(st: StageRun, wanted: list[str]) -> list[str]:
 
 
 def _cross_fit(st: StageRun, cfg: Config, M: np.ndarray, cols: list[str], y: np.ndarray,
-               folds: tuple, is_val: np.ndarray, tag: str) -> tuple[np.ndarray, np.ndarray]:
+               folds: tuple, is_val: np.ndarray, tag: str,
+               seed_offset: int = 0) -> tuple[np.ndarray, np.ndarray]:
     """Cross-fitted stage-2 models on the first ``len(cols)`` columns of M: fold k's
     model trains on the trainable rows of the other folds (early stopping on 10 % of
     their groups, never the held-out fold) and predicts fold k. Saves
@@ -344,6 +345,8 @@ def _cross_fit(st: StageRun, cfg: Config, M: np.ndarray, cols: list[str], y: np.
     nc = len(cols)
     oof = np.zeros(len(M), dtype=np.float64)
     imp = np.zeros(nc)
+    params = _params(cfg)
+    params["seed"] = cfg.seed + seed_offset
     for k in range(rc.folds):
         tr, te = (fold != k) & trainable, fold == k
         es = tr & (u * 10 % 1 < 0.1)
@@ -352,7 +355,7 @@ def _cross_fit(st: StageRun, cfg: Config, M: np.ndarray, cols: list[str], y: np.
                           weight=None if w is None else w[fit])
         des = lgb.Dataset(M[es, :nc], y[es], reference=dtr,
                           weight=None if w is None else w[es])
-        m = lgb.train(_params(cfg), dtr, num_boost_round=rc.num_boost_round,
+        m = lgb.train(params, dtr, num_boost_round=rc.num_boost_round,
                       valid_sets=[des], valid_names=["es"],
                       callbacks=[lgb.early_stopping(rc.early_stopping, verbose=False)])
         del dtr, des
@@ -388,9 +391,12 @@ def run_rerank(cfg: Config) -> None:
                                  f"subset of the loaded sides {sides} (hold needs hold_frac > 0)")
             if rc.rounds not in (1, 2):
                 raise ValueError(f"rerank.rounds must be 1 or 2, got {rc.rounds}")
+            if rc.bags < 1 or (rc.bags > 1 and rc.rounds == 2):
+                raise ValueError("rerank.bags must be >= 1 (and 1 with rounds = 2)")
             g2cols = [G2 + c for c in group_columns()] if rc.rounds == 2 else []
-            for old in st.dir.glob("model_r2_fold*.txt"):  # a test pass must never pick up
-                old.unlink()                                # round-2 models of another run
+            for pat in ("model_r2_fold*.txt", "model_b*_fold*.txt"):  # a test pass must never
+                for old in st.dir.glob(pat):                          # pick up round-2 / bag
+                    old.unlink()                                      # models of another run
             with timed(st.log, f"load pairs ({'+'.join(sides)})"):
                 keys, M, cols = _read_pairs(st, cfg, raw_cols, sides, n_extra=len(g2cols))
                 q = pd.factorize(keys.q_id)[0]
@@ -457,6 +463,22 @@ def run_rerank(cfg: Config) -> None:
             folds = (fold, u, trainable, w)
             with timed(st.log, f"cross-fit {rc.folds} folds (train on {'+'.join(rc.train_sides)})"):
                 oof, imp = _cross_fit(st, cfg, M, cols, y, folds, is_val, "")
+            if rc.bags > 1:
+                st.metric("val_auc_p2_bag0", round(float(roc_auc_score(y[is_val], oof[is_val])), 6))
+            for b in range(1, rc.bags):
+                # another fold split (and early-stopping split, LightGBM seed): each val pair
+                # gets one more out-of-fold p2; the bags' mean is still out-of-fold
+                ub = pd.Series(stable_unit(top.s1_id.astype(str), cfg.seed + 7 + 101 * b),
+                               index=top.q.to_numpy()).reindex(q).to_numpy()
+                fb = fold if rc.fold_by == "region" else np.minimum((ub * rc.folds).astype(int),
+                                                                    rc.folds - 1)
+                with timed(st.log, f"bag {b}: cross-fit {rc.folds} folds"):
+                    ob, ib = _cross_fit(st, cfg, M, cols, y, (fb, ub, trainable, w), is_val,
+                                        f"_b{b}", seed_offset=b)
+                st.metric(f"val_auc_p2_bag{b}", round(float(roc_auc_score(y[is_val], ob[is_val])), 6))
+                oof, imp = oof + ob, imp + ib
+            if rc.bags > 1:
+                oof = oof / rc.bags
             p_r1 = None
             if g2cols:
                 # round 2: the group context again, from the round-1 out-of-fold p2 (sharper
@@ -511,8 +533,8 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
                          columns=["entity_id", "country"], filters=[("source", "==", 1)])
     s1_country = rt.set_index("entity_id").country
     del rt
-    models = [lgb.Booster(model_file=str(st.path(f"model_fold{k}.txt")))
-              for k in range(rc.folds)]
+    models = [lgb.Booster(model_file=str(st.path(f"model{'' if b == 0 else f'_b{b}'}_fold{k}.txt")))
+              for b in range(rc.bags) for k in range(rc.folds)]
     models2 = [lgb.Booster(model_file=str(st.path(f"model_r2_fold{k}.txt")))
                for k in range(rc.folds)] if rc.rounds == 2 else []
     gcols = group_columns()
