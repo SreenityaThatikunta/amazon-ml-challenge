@@ -988,7 +988,7 @@ other entry points, submitted-file provenance). Zip rebuilt from dcbaee8: 76 fil
 TSVs = v2.7_crossenc (sha256 faf49d17…), 73 code files = HEAD, a bare extraction passes its
 tests (139 + 1 skip).
 
-**Package layout fixed to the organisers' pattern (2026-09-27 ~20:20; commit 5889cc5).**
+**Package layout fixed to the organisers' pattern (2026-09-27 ~19:55; commit 5889cc5).**
 The user pointed out that the zip broke the required structure
 (`code/business_entity_resolution/` = `src/` + `README.md` + pinned `requirements.txt`):
 tools/, tests/, configs/, pyproject.toml, a LICENSE copy and three requirements files sat

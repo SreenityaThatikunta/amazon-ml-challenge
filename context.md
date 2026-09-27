@@ -15,7 +15,7 @@ architectures go on separate branches.
 
 ## 0. Where we left off (do this first)
 
-**Update ~20:20 IST: package layout fixed to the brief (commit 5889cc5).** The zip's
+**Update ~19:55 IST: package layout fixed to the brief (commit 5889cc5).** The zip's
 `code/business_entity_resolution/` now holds exactly `src/`, `README.md`, `requirements.txt`
 (configs in `src/ber/configs`, tests in `src/tests`, tools in `src/tools`; run as `python -m
 ber <stage>` with `PYTHONPATH=code/business_entity_resolution/src`; zip builder
