@@ -873,3 +873,12 @@ France is what val cannot check; the LB check decides.
 **Pipeline-native reproduction:** `ber crossenc` (src/ber/crossenc/stage.py, the same logic
 as the scripts) → rerank (`rerank.extra_scores: crossenc`) → decide → submit in run `v26`
 (`D:\aml\run_v26.sh`), so the final file comes from the code in the zip.
+
+**v2.7 public LB 0.98316** (2026-09-27 ~14:05, uploaded by the user): +0.000816 over v2.6
+(0.982344) → the cross-encoder hybrid is adopted as the next final (on this branch;
+`improve/v2` stays at v2.6). Uploads 2026-09-27: v2.6, v2.7 (2 of 5).
+Pipeline-native reproduction (run `v26`, `D:\aml\run_v26.sh`, started 13:45): `ber
+crossenc` rebuilt the identical 982,265 training pairs (68.0 % positive) and fine-tuned at
+the same speed (loss 0.060 at step 7,000 of 7,674); scoring and the stage-2/test passes
+follow (expected done ~16:25 → `D:\aml\submissions\v2.7_ber\`). Remaining steps: context.md
+section 8.
