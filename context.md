@@ -15,6 +15,18 @@ architectures go on separate branches.
 
 ## 0. Where we left off (do this first)
 
+**Update ~18:40 IST: FINAL FILE = v2.7_crossenc (the first v2.7 run, public LB 0.98316),
+not v2.7_ber.** The user uploaded v2.7_ber: LB 0.982681. Same method, two draws of the
+cross-encoder fine-tuning; the first run is better on labelled val too (paired z 3.9) and
+the files differ on 1.35 % of test S1, so the LB gap is not public-subset noise (progress.md
+"Final file switched"). `output\` = v2.7_crossenc (validator `--check-ids` PASS);
+`pootato_submission.zip` rebuilt from 19b564b and verified (TSVs = v2.7_crossenc, sha256
+faf49d17…; code = HEAD; `tools/crossenc_prototype/` = the exact scripts behind its
+cross-encoder); docs describe the submitted run. Backups of the older zips in
+`D:\aml\submissions\`. Uploads 2026-09-27: 3 of 5; the user re-uploads
+`output\matching_results.tsv` (= v2.7_crossenc) as the last upload and submits the zip.
+PR / merge still to be asked. The 16:30 update below is superseded where it says v2.7_ber.
+
 **Update ~16:30 IST: final packaging is DONE (section 9)** on `explore/cross-encoder`
 (commits 9f5caf2, 247a035 + notes, pushed): the default config reproduces v2.7_ber (config hashes
 equal to v26's), `output\` = v2.7_ber (validator `--check-ids` PASS),
@@ -68,7 +80,8 @@ Optionally the user uploads v2.7_ber once as a check.
   0.98316** (v2.6 0.982344; v2.5 0.981708; v2.4 0.980973; v2.2 0.980; v2.1 0.977; main 0.975).
   Prototype file `D:\aml\submissions\v2.7_crossenc\` (made with `D:\aml\ce\*.py` + run
   `v25f`); pipeline-native file coming in `D:\aml\submissions\v2.7_ber\` (run `v26`).
-- `output\` and `pootato_submission.zip` hold **v2.7_ber** (zip built from
+- **Superseded 18:40: they hold v2.7_crossenc (zip from 19b564b), see section 0.** Before:
+  `output\` and `pootato_submission.zip` held **v2.7_ber** (zip built from
   `explore/cross-encoder` 247a035, 2026-09-27 ~16:30); the v2.6 zip is in `submissions\`.
 - **Which upload counts:** check on the Unstop page whether the private leaderboard uses
   the last or the best upload; make sure the final file is the one that counts.
@@ -212,7 +225,8 @@ unseen regions 0.99163 → 0.99309; singletons 0.98892 → 0.99385.
 
 ## 8. Next steps
 
-1. Done: v26 finished, v2.7_ber chosen and packaged (section 0).
+1. Done: v26 finished and packaged; after its LB (0.982681) the first run v2.7_crossenc
+   (0.98316, better on val, z 3.9) became the final file and is packaged (section 0).
 2. The user: upload `output\matching_results.tsv` once (final LB file = the zip's file;
    regression check only, expected ≈ 0.983 ± public-subset noise), submit the zip.
 3. Optional, only with the user's OK: evaluate `rerank.learner=both` (XGBoost + LightGBM)

@@ -936,3 +936,32 @@ vs the prototype v2.7 (LB 0.98316) S1 changed France 3.7 %, India 1.0 %, US 0.8 
   from the extracted `src/`, its `default.yaml` hashes to v26's 2122d2eaba86, and its tests
   pass (146 + 1 skip: the cross-check against the organisers' `utils/score.py`, which now
   skips when that file is absent instead of erroring; 247a035).
+
+**Final file switched to the first v2.7 run (2026-09-27 ~18:40; commit 19b564b).** The user
+uploaded v2.7_ber: public LB **0.982681** vs 0.98316 for the first run (v2.7_crossenc).
+Same method and settings, two draws of the cross-encoder fine-tuning (the prototype's
+`train.py` draws a 200 k val sample from its RNG before training, so the batch order
+differs; GPU training is not bit-for-bit reproducible anyway). Evidence
+(`D:\aml\analysis\run_draws_compare.py`):
+- labelled val, paired per S1 (v25f vs v26 decide, both min_p 0.02): +0.00018, SE 0.00005,
+  **z 3.93**; 1,121 S1 better, 703 worse; India +0.00033 (z 3.9), US +0.00008 (z 1.6).
+- test: the files differ on 23,313 S1 (1.35 %: France 3.69 %, India 1.04 %, US 0.80 %).
+  If both were equally good, a public-LB gap would have SD ≈ 0.00004–0.00008 (public share
+  50–10 %, realistic per-S1 swing rms 0.275; worst case |d| = 1: 0.00013–0.00028); the
+  observed 0.000479 is 6–14 SD (1.7–3.8 worst case) → the first run is better on the test
+  set, and the private part should agree. Picking the better of two draws of one method on
+  val + LB is not public-LB tuning.
+Provenance of v2.7_crossenc: cross-encoder = `D:\aml\ce\{prep,train,score}.py` (same pair
+rule, text, model, hyper-parameters as `ber crossenc`; now copied unmodified into
+`tools/crossenc_prototype/` + README); stage-2 models trained 11:53 in v25d from the working
+tree committed 8 min later as ac1b2fa (only a log-metric key renamed in between: 'dir' →
+'source'); its test pass v25f ran at ac1b2fa (clean); `src/` unchanged since. Package:
+`output\` = v2.7_crossenc (sha256 faf49d17…, candidates 69e5b2e1… = same as every v2.7
+file); validator `--check-ids` PASS; docs describe the submitted run (val 0.99078, US
+0.99147, India 0.98970, singletons 0.99343, unseen regions 0.98988, anchor ×2.70, ce
+features 4/5/9 of 132; ce alone AUC 0.97485 / log loss 0.3026, band 0.683 → p2 0.862 →
+0.893) and report the re-run as run-to-run variation. Zip rebuilt from 19b564b (105.0 MB,
+89 files, CRC OK; TSVs = v2.7_crossenc; 86 code files = HEAD; prototype scripts
+byte-identical). Backups: `D:\aml\submissions\pootato_submission_v2.7_ber.zip`,
+`pootato_submission_v2.6.zip`. Uploads 2026-09-27: v2.6, v2.7, v2.7_ber (3 of 5); the user
+re-uploads v2.7_crossenc as the last upload (best + last, = the zip's file).
