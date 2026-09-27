@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[3]
 
 @pytest.fixture(scope="module")
 def reference():
+    if not (ROOT / "utils" / "score.py").is_file():  # the organisers' scorer, next to code/
+        pytest.skip("utils/score.py not found (run from the student_resource directory)")
     spec = importlib.util.spec_from_file_location("score", ROOT / "utils" / "score.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
