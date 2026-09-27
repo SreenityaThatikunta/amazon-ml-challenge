@@ -888,3 +888,51 @@ section 8.
 `D:\aml\submissions\v2.7_ber\` (validator PASS, 5,895,646 links, same candidate set);
 vs the prototype v2.7 (LB 0.98316) S1 changed France 3.7 %, India 1.0 %, US 0.8 %
 (retraining noise). v2.7_ber = the final file; packaging next (context.md section 9).
+
+**Final packaging (2026-09-27 ~16:30, fourth session; commits 9f5caf2 + 247a035 on
+`explore/cross-encoder`):**
+- `configs/default.yaml` now reproduces v2.7: a documented `crossenc:` section (the
+  dataclass defaults) and `rerank.extra_scores: crossenc` (+ `bags: 1`, `learner: lgb`).
+  Check: the default config with only the local model path set
+  (`crossenc.base_model=D:/aml/models/ms-marco-MiniLM-L-6-v2`, same model) resolves to
+  exactly the config hashes v26 recorded (2122d2eaba86 crossenc/rerank/decide, b4e7ed48928a
+  submit; v26 ran from clean b205e14, no code change since). `dev.yaml` and
+  `france_proxy.yaml` set `extra_scores: null` (their scorer trains on every train record,
+  so the cross-encoder would have no out-of-sample pairs). Tests: 147 pass.
+- `tools/check_licenses.py`: `certifi` (MPL-2.0, pulled in by huggingface_hub → httpx for
+  the model download) reviewed like `tqdm` → "all permissive". Model card: apache-2.0,
+  22,714,113 parameters.
+- `output\` = `D:\aml\submissions\v2.7_ber\` (sha256 matching dcc97211…, candidates
+  69e5b2e1…). Official validator with `--check-ids`: **PASS** (1,732,544 S1; 96,715 empty
+  matching rows; peak 4.1 GB, 33 s).
+- Documentation_template.md: cross-encoder in sections 1, 2.2 (diagram, data roles), 4 (new
+  paragraph: model, training pairs, why it is out-of-sample, alone vs as evidence, 132
+  features), 5 (results table rows, LB 0.98316, "alone vs as evidence" table), 6, appendix A
+  (install + `ber crossenc`), B (feature gains, rejected variants). New numbers, all on the
+  1,112,888 val stage-2 pairs of the submitted run (`D:\aml\analysis\final_ce_table.py`):
+
+  | Scores | AUC | log loss | AUC in v2.6's uncertain band (p2 0.05–0.95, 68,986 pairs) |
+  |---|---|---|---|
+  | p1 | 0.996023 | 0.0661 | |
+  | cross-encoder alone | 0.974167 | 0.3167 | 0.673 |
+  | p2 v2.6 | 0.998869 | 0.0359 | 0.862 |
+  | p2 v2.7 (v26) | 0.999059 | 0.0320 | 0.890 |
+
+  The gain sits in the hard cases, where the cross-encoder alone is nearly useless: its
+  value is relative (margins over competitors). Stage-2 gains (v26): q_margin 55 %, p1 +
+  logit 37 %, `ce` 4th, `ce_q_margin` 5th, `ce_s_margin` 7th of 132. Test anchor (v26):
+  France generic swaps π 0.81 vs mean p2 0.60 → ×2.41; all US/India kinds 0.89–1.85
+  (not applied).
+- `pootato_submission.zip` rebuilt from 247a035 (105.0 MB, 85 files, CRC OK); verified:
+  output TSVs byte-identical to v2.7_ber, all 82 code files identical to HEAD, layout
+  `output/ code/ Documentation_template.md`. The old v2.6 zip is kept as
+  `D:\aml\submissions\pootato_submission_v2.6.zip`.
+- The user stressed (2026-09-27) that the final ranking is on a different part of the test
+  set (the private S1; the public LB is a subset): no public-LB tuning. The final file was
+  chosen for reproducibility and on validation evidence (v2.7_ber = the zip's code), not on
+  public score; the upload of v2.7_ber is a regression check and makes the uploaded file
+  identical to the zip's `output/matching_results.tsv` (the rules ask for the same file).
+- Clean-extraction check: the zip's code extracted alone (no repo, no `utils/`) imports
+  from the extracted `src/`, its `default.yaml` hashes to v26's 2122d2eaba86, and its tests
+  pass (146 + 1 skip: the cross-check against the organisers' `utils/score.py`, which now
+  skips when that file is absent instead of erroring; 247a035).

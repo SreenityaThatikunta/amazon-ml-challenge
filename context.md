@@ -1,10 +1,11 @@
 # Handoff context: Amazon ML Challenge 2026 (Business Entity Resolution), team "pootato"
 
-Updated 2026-09-27 ~14:15 IST at the end of the third Claude Code session (earlier handoffs:
-git history, commits e83a912, 2d9cbc0). Read this first, then `progress.md` (the detailed
-log with the logic and every number; newest sections at the end: "Exploration branch
-`explore/cross-encoder`" and "v2.6 → next", then "v2.5"). Problem statement:
-`D:\aml\problem_pdf.txt`.
+Updated 2026-09-27 ~16:30 IST in the fourth Claude Code session (earlier handoffs: git
+history, commits e83a912, 2d9cbc0, b205e14). Read this first, then `progress.md` (the
+detailed log with the logic and every number; newest sections at the end: "Exploration
+branch `explore/cross-encoder`" incl. "Final packaging", "v2.6 → next", then "v2.5").
+Problem statement: `D:\aml\problem_pdf.txt` (the organisers' brief with the
+candidate_pairs update: the user's copy `Downloads\6ab674645103d_emails_comms_amazon_ml_challenge_2026.pdf`).
 
 **The working tree is on branch `explore/cross-encoder`** (this file, progress.md and the
 cross-encoder code live there). `improve/v2` = v2.6, untouched since the user asked that new
@@ -13,6 +14,21 @@ architectures go on separate branches.
 ---
 
 ## 0. Where we left off (do this first)
+
+**Update ~16:30 IST: final packaging is DONE (section 9)** on `explore/cross-encoder`
+(commits 9f5caf2, 247a035 + notes, pushed): the default config reproduces v2.7_ber (config hashes
+equal to v26's), `output\` = v2.7_ber (validator `--check-ids` PASS),
+Documentation_template.md covers the cross-encoder, `pootato_submission.zip` rebuilt and
+verified (105.0 MB; TSVs byte-identical to v2.7_ber; code = HEAD); the v2.6 zip is kept in
+`D:\aml\submissions\pootato_submission_v2.6.zip`. Details: progress.md "Final packaging".
+What remains is the user's: upload `output\matching_results.tsv` (= v2.7_ber) to the
+portal as the last LB upload (so the uploaded file = the zip's file, as the rules ask;
+uploads used 2026-09-27: 2 of 5 before it), submit the zip, decide on PR / merge (not
+asked yet → ask). **The user stressed that the final ranking uses the private part of the
+test set: no public-LB tuning; generalisation first.** Any further experiment must be
+judged on validation + the unseen-region check and must not endanger the packaged state
+(don't touch `output\` or the zip unless a new file is clearly better on val AND unseen
+regions and there are ≥ 3 h left).
 
 **Update 16:10 IST: the v26 run finished OK** (`D:\aml\logs\v26_run.log`, exit 0).
 `ber crossenc` rebuilt the same 982,265 training pairs; its cross-encoder has val AUC
@@ -52,8 +68,8 @@ Optionally the user uploads v2.7_ber once as a check.
   0.98316** (v2.6 0.982344; v2.5 0.981708; v2.4 0.980973; v2.2 0.980; v2.1 0.977; main 0.975).
   Prototype file `D:\aml\submissions\v2.7_crossenc\` (made with `D:\aml\ce\*.py` + run
   `v25f`); pipeline-native file coming in `D:\aml\submissions\v2.7_ber\` (run `v26`).
-- `output\` and `pootato_submission.zip` still hold **v2.6** (built from `improve/v2`).
-  They must be replaced by the final v2.7 file + a zip built from `explore/cross-encoder`.
+- `output\` and `pootato_submission.zip` hold **v2.7_ber** (zip built from
+  `explore/cross-encoder` 247a035, 2026-09-27 ~16:30); the v2.6 zip is in `submissions\`.
 - **Which upload counts:** check on the Unstop page whether the private leaderboard uses
   the last or the best upload; make sure the final file is the one that counts.
 - The public LB shows 6 decimals (resolves ~0.0005); it is a subset of test S1, the
@@ -125,9 +141,9 @@ Optionally the user uploads v2.7_ber once as a check.
 Git Bash, from `D:\aml\amazon-ml-challenge`, `export PYTHONUTF8=1`. Stages:
 `split normalize candidates features features-hold scorer crossenc rerank decide submit`;
 each `ber <stage> --run <run> [--set key=value ...]`; `--set data.phase=train|test` runs
-one side (a test pass reuses the train pass's models/params). v2.7 needs
-`--set rerank.extra_scores=crossenc` (**not yet the default** in `configs/default.yaml`;
-section 9) and `crossenc.base_model` = HF id (default) or `D:/aml/models/ms-marco-MiniLM-L-6-v2`
+one side (a test pass reuses the train pass's models/params). v2.7 is the default
+(`rerank.extra_scores: crossenc` in `configs/default.yaml` since 9f5caf2; `null` = v2.6);
+`crossenc.base_model` = HF id (default) or `D:/aml/models/ms-marco-MiniLM-L-6-v2`
 (offline; `HF_HUB_OFFLINE=1`). Tests: `cd code/business_entity_resolution &&
 ../../.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider --basetemp=/d/aml/pytest_tmp`
 (147 pass).
@@ -196,14 +212,20 @@ unseen regions 0.99163 → 0.99309; singletons 0.98892 → 0.99385.
 
 ## 8. Next steps
 
-1. Section 0 (finish v26, compare, choose the final file).
-2. Optional if time allows and the user wants: evaluate `rerank.learner=both` (XGBoost +
-   LightGBM) on top of v2.7 (`RUN=v25d bash D:\aml\run_v25.sh --skip-scorer E1b_nc_ce_xgb`
-   and `E3b_nc_ce_xgb`; ~30 min each, GPU); a stronger cross-encoder (more epochs, a larger
-   MiniLM) is possible but scoring 15 M pairs takes ~1.5 h on this GPU.
-3. Ask the user about PR / merges (explore → improve/v2? → main).
+1. Done: v26 finished, v2.7_ber chosen and packaged (section 0).
+2. The user: upload `output\matching_results.tsv` once (final LB file = the zip's file;
+   regression check only, expected ≈ 0.983 ± public-subset noise), submit the zip.
+3. Optional, only with the user's OK: evaluate `rerank.learner=both` (XGBoost + LightGBM)
+   on top of v2.7 (`RUN=v25d bash D:\aml\run_v25.sh --skip-scorer E1b_nc_ce_xgb` and
+   `E3b_nc_ce_xgb`; ~30 min each, GPU). **Stage-2 training peaks at ~8 GB RAM** (v25d/v26:
+   8.0–8.3 GB), above the ~5 GB cap the user set on 2026-09-27, so it needs their OK; adopt
+   only if it gains on val AND on the unseen-region check (bagging with 2 fold splits gained
+   nothing, so expect little), then test pass + decide + submit + re-package (~1.5 h). A
+   stronger cross-encoder (more epochs, larger MiniLM) needs ~2 h of GPU scoring and the
+   ~10 GB crossenc stage: not before the deadline.
+4. Ask the user about PR / merges (explore → improve/v2? → main).
 
-## 9. Before the deadline (leave ≥ 3 h)
+## 9. Before the deadline (leave ≥ 3 h) — DONE 2026-09-27 ~16:30 (progress.md "Final packaging")
 
 On branch `explore/cross-encoder`:
 - `configs/default.yaml`: add `rerank.extra_scores: crossenc` (and a `crossenc:` section
