@@ -839,3 +839,37 @@ matcher it is clearly worse than the GBM cascade.** Complementarity on all 1.11 
 pairs (5-fold logistic stacking grouped by S1): log loss 0.03574 → 0.03526, AUC 0.998869 →
 0.998891; in the uncertain band (p2 0.05–0.95, 69 k pairs) the cross-encoder alone has AUC
 0.683 (p2 0.862, stacked 0.864): the remaining hard cases are ambiguous in the text itself.
+
+**Hybrid: the cross-encoder's score as stage-2 evidence → v2.7 candidate.** Scores for
+every stage-2 pair (val 1.11 M, hold 4.28 M, test 9.58 M; `D:\aml\ce\scores_v1`, ~2,800
+pairs/s on the RTX 4050, India slowest with its long addresses) enter stage 2 as `ce`
+(logit), `ce_q_margin` / `ce_q_rank` (vs the record's other candidates) and `ce_s_margin` /
+`ce_s_rank` (vs the other records of the S1's group) (`rerank.extra_scores`). On its own
+the raw score added little (logistic stacking above), but its *context* does: `ce`,
+`ce_q_margin` and `ce_s_margin` rank 4th, 5th and 9th of 136 stage-2 features by gain.
+
+| Stage 2 | folds | val F0.5 | clean | clean US | clean India | singletons | OOF AUC / logloss |
+|---|---|---|---|---|---|---|---|
+| v2.6 (E1b_nc) | by S1 | 0.98918 | 0.99263 | 0.99418 | 0.99015 | 0.98892 | 0.998869 / 0.0359 |
+| **v2.6 + cross-encoder (E1b_nc_ce)** | by S1 | **0.99078** | **0.99400** | 0.99498 | 0.99242 | 0.99385 | 0.999088 / 0.0315 |
+| v2.6 (E3b_nc) | whole regions | 0.98817 | 0.99163 | 0.99408 | 0.98773 | 0.98857 | |
+| **v2.6 + cross-encoder (E3b_nc_ce)** | whole regions | **0.98988** | **0.99309** | 0.99494 | 0.99014 | 0.99368 | |
+
++0.0016 on val and +0.0017 on unseen regions (India +0.0024, singletons +0.005: far fewer
+false links). No leakage path: the cross-encoder never saw a val or hold record or label
+(val/hold S1 appear in its training data only as cross-region negatives of train-side
+records, which could only bias it against them), and stage 2 is cross-fitted as before.
+
+**v2.7 test file** (run `v25f` = the E1b_nc_ce models restored from `v25d\exp\E1b_nc_ce`,
+decision sweep flat at 0.99078, min_p 0.02; `D:\aml\submissions\v2.7_crossenc\`,
+validator PASS, 2026-09-27 13:28): 5,885,860 links (v2.6 5,865,018); candidate_pairs.tsv
+unchanged. Links per S1 France 3.500 / India 3.368 / US 3.393 (v2.6 3.424 / 3.368 / 3.391);
+S1 changed vs v2.6: **France 11.7 %**, India 5.4 %, US 2.3 %. The cross-encoder raises the
+model's p for French name variants: generic swaps' mean p2 0.570 (v2.6 0.344), so the
+anchor correction is ×2.70 (v2.6 capped ×6; π_anchor 0.81 either way); French rare swaps
+π 0.875 vs p 0.807 (ratio 1.19), other 1.06: if anything still slightly under-linked.
+France is what val cannot check; the LB check decides.
+
+**Pipeline-native reproduction:** `ber crossenc` (src/ber/crossenc/stage.py, the same logic
+as the scripts) → rerank (`rerank.extra_scores: crossenc`) → decide → submit in run `v26`
+(`D:\aml\run_v26.sh`), so the final file comes from the code in the zip.
