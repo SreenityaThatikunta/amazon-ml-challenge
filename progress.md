@@ -74,7 +74,7 @@ final ranking** (smaller candidate set per S1 = ranked higher).
 **Refreshed submission v2.1 (2026-09-26 03:33, stage 2 on all 102 features):** val 0.98895;
 test 5,947,349 links, same `candidate_pairs.tsv` (9,649,852); validator PASS; 4.2 % of S1
 predictions differ from the first v2 file; links per S1 France 3.438 / India 3.422 / US 3.444.
-Files: `output/` and `D:ml\submissions2.1\` (first v2 file kept in `...\submissions2\`).
+Files: `output/` and `D:\aml\submissions\v2.1\` (first v2 file kept in `...\submissions\v2\`).
 Stage-2 test pass peaks at 9.3 GB with all 102 features.
 
 **Test pass (2026-09-26 02:38, `output/`):** validator PASS (matching + candidate file).
@@ -153,7 +153,7 @@ more than further val gains. Checks so far (`D:\aml\analysis\shift.py`, `lowp_in
   in a half-size pool), so only the leaderboard can tell which way is right.
 
   Result: val 0.98897 (neutral, as expected on one domain); test file
-  `D:ml\submissions2.2_domainnorm\` (validator PASS, 5,912,771 links, 3.413 per S1) differs
+  `D:\aml\submissions\v2.2_domainnorm\` (validator PASS, 5,912,771 links, 3.413 per S1) differs
   from v2.1 on 4.1 % of S1 (France 6.4 %, India 4.0 %, US 3.3 %). The stage-1-only probe
   differs from v2.1 on 9.4 % of S1.
 
@@ -885,6 +885,6 @@ section 8.
 
 **v26 done (16:09):** pipeline-native v2.7: crossenc val AUC 0.97417, stage 2 OOF AUC
 0.999059 / logloss 0.0320, **val F0.5 0.99060** (India 0.98936, US 0.99138); test file
-`D:ml\submissions2.7_ber\` (validator PASS, 5,895,646 links, same candidate set);
+`D:\aml\submissions\v2.7_ber\` (validator PASS, 5,895,646 links, same candidate set);
 vs the prototype v2.7 (LB 0.98316) S1 changed France 3.7 %, India 1.0 %, US 0.8 %
 (retraining noise). v2.7_ber = the final file; packaging next (context.md section 9).
