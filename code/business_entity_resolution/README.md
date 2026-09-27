@@ -57,7 +57,9 @@ regions that stage 1 never sees (`rerank.hold_frac: 0.4`, `rerank.train_sides: [
 hold]`; `hold_frac: 0` gives the v2.2 setup: validation regions only, no `features-hold`).
 Held-out S2/S3 records follow their owner's region, as in the validation split
 (`rerank.hold_by: owner`; v2.4 used `query_region`), and stage 2 trains only on pairs
-whose S1 group is complete (`rerank.train_complete: true`), as every group is at test time.
+whose S1 group is complete (`rerank.train_complete: true`), as every group is at test time;
+the domain normalisation takes the scale of the S1-group counts from those pairs too
+(`rerank.norm_complete: true`).
 `decide.prior_shift: anchor` corrects a name-change kind's probabilities when the
 house-number evidence in the test data says the model misjudges how often it is a true
 copy (on current data only France's generic-word swaps; `none` switches it off).

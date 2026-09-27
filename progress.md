@@ -100,7 +100,8 @@ claims (`c_expected`, `c_best_other`, `c_sum_other`), i.e. exactly the group con
 | **v2.2 (+ domain normalisation of size-dependent stage-2 features)** | 0.98897 | **0.980** | 0.009 |
 | v2.3 (+ anchor prior correction: France's generic-word swaps) | 0.98897 | not submitted (decision below) | |
 | v2.4 (stage 2 on val + 20 % held-out train regions, stage 1 without them, + v2.3's anchor correction) | 0.98911 (unseen-region CV 0.98776) | 0.980973 | 0.008 |
-| **v2.5 (40 % held-out regions by owner, stage 2 on complete groups only)** | 0.98923 (unseen-region CV 0.98822) | **0.981708** | 0.0075 |
+| v2.5 (40 % held-out regions by owner, stage 2 on complete groups only) | 0.98923 (unseen-region CV 0.98822) | 0.981708 | 0.0075 |
+| **v2.6 (+ normalisation scale of the S1-group counts from complete groups)** | 0.98918 (val-blind change) | **0.982344** | 0.0068 |
 
 Submission policy (2026-09-26, with the user): we assumed the public board shows 3
 decimals (it shows 6, as the v2.4 score 0.980973 revealed), so a v2.3 upload looked
@@ -480,6 +481,9 @@ training, which is their true relation). Anchor: French generic swaps mean p2 0.
 de-biased ratio 6.58 → capped at 6 (v2.5: 5.40). candidate_pairs.tsv identical to v2.5's.
 Decision rule: upload once as the check; adopt if the LB does not drop (≥ v2.5 − 0.0002),
 since it removes a measured train/test mismatch and costs nothing on val; else keep v2.5.
+**Public LB 0.982344** (2026-09-27 ~09:00, uploaded by the user): +0.000636 over v2.5 →
+**adopted as v2.6** (default `rerank.norm_complete: true`, `output\` = this file, docs,
+zip, push). Uploads 2026-09-27: v2.6 (1 of 5).
 
 **7. France's region-less records are not a problem** (`D:\aml\analysis\fr_region.py`,
 `fr_region.txt`, v2.5 scores). In France, 34.9 % of the records with a kept pair have no

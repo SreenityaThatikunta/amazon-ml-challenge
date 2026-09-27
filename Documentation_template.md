@@ -19,9 +19,9 @@ how strongly and from which source. The re-ranker is trained on whole held-out r
 it is at test time), so it has seen many regions and scores unseen ones well. A per-S1
 expected-F0.5 rule (one owner per record) produces the final links, with a label-free
 prior correction for a French name-noise pattern that the training countries do not
-have. Validation macro F0.5 is **0.98923** on a geographic hold-out (10 % of the S1
+have. Validation macro F0.5 is **0.98918** on a geographic hold-out (10 % of the S1
 entities, whole states), **0.98822 with every validation state unseen by the model that
-scores it**, up from 0.98211 for our first submission. Everything runs on one laptop
+scores it**, up from 0.98211 for our first submission; public leaderboard **0.982344**. Everything runs on one laptop
 (16 GB RAM; optional NVIDIA GPU for the retrieval step) with MIT/BSD/Apache dependencies
 and no pretrained model.
 
@@ -162,7 +162,13 @@ the S1, best/sum/count of competing p1, the same within the record's source, and
 all 102 stage-1 features passed through (25 of them: val 0.98748; all: 0.98895).
 **Domain normalisation:** 16 count-like features (per-S1 and per-record counts, name
 frequency) are divided by their mean and 4 IDF-like ones by their 99th percentile, within each
-country and split, because test has a different S1 density than train (section 5).
+country and split, because test has a different S1 density than train (section 5). The
+scale of the 9 counts over an S1's group (claims, competitors) is taken from training
+pairs whose S1 group is complete only: the ~9 % of training pairs whose group is
+artificially empty (see "Complete S1 groups") pulled those means 9–10 % below what the
+same density gives at test, where every group is complete, so the model read test's
+competition as weaker than it is (public leaderboard 0.981708 → 0.982344; validation
+cannot show this, as it shares the training scale).
 
 **Model type:** LightGBM (MIT) binary classifiers. Stage 1: 127 leaves, lr 0.05, early
 stopping on 5 % of val records (best iteration 330; val AUC 0.99994), trained on 3.6 M
@@ -234,8 +240,9 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
 
 ## 5. Results & Error Analysis
 
-- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.98923** (US 0.99044,
-  India 0.98734; singletons 0.98902; pair precision 0.99838, recall 0.97142). With every
+- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.98918** (US 0.99040,
+  India 0.98726; singletons 0.98846; pair precision 0.99836, recall 0.97141; 0.98923 without the
+  normalisation-scale fix, which validation cannot see, see section 4). With every
   validation state unseen by the model that scores it (whole regions held out per
   cross-fitting fold, the harsher test-like check): **0.98822**.
   Progression: first submission 0.98211 → v2 features, stage 1 only 0.98337 → + stage-2
@@ -260,7 +267,8 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
   | + complete groups only | whole regions held out | **0.98822** | **0.99171** | 0.99417 | 0.98778 |
   | + 20 % held-out regions | by S1 | 0.98911 | 0.99241 | 0.99400 | 0.98987 |
   | + 40 % held-out regions (owner rule) | by S1 | 0.98896 | 0.99261 | 0.99421 | 0.99005 |
-  | + complete groups only (**final**) | by S1 | **0.98923** | **0.99270** | 0.99424 | 0.99025 |
+  | + complete groups only | by S1 | **0.98923** | **0.99270** | 0.99424 | 0.99025 |
+  | + normalisation scale from complete groups (**final**) | by S1 | 0.98918 | 0.99263 | 0.99418 | 0.99015 |
 - **Common false positives (wrong merges)** (error analysis of the 25-feature re-ranker): 2,765 of 752,513 predicted links: 1,842
   lookalike distractors (same address, one-letter name edit or house number shifted by a
   few units, often indistinguishable from a true pair with a digit typo), 923 records of
@@ -274,7 +282,8 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
   features 0.977 (val 0.98895); + domain normalisation 0.980 (val 0.98897); re-ranker on
   validation + 20 % held-out regions, French prior correction **0.980973** (val 0.98911,
   unseen-region 0.98776); final model (40 % held-out regions, records following their
-  owner, complete groups only) **0.981708** (val 0.98923, unseen-region 0.98822). The widening
+  owner, complete groups only) 0.981708 (val 0.98923, unseen-region 0.98822); final model
+  (+ normalisation scale from complete groups) **0.982344** (val 0.98918). The widening
   val-LB gap led to adversarial validation (a classifier separates val from test pairs with
   AUC 0.99): test US has half the S1 of train US and 23 % more S2/S3 records per S1, so
   count- and IDF-based features sit on a different scale. Dividing them by their

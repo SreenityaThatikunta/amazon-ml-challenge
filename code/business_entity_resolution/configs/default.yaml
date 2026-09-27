@@ -87,7 +87,11 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
                       # scored by the fold mean, i.e. a pure unseen-region check)
   train_complete: true  # v2.5: train only on pairs whose S1 lies in a loaded (val / hold) region, i.e.
                       # whose group is complete as at test time; the others are still scored
-  rounds: 1           # 2 = second round with group features from the round-1 p2 (experimental)
+  norm_complete: true # v2.6: with domain_norm, the S1-group counts take their training scale from
+                      # complete-group pairs only (the empty groups pulled the mean 9-10 % below
+                      # test's, where every group is complete); LB 0.981708 -> 0.982344
+  rounds: 1           # 2 = second round with group features from the round-1 p2 (rejected:
+                      # India -0.0011 on unseen regions)
   learning_rate: 0.05
   num_leaves: 63
   min_data_in_leaf: 200

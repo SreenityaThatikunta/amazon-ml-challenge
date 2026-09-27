@@ -11,13 +11,16 @@ sections are "v2.5", "v2.4" and "v2.3"). The problem statement text is at
 
 ## 1. Situation
 
-- **Best file: v2.5, public LB 0.981708** (v2.4 0.980973; v2.2 0.980; v2.1 0.977; main
-  0.975). It is in `output\` and `D:\aml\submissions\v2.5_hold04_complete\`; the code on
-  branch `improve/v2` (pushed) reproduces it with the default config (run `v25`).
+- **Best file: v2.6, public LB 0.982344** (v2.5 0.981708; v2.4 0.980973; v2.2 0.980; v2.1
+  0.977; main 0.975). It is in `output\` and `D:\aml\submissions\v2.6_normcomplete\`; the
+  code on branch `improve/v2` (pushed) reproduces it with the default config (stage 1 of
+  run `v25`, stage 2 in run `v25b` = experiment `v25b\exp\E1b_nc`).
   `pootato_submission.zip` (project root) was rebuilt from it (section 9: final checklist).
 - v2.5 = v2.4 + stage 2 on 40 % held-out train regions (was 20 %) whose S2/S3 records
   follow their owner's region (`rerank.hold_by: owner`) + stage 2 trained only on pairs
   whose S1 group is complete (`rerank.train_complete: true`). Details: progress "v2.5".
+  v2.6 = v2.5 + the S1-group counts' normalisation scale from complete-group pairs
+  (`rerank.norm_complete: true`; progress 6f). Uploads 2026-09-27: v2.6 (1 of 5).
 - The **public LB shows 6 decimals** (not 3, as the previous handoff implied), so it can
   resolve differences of ~0.0005. It is computed on a subset of the test S1; the private LB
   (final ranking) on the rest. `candidate_pairs.tsv` and the code are also reviewed:
