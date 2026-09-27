@@ -39,6 +39,7 @@ $B candidates  --run main  # region-blocked TF-IDF top-k + recall report       (
 $B features    --run main  # 102 pair + context features                       (~4 h, train+test)
 $B features-hold --run main  # all pairs of the held-out train regions (rerank.hold_frac) (~1.3 h)
 $B scorer      --run main  # stage-1 LightGBM (without the held-out regions), scores val + hold + test (~25 min)
+$B crossenc    --run main  # v2.7: fine-tune the MiniLM cross-encoder, score every stage-2 pair (GPU, ~2.5 h)
 $B rerank      --run main  # stage-2 re-ranker (cross-fitted on val + held-out regions) + test (~25 min)
 $B decide      --run main  # one owner per record + expected F0.5 (+ anchor prior correction); val F0.5 (~10 min)
 $B submit      --run main  # output/matching_results.tsv + candidate_pairs.tsv + official validator
@@ -48,8 +49,8 @@ The train/val side and the test side can also run as two passes (the test pass r
 the model, region neighbourhoods and decision parameters of the train pass):
 
 ```bash
-for s in candidates features features-hold scorer rerank decide; do $B $s --run main --set data.phase=train; done
-for s in candidates features scorer rerank decide submit; do $B $s --run main --set data.phase=test; done
+for s in candidates features features-hold scorer crossenc rerank decide; do $B $s --run main --set data.phase=train; done
+for s in candidates features scorer crossenc rerank decide submit; do $B $s --run main --set data.phase=test; done
 ```
 
 Stage 2 (`rerank`) trains on the validation regions and on ~40 % more whole train-side
@@ -60,6 +61,14 @@ Held-out S2/S3 records follow their owner's region, as in the validation split
 whose S1 group is complete (`rerank.train_complete: true`), as every group is at test time;
 the domain normalisation takes the scale of the S1-group counts from those pairs too
 (`rerank.norm_complete: true`).
+**Cross-encoder (v2.7, `ber crossenc`).** A pretrained MiniLM cross-encoder
+(`cross-encoder/ms-marco-MiniLM-L-6-v2`, Apache-2.0, 22 M parameters) reads both records'
+normalised text jointly and is fine-tuned on stage 1's own out-of-sample pairs; its logit
+and the logit's margin/rank among the record's candidates and within the S1's group are
+stage-2 features (`rerank.extra_scores: crossenc`). Install its dependencies first
+(`requirements-crossenc.txt`; torch with CUDA from the PyTorch index); the model is
+downloaded on first use (or `--set crossenc.base_model=<local dir>`). Needs an NVIDIA GPU
+for reasonable run time (RTX 4050 laptop: fine-tuning ~20 min, scoring ~15 M pairs ~2 h).
 `decide.prior_shift: anchor` corrects a name-change kind's probabilities when the
 house-number evidence in the test data says the model misjudges how often it is a true
 copy (on current data only France's generic-word swaps; `none` switches it off).
