@@ -21,6 +21,9 @@ IGNORE = {"pip", "setuptools", "wheel", "ber"}
 REVIEWED = {
     "tqdm": "MPL-2.0 AND MIT; used unmodified as a transitive dependency of "
             "indic-transliteration (MPL copyleft is file-level only)",
+    "certifi": "MPL-2.0; Mozilla's CA certificate bundle, used unmodified as a transitive "
+               "dependency of huggingface_hub (httpx: HTTPS download of the cross-encoder "
+               "model; MPL copyleft is file-level only)",
 }
 
 

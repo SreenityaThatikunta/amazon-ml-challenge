@@ -13,6 +13,9 @@ Python 3.11–3.13, tested with 3.12 on macOS and 3.13 on Windows 11):
 python -m venv .venv
 .venv/bin/pip install -r code/business_entity_resolution/requirements.txt      # Windows: .venv\Scripts\pip
 .venv/bin/pip install -e code/business_entity_resolution
+# cross-encoder stage (part of the default pipeline since v2.7; NVIDIA GPU strongly advised):
+.venv/bin/pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126
+.venv/bin/pip install -r code/business_entity_resolution/requirements-crossenc.txt
 # optional, NVIDIA GPU + CUDA 13 toolkit: GPU top-k search in stage 1 (~2x faster end to end)
 .venv/bin/pip install -r code/business_entity_resolution/requirements-gpu.txt
 ```
@@ -29,7 +32,9 @@ Every stage is one command that reads the previous stage's artifacts from
 `artifacts/<run>/` and writes its own (with `manifest.json` + `log.txt`).
 Run them one at a time: heavy stages in parallel swap on a 16 GB machine
 (peak memory: candidates ~8 GB, features ~10 GB, features-hold ~9 GB, scorer ~9 GB,
-rerank ~8 GB, decide ≤ 5 GB).
+crossenc ~10.6 GB RAM + ≤ 6 GB GPU, rerank ~8 GB, decide ≤ 5 GB).
+`configs/default.yaml` reproduces the submitted file (v2.7); `--set rerank.extra_scores=null`
+gives v2.6 (no cross-encoder stage, no torch).
 
 ```bash
 B=.venv/bin/ber            # Windows: .venv\Scripts\ber.exe (set PYTHONUTF8=1)

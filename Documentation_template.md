@@ -8,22 +8,26 @@
 
 ## 1. Executive Summary
 
-A four-stage cascade that never compares all pairs: normalisation tuned to the noise we
-measured in the data, region-blocked character-trigram TF-IDF retrieval (24.6 S1
-candidates per S2/S3 record, 99.05 % of true pairs), a LightGBM pair scorer with 102
-features that also acts as a learned filter (**~1.07 candidates per record kept, 99.97 %
-of the retrieved true pairs; 5.53 candidates per S1 on test**), and a second LightGBM that
-re-ranks the survivors with *group context*: how many other records claim the same S1,
-how strongly and from which source. The re-ranker is trained on whole held-out regions
-(the validation states plus 40 % more train-side states, with every S1 group complete, as
-it is at test time), so it has seen many regions and scores unseen ones well. A per-S1
-expected-F0.5 rule (one owner per record) produces the final links, with a label-free
-prior correction for a French name-noise pattern that the training countries do not
-have. Validation macro F0.5 is **0.98918** on a geographic hold-out (10 % of the S1
-entities, whole states), **0.98817 with every validation state unseen by the model that
-scores it**, up from 0.98211 for our first submission; public leaderboard **0.982344**. Everything runs on one laptop
-(16 GB RAM; optional NVIDIA GPU for the retrieval step) with MIT/BSD/Apache dependencies
-and no pretrained model.
+A cascade that never compares all pairs: normalisation tuned to the noise we measured in
+the data, region-blocked character-trigram TF-IDF retrieval (24.6 S1 candidates per S2/S3
+record, 99.05 % of true pairs), a LightGBM pair scorer with 102 features that also acts as
+a learned filter (**~1.07 candidates per record kept, 99.97 % of the retrieved true pairs;
+5.53 candidates per S1 on test**), a small **transformer cross-encoder** (MiniLM,
+22.7 M parameters, Apache-2.0) fine-tuned on the scorer's out-of-sample pairs, which reads
+both records' text jointly, and a second LightGBM that re-ranks the survivors with *group
+context*: how many other records claim the same S1, how strongly and from which source,
+and how the cross-encoder rates the pair against the competing candidates. The re-ranker
+is trained on whole held-out regions (the validation states plus 40 % more train-side
+states, with every S1 group complete, as it is at test time), so it has seen many regions
+and scores unseen ones well. A per-S1 expected-F0.5 rule (one owner per record) produces
+the final links, with a label-free prior correction for a French name-noise pattern that
+the training countries do not have. Validation macro F0.5 is **0.99060** on a geographic
+hold-out (10 % of the S1 entities, whole states; 0.98918 without the cross-encoder),
+**0.98988 with every validation state unseen by the model that scores it** (0.98817
+without), up from 0.98211 for our first submission; public leaderboard **0.98316**
+(0.982344 without the cross-encoder). Everything runs on one laptop (16 GB RAM; an NVIDIA
+GPU for the cross-encoder, optional for retrieval) with MIT/BSD/Apache dependencies; the
+only pretrained model is the 22.7 M-parameter cross-encoder.
 
 ---
 
@@ -70,23 +74,29 @@ v2 checks in `progress.md`):
 
 ### 2.2 Solution Strategy
 
-**Approach Type:** Blocking + learned filter + group-aware re-ranker + expected-F0.5 decision.
+**Approach Type:** Blocking + learned filter + transformer cross-encoder + group-aware
+re-ranker + expected-F0.5 decision (a hybrid of gradient-boosted trees and a small
+transformer).
 **Core Innovation:** a *cascade* where the stage-1 classifier doubles as the final
 blocking filter (tiny candidate set without losing recall), and a stage-2 re-ranker
 trained cross-fitted on complete S1 groups that reasons about competing claims on the
-same S1, the information a pairwise matcher cannot see.
+same S1, the information a pairwise matcher cannot see. A transformer cross-encoder,
+clearly weaker than the cascade as a matcher on its own, feeds the re-ranker its
+*margins* over the competing candidates, which turn out to be strong evidence.
 
 ```
 records ─► [0] normalise ─► [1] TF-IDF top-k (region-blocked, 24.6/record)
-        ─► [2] 102 pair features ─► stage-1 LightGBM p1 ─► keep p1 ≥ 0.001 (~1.08/record)
-        ─► [3] stage-2 LightGBM p2 (group context) ─► [4] one owner + expected F0.5 per S1
+        ─► [2] 102 pair features ─► stage-1 LightGBM p1 ─► keep p1 ≥ 0.001 (~1.07/record)
+        ─► [2b] MiniLM cross-encoder reads both records ─► logit + margins over competitors
+        ─► [3] stage-2 LightGBM p2 (group context + cross-encoder evidence)
+        ─► [4] one owner + expected F0.5 per S1
 ```
 
 Data roles (whole regions, i.e. US and Indian states, never split):
 
 | Part | Share of S1 | Used for |
 |---|---|---|
-| train regions | ~50 % | stage 1 (a 14 % sample of the 20 % featurised records) |
+| train regions | ~50 % | stage 1 (a 14 % sample of the 20 % featurised records); the cross-encoder (the other featurised records, whose p1 is out-of-sample) |
 | held-out train regions ("hold") | ~40 % | stage 2 training (all records featurised; stage 1 never saw them) |
 | validation regions | ~10 % | stage 2 training, cross-fitted (every val pair gets an out-of-fold p2), all metrics |
 
@@ -155,11 +165,12 @@ F0.5 includes blocking losses, singletons and every stage, like the leaderboard.
   margin over the record's best *other* candidate, the gap to its best and the rank;
   candidates per record and per S1.
 
-**Stage-2 features (re-ranker, 127):** p1 and logit; record context (rank, best/sum/count
+**Stage-2 features (re-ranker, 132):** p1 and logit; record context (rank, best/sum/count
 of the record's other p1); **S1 context** (rank of the record among all records listing
 the S1, best/sum/count of competing p1, the same within the record's source, and
 "claims": records whose best S1 this is, their expected count and best competitor);
-all 102 stage-1 features passed through (25 of them: val 0.98748; all: 0.98895).
+all 102 stage-1 features passed through (25 of them: val 0.98748; all: 0.98895); the
+cross-encoder's logit and its context (5 features, below).
 **Domain normalisation:** 16 count-like features (per-S1 and per-record counts, name
 frequency) are divided by their mean and 4 IDF-like ones by their 99th percentile, within each
 country and split, because test has a different S1 density than train (section 5). The
@@ -177,8 +188,38 @@ pairs from 14 % of the featurised train-side records outside the held-out region
 regions (1.11 M + 4.28 M pairs with p1 ≥ 0.001; stage 1 never saw either, so p1 is
 out-of-sample as on test) whose S1 group is complete (below), with **4-fold
 cross-fitting** grouped by the record's top S1: every val pair gets an out-of-fold p2
-(honest validation), test pairs get the mean of the 4 fold models. No pretrained model,
-far below the 8 B parameter limit.
+(honest validation), test pairs get the mean of the 4 fold models. The only pretrained
+model is the cross-encoder below (22.7 M parameters, Apache-2.0), far below the 8 B
+parameter limit.
+
+**Cross-encoder (`ber crossenc`, `src/ber/crossenc/stage.py`).** A transformer that reads
+both records at once: `cross-encoder/ms-marco-MiniLM-L-6-v2` (Hugging Face, Apache-2.0,
+6 layers, 22.7 M parameters), each record written as its normalised
+`name core + legal form ; address + region` (at most 64 word-piece tokens per pair; 3 %
+of pairs truncated). It is fine-tuned (binary cross-entropy, AdamW, 2 epochs, batch 256,
+learning rate 5e-5 with 5 % linear warm-up and linear decay, fp16; ~20 min on a laptop
+RTX 4050) on 982,265 pairs (68 % true) of 777,808 records from stage 1's own regions: the
+featurised train-side records that stage 1 did *not* train on, kept at p1 ≥ 0.001 exactly
+like stage 2's inputs. It
+never sees a validation or held-out record or label (their S1 appear in its training data
+only as cross-region negatives of train-side records, which could only bias it against
+them), so its scores on validation, held-out and test pairs are all out-of-sample; it then
+scores every stage-2 pair (15 M, ~2,800 pairs/s). **On its own it is a clearly weaker
+matcher than the cascade** (AUC 0.974 on the validation stage-2 pairs, vs 0.996 for p1 and
+0.9989 for p2; training log loss 0.06 vs 0.32 on validation): it learns street and city
+strings of the training regions that do not transfer to new regions, and it sees house
+numbers only as word pieces (`848` vs `843`), where the lookalike decoys differ. A logistic
+stack of p2 and its raw logit barely helps (log loss 0.0357 → 0.0353). What helps is its
+*context*: stage 2 gets the logit plus its margin over, and rank among, the record's other
+candidates and the other records of the S1's group (`ce`, `ce_q_margin`, `ce_q_rank`,
+`ce_s_margin`, `ce_s_rank`). `ce` and `ce_q_margin` rank 4th and 5th and `ce_s_margin` 7th
+of the 132 stage-2 features by gain (after the record margin, p1 and its logit). With them,
+val F0.5 rises from 0.98918 to 0.99078 and the unseen-region score from 0.98817 to 0.98988
+(clean unseen-region India +0.0024, see section 5; singletons 0.98892 → 0.99385, i.e. far
+fewer false links), and the public leaderboard from 0.982344 to 0.98316. The submitted
+file comes from a re-run of this configuration with the packaged code (cross-encoder
+retrained: val AUC 0.97417 vs 0.97485, stage-2 out-of-fold AUC 0.999059 vs 0.999088, val
+F0.5 0.99060 vs 0.99078; GPU training is not bit-for-bit deterministic).
 
 **Why stage 2 needs many regions.** Stage 2 first trained on the validation regions
 only (10 % of S1). With whole validation regions held out per fold its score fell from
@@ -213,7 +254,7 @@ complete:
 **Threshold selection method:** one owner per record (its highest p2), then per S1 the
 prefix of its records (sorted by p2) that maximises the expected F0.5
 (≈ 1.25·Σp / (0.25·Σp_all + k), vs P(no match) = Π(1 − p) for the empty prediction), after
-dropping p2 < min_p. min_p = 0.02 chosen on validation; the curve is flat (0.98916–0.98923
+dropping p2 < min_p. min_p = 0.02 chosen on validation; the curve is flat (0.99058–0.99060
 for 0.02–0.5). Exact duplicate records share one owner.
 
 **Prior correction per name-change kind (`decide.prior_shift = anchor`,
@@ -233,26 +274,32 @@ beyond 2× and the kind has ≥ 2,000 pairs, the kind's p2 are rescaled by that 
 validation: no correction fires under eight simulated label shifts where the model stays
 calibrated; when one kind's scores are replaced by house-number-only scores with a wrong
 prior (France's situation), the correction recovers 96–99 % of the lost F0.5. On test
-it fires only for **France's generic-word swaps** (final model: π = 0.81 vs mean p2 0.39,
-odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
+it fires only for **France's generic-word swaps** (final model: π = 0.81 vs mean p2 0.60,
+odds × 2.4 after de-biasing; the cross-encoder already rates these swaps higher: without it
+the mean p2 was 0.39 and the factor 5.4); every US/India kind stays within 0.9–1.9×, below
+the threshold.
 
 ---
 
 ## 5. Results & Error Analysis
 
-- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.98918** (US 0.99040,
-  India 0.98726; singletons 0.98846; pair precision 0.99836, recall 0.97141; 0.98923 without the
-  normalisation-scale fix, which validation cannot see, see section 4). With every
+- **F_0.5 Score (macro, validation, 222,624 held-out S1):** **0.99060** for the submitted
+  file (US 0.99138, India 0.98936; singletons 0.99359; pair precision 0.99897, recall
+  0.97353); 0.99078 in the first run of the same configuration (section 4). With every
   validation state unseen by the model that scores it (whole regions held out per
-  cross-fitting fold, the harsher test-like check): **0.98817** (0.98822 without the fix).
+  cross-fitting fold, the harsher test-like check): **0.98988** (first run). Without the
+  cross-encoder: 0.98918 and 0.98817 (0.98923 and 0.98822 without the normalisation-scale
+  fix, which validation cannot see, see section 4).
   Progression: first submission 0.98211 → v2 features, stage 1 only 0.98337 → + stage-2
   re-ranker on 25 stage-1 features 0.98748 → on all 102 features 0.98895 → re-ranker
   trained on validation + 20 % held-out train regions 0.98911 (0.98776 unseen-region, vs
   0.98660 when trained on validation regions only) → 40 % held-out regions, records
-  following their owner, training on complete groups only 0.98923 (0.98822). Stage 2
-  trained on US val only and applied to Indian val still beats stage 1 there (0.9807 vs
-  0.9790), our best proxy for France; a re-ranker trained only on the held-out regions
-  scores the validation regions as well as one trained on them (0.98666 vs 0.98660).
+  following their owner, training on complete groups only 0.98923 (0.98822) →
+  normalisation scale from complete groups 0.98918 (0.98817) → + cross-encoder evidence
+  0.99078 (0.98988). Stage 2 trained on US val only and applied to Indian val still beats
+  stage 1 there (0.9807 vs 0.9790), our best proxy for France; a re-ranker trained only on
+  the held-out regions scores the validation regions as well as one trained on them
+  (0.98666 vs 0.98660).
 
   Loading more held-out regions also completes more validation groups (their S1's copies
   are then loaded), which makes the validation set harder, as test is. So the variants
@@ -264,12 +311,32 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
   | validation regions | whole regions held out | 0.98660 | 0.99020 | 0.99347 | 0.98497 |
   | + 20 % held-out regions | whole regions held out | 0.98776 | 0.99125 | 0.99401 | 0.98684 |
   | + 40 % held-out regions (owner rule) | whole regions held out | 0.98789 | 0.99156 | 0.99410 | 0.98750 |
-  | + complete groups only | whole regions held out | **0.98822** | **0.99171** | 0.99417 | 0.98778 |
-  | + normalisation scale from complete groups (final) | whole regions held out | 0.98817 | 0.99163 | 0.99408 | 0.98773 |
+  | + complete groups only | whole regions held out | 0.98822 | 0.99171 | 0.99417 | 0.98778 |
+  | + normalisation scale from complete groups | whole regions held out | 0.98817 | 0.99163 | 0.99408 | 0.98773 |
+  | + cross-encoder evidence (**final**) | whole regions held out | **0.98988** | **0.99309** | 0.99494 | 0.99014 |
   | + 20 % held-out regions | by S1 | 0.98911 | 0.99241 | 0.99400 | 0.98987 |
   | + 40 % held-out regions (owner rule) | by S1 | 0.98896 | 0.99261 | 0.99421 | 0.99005 |
-  | + complete groups only | by S1 | **0.98923** | **0.99270** | 0.99424 | 0.99025 |
-  | + normalisation scale from complete groups (**final**) | by S1 | 0.98918 | 0.99263 | 0.99418 | 0.99015 |
+  | + complete groups only | by S1 | 0.98923 | 0.99270 | 0.99424 | 0.99025 |
+  | + normalisation scale from complete groups | by S1 | 0.98918 | 0.99263 | 0.99418 | 0.99015 |
+  | + cross-encoder evidence (**final**) | by S1 | **0.99078** | **0.99400** | 0.99498 | 0.99242 |
+
+  (Cross-encoder rows: first run of the final configuration; the submitted re-run scores
+  0.99060 by S1.)
+- **Cross-encoder alone vs as evidence** (all 1,112,888 validation stage-2 pairs; every
+  score out-of-sample or out-of-fold; submitted run):
+
+  | Scores | AUC | Log loss | AUC where p2 without it is 0.05–0.95 (68,986 pairs) |
+  |---|---|---|---|
+  | stage 1 (p1) | 0.99602 | 0.0661 | |
+  | cross-encoder alone | 0.97417 | 0.3167 | 0.673 |
+  | stage 2 without the cross-encoder | 0.99887 | 0.0359 | 0.862 |
+  | stage 2 with the cross-encoder features | **0.99906** | **0.0320** | **0.890** |
+
+  The transformer alone is the weakest model here, and nearly useless on the hard cases
+  (0.673), which are ambiguous in the text itself; yet as evidence for the re-ranker it
+  improves exactly those cases (0.862 → 0.890), because what it adds is *relative*: how
+  much better it rates this pair than the record's other candidates and the S1's other
+  records.
 - **Common false positives (wrong merges)** (error analysis of the 25-feature re-ranker): 2,765 of 752,513 predicted links: 1,842
   lookalike distractors (same address, one-letter name edit or house number shifted by a
   few units, often indistinguishable from a true pair with a digit typo), 923 records of
@@ -281,11 +348,11 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
   address that hosts several S1, and retrieval ties among dozens of S1 with the same name.
 - **Leaderboard (public):** first submission 0.975 (val 0.982); stage-2 re-ranker on all
   features 0.977 (val 0.98895); + domain normalisation 0.980 (val 0.98897); re-ranker on
-  validation + 20 % held-out regions, French prior correction **0.980973** (val 0.98911,
-  unseen-region 0.98776); final model (40 % held-out regions, records following their
-  owner, complete groups only) 0.981708 (val 0.98923, unseen-region 0.98822); final model
-  (+ normalisation scale from complete groups) **0.982344** (val 0.98918, unseen-region
-  0.98817). The widening
+  validation + 20 % held-out regions, French prior correction 0.980973 (val 0.98911,
+  unseen-region 0.98776); 40 % held-out regions, records following their owner, complete
+  groups only 0.981708 (val 0.98923, unseen-region 0.98822); + normalisation scale from
+  complete groups 0.982344 (val 0.98918, unseen-region 0.98817); final model (+ cross-encoder
+  evidence) **0.98316** (val 0.99078, unseen-region 0.98988; first run). The widening
   val-LB gap led to adversarial validation (a classifier separates val from test pairs with
   AUC 0.99): test US has half the S1 of train US and 23 % more S2/S3 records per S1, so
   count- and IDF-based features sit on a different scale. Dividing them by their
@@ -293,8 +360,13 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
   The model's own expected F0.5 on test (0.9913, France 0.9870 lowest) minus its
   validation optimism predicts ≈ 0.985, so roughly half of the remaining gap was invisible
   to the model; the two causes we found (France's generic-word swaps and the empty S1
-  groups of cross-region candidates, both in section 4) are addressed in the final model. We used the public leaderboard only as a check against regressions, not to
-  choose parameters: all choices above rest on validation evidence.
+  groups of cross-region candidates, both in section 4) are addressed in the final model.
+  We used the public leaderboard only as a check against regressions, not to choose
+  parameters: all choices above rest on validation evidence, as the final ranking scores
+  the other (private) test S1. The cross-encoder was adopted because it gained on
+  validation (+0.0016), on unseen regions (+0.0017), in both countries and on singletons;
+  the public leaderboard moved the same way (+0.0008). The submitted file is the re-run of
+  the packaged code, not the file with the best public score.
 
 ---
 
@@ -308,8 +380,13 @@ entity. The cascade keeps the candidate set to about one S1 per record while ret
 training data look like test data: many held-out regions, every S1 group complete, and
 feature scales taken from the same kind of pairs as at test. These moved the public
 leaderboard (0.980 → 0.982) by more than validation could show, because validation shares
-the training set's artefacts. The main remaining loss is records without an address whose
-name is shared by many S1, which no feature of the pair can resolve.
+the training set's artefacts. The last gain came from a hybrid: a small pretrained
+transformer cross-encoder was a weak matcher on its own (it overfits the training regions'
+strings and cannot compare house numbers), but its margins over the competing candidates,
+given to the re-ranker as evidence, raised validation by 0.0016, unseen regions by 0.0017
+and the public leaderboard to 0.98316; each model does what it is good at. The main
+remaining loss is records without an address whose name is shared by many S1, which no
+feature of the pair can resolve.
 
 ---
 
@@ -318,18 +395,24 @@ name is shared by many S1, which no feature of the pair can resolve.
 ### A. Code Artefacts
 
 `code/business_entity_resolution/` (Python ≥ 3.11; `requirements.txt` pinned,
-`requirements-gpu.txt` optional): package `ber`, one CLI command per stage, each reading
-the previous stage's artifacts from `artifacts/<run>/<stage>/` and writing its own with a
-`manifest.json` (config hash, git commit, timings, peak memory, metrics). All thresholds
-live in `configs/default.yaml`.
+`requirements-crossenc.txt` for the cross-encoder (torch, transformers), `requirements-gpu.txt`
+optional): package `ber`, one CLI command per stage, each reading the previous stage's
+artifacts from `artifacts/<run>/<stage>/` and writing its own with a `manifest.json`
+(config hash, git commit, timings, peak memory, metrics). All thresholds live in
+`configs/default.yaml`, which reproduces the submitted file (`rerank.extra_scores:
+crossenc`; `null` gives the pipeline without the cross-encoder, no torch needed).
 
 ```bash
 pip install -r code/business_entity_resolution/requirements.txt
+pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126   # CUDA build
+pip install -r code/business_entity_resolution/requirements-crossenc.txt
 pip install -e code/business_entity_resolution
 B=ber   # run from the directory that contains dataset/
 $B split --run main && $B normalize --run main && $B candidates --run main
 $B features --run main && $B features-hold --run main   # held-out train regions for stage 2
-$B scorer --run main && $B rerank --run main
+$B scorer --run main
+$B crossenc --run main   # fine-tune MiniLM (downloads cross-encoder/ms-marco-MiniLM-L-6-v2), score all stage-2 pairs; GPU ~2 h
+$B rerank --run main
 $B decide --run main && $B submit --run main   # -> output/matching_results.tsv, candidate_pairs.tsv
 ```
 
@@ -337,8 +420,12 @@ $B decide --run main && $B submit --run main   # -> output/matching_results.tsv,
 (same outputs). `ber explain <entity_id>` traces one record through every stage.
 Main modules: `normalize/` (text, address, geo, transliteration, lookup tables),
 `candidates/` (TF-IDF, region blocking, GPU top-k), `features/` (pair + context features),
-`scorer/` (stage 1), `rerank/` (stage 2), `decide/` (one owner, expected F0.5),
-`submit.py` (TSVs + official validator), `eval/` (geographic split, macro F0.5).
+`scorer/` (stage 1), `crossenc/` (transformer cross-encoder: training pairs, fine-tuning,
+scoring), `rerank/` (stage 2), `decide/` (one owner, expected F0.5), `submit.py` (TSVs +
+official validator), `eval/` (geographic split, macro F0.5). Dependency licenses:
+`tools/check_licenses.py` (all MIT/BSD/Apache/PSF except two MPL-2.0 packages used
+unmodified as transitive dependencies: `tqdm`, `certifi`); the model is Apache-2.0
+(22.7 M parameters).
 
 ### B. Additional Results
 
@@ -347,17 +434,24 @@ Main modules: `normalize/` (text, address, geo, transliteration, lookup tables),
 | All S1 of the country | ~10⁶ | 100 % |
 | TF-IDF top-k union | 24.6 | 99.05 % |
 | Stage-1 filter (p1 ≥ 0.001) = `candidate_pairs.tsv` | 1.07 | 99.02 % |
-| Final links | 0.72 | 97.14 % |
+| Final links | 0.72 | 97.35 % |
 
-Stage-2 features by gain: record margin over its other candidates, p1, then the S1-side
-claim features (`c_expected`, `c_best_other`, `c_sum_other`).
+Stage-2 features by gain (submitted run): record margin over its other candidates (55 %
+of the gain), p1 and its logit (37 %), then the cross-encoder's logit and record margin
+(`ce`, `ce_q_margin`, 1.1 % each), `r_q_missing`, the cross-encoder's S1-group margin
+(`ce_s_margin`) and the record/S1 context (`q_sum_other`, `s_n_top1`, ...). Without the
+cross-encoder the S1-side claim features (`c_expected`, `c_best_other`, `c_sum_other`)
+came right after p1.
 
 **Evaluated and not adopted** (all on the validation regions, same stage 1; "clean" = the
-validation S1 whose groups are complete in every variant; the final model: val 0.98918,
-clean 0.99263, unseen-region 0.98817 / clean 0.99163):
+validation S1 whose groups are complete in every variant; measured against the model
+without the cross-encoder: val 0.98918, clean 0.99263, unseen-region 0.98817 / clean
+0.99163):
 
 | Variant | Result | Why not |
 |---|---|---|
+| Cross-encoder as the matcher (instead of the GBM cascade) | val stage-2 pairs AUC 0.974 vs 0.9989 | overfits the training regions' strings; house numbers only as word pieces |
+| Cross-encoder logit stacked with p2 (logistic regression) | log loss 0.0357 → 0.0353 | small; its margins over competitors, given to stage 2, gain far more (adopted) |
 | Stage 2 up to 3,500 trees (folds stopped at 2,280–2,400 instead of ≤ 2,000) | unseen-region clean 0.99168 vs 0.99170 | flat |
 | Second stage-2 round, group features recomputed from out-of-fold p2 | unseen-region clean 0.99134 vs 0.99170, India −0.0011 | stacking shift: an unseen region's round-1 p2 looks unlike the training regions' |
 | Stronger regularisation (min 2,000 per leaf, L2 10, 70 % features) | clean 0.99261 vs 0.99270 | flat / slightly worse |
@@ -371,4 +465,5 @@ relation profile does not depend on the pair's segment, so the true-copy and dec
 profiles measured on labelled validation pairs let us estimate the share of true copies
 among test pairs without labels. On the largest US test segment (same street, same name
 key; 1.78 M records, twice the lookalikes of validation) it is 0.756 against the model's
-mean p2 of 0.762: the re-ranker stays calibrated under the test's higher decoy density.
+mean p2 of 0.762 (model without the cross-encoder): the re-ranker stays calibrated under
+the test's higher decoy density.

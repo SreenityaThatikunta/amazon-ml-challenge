@@ -71,6 +71,21 @@ scorer:               # stage 2 (T3.4): LightGBM pair scorer
   es_query_frac: 0.05     # share of val-side queries used for early stopping (all val pairs are scored)
   drop_features: []       # ablations: feature names or "prefix*" left out of the model
 
+crossenc:             # v2.7 (ber crossenc): a transformer cross-encoder reads both records' normalised
+                      # text ("name core + legal form ; address + region") jointly. Fine-tuned on stage 1's
+                      # own out-of-sample pairs (train-side records outside the hold regions that the
+                      # scorer did not train on, p1 >= rerank.min_p1), it then scores every stage-2 pair
+                      # (val, hold, test); stage 2 uses the scores (rerank.extra_scores: crossenc)
+  base_model: cross-encoder/ms-marco-MiniLM-L-6-v2  # Hugging Face id (Apache-2.0, 22 M parameters) or a local copy
+  max_len: 64         # tokens per pair (record text + S1 text; ~3 % of pairs truncated)
+  batch_size: 256     # fine-tuning batch (fp16 on CUDA)
+  learning_rate: 0.00005
+  weight_decay: 0.01
+  warmup: 0.05        # share of the steps with a linear warm-up
+  epochs: 2
+  infer_batch: 2048   # scoring batch; halved automatically on CUDA out-of-memory
+  chunk: 1000000      # pairs tokenised at a time (memory vs speed)
+
 rerank:               # stage 2b: re-ranker with S1/query group context from stage-1 p (ber rerank)
   min_p1: 0.001       # pairs below this stage-1 p are dropped first (never selected anyway)
   folds: 4            # trained on the val side, cross-fitted: out-of-fold p2 for every val pair
@@ -92,6 +107,13 @@ rerank:               # stage 2b: re-ranker with S1/query group context from sta
                       # test's, where every group is complete); LB 0.981708 -> 0.982344
   rounds: 1           # 2 = second round with group features from the round-1 p2 (rejected:
                       # India -0.0011 on unseen regions)
+  bags: 1             # > 1: repeat the cross-fit with other fold splits and seeds, average the p2
+                      # (rejected: 2 bags, clean val 0.99265 vs 0.99263 for twice the cost)
+  learner: lgb        # lgb | xgb (XGBoost, GPU) | both (mean of the two p)
+  extra_scores: crossenc  # v2.7: the crossenc stage's pair scores (cross-encoder logit) and their margin /
+                      # rank among the record's candidates and within the S1's group as stage-2 features
+                      # (val F0.5 0.98918 -> 0.99078, public LB 0.982344 -> 0.98316); null = v2.6 (no
+                      # cross-encoder); or a dir with val/hold/test_<country>.parquet (q_id, s1_id, ce)
   learning_rate: 0.05
   num_leaves: 63
   min_data_in_leaf: 200

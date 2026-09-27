@@ -20,3 +20,4 @@ scorer:
 rerank:               # synthetic data: everything is validation, no held-out regions
   hold_frac: 0.0
   train_sides: [val]
+  extra_scores: null  # no cross-encoder (it needs train-side pairs to fine-tune on)

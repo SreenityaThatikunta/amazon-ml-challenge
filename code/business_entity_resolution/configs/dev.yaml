@@ -17,3 +17,4 @@ scorer:
 rerank:               # the dev slice has no held-out regions of its own
   hold_frac: 0.0
   train_sides: [val]
+  extra_scores: null  # no cross-encoder: the scorer trains on every dev train record (none left for it)
