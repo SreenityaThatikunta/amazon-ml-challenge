@@ -70,3 +70,20 @@ def test_domain_normalize_s1_counts_scaled_on_complete_groups_only():
     np.testing.assert_allclose(out[:, 1], [2 / 3, 2 / 3, 2 / 3, 2], rtol=1e-6)  # all rows
     plain = domain_normalize(M.copy(), cols)
     np.testing.assert_allclose(plain[:, 0], [4 / 4.5, 6 / 4.5, 8 / 4.5, 0], rtol=1e-6)
+
+
+def test_extra_features_context_and_alignment():
+    import pandas as pd
+    from ber.rerank.stage import _aligned_extra, extra_features
+    q = np.array([0, 0, 1])
+    s = np.array([5, 6, 5])
+    ce = np.array([2.0, -1.0, 0.5])
+    f = extra_features(q, s, ce)
+    assert list(f["ce_q_rank"]) == [0, 1, 0]
+    np.testing.assert_allclose(f["ce_q_margin"], [3.0, -3.0, 20.5])   # no other candidate: vs -20
+    assert list(f["ce_s_rank"]) == [0, 0, 1]
+    np.testing.assert_allclose(f["ce_s_margin"], [1.5, 19.0, -1.5])
+    e = pd.DataFrame({"q_id": ["a", "a", "b"], "s1_id": ["x", "y", "x"], "ce": [2.0, -1.0, 0.5]})
+    np.testing.assert_allclose(_aligned_extra([e], ["a", "a", "b"], ["x", "y", "x"]), [2.0, -1.0, 0.5])
+    # another row order falls back to the join
+    np.testing.assert_allclose(_aligned_extra([e], ["b", "a", "a"], ["x", "y", "x"]), [0.5, -1.0, 2.0])

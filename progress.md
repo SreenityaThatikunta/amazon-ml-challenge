@@ -806,3 +806,36 @@ does stage 2 transfer to test?). Next: adversarial validation on stage-2 inputs
 ## Open questions
 - Local RAM is 16 GB: full-train TF-IDF top-k (T2.1) must stream per country/chunk; watch peak memory.
 - Kaggle specifics to confirm at T5.4: GPU type available (P100 vs 2×T4), session RAM, dataset size limits.
+
+## Exploration branch `explore/cross-encoder` (2026-09-27): a different architecture
+
+The user asked for a genuinely different architecture next to the GBM cascade (v2.6 stays
+the submission on `improve/v2`; this work lives on its own branch). Downloads approved by
+the user: PyTorch 2.14 + CUDA 12.6 (download.pytorch.org), transformers / tokenizers /
+huggingface_hub / xgboost (PyPI), model `cross-encoder/ms-marco-MiniLM-L-6-v2`
+(Hugging Face, Apache-2.0, 22 M parameters). Scripts: `D:\aml\ce\{prep,train,score,
+alone_eval}.py`; data `D:\aml\ce\data`, models `D:\aml\models`.
+
+**Transformer cross-encoder (Ditto-style).** Both records' normalised text
+(`name core + legal form ; address + region`) is read jointly by a pretrained MiniLM
+fine-tuned to predict the match. Training pairs: stage 1's own regions (train side,
+outside the hold regions), only records stage 1 did *not* train on (stable_unit(q_id,
+seed + 4) ≥ 0.14), kept at p1 ≥ 0.001 exactly as stage 2's inputs → 982,265 pairs (68 %
+true), so the cross-encoder is out-of-sample on val, hold and test. RTX 4050, fp16, batch
+256, max 64 tokens (3 % truncated), 2 epochs at ~2,000 pairs/s (a first run hit CUDA
+out-of-memory in the epoch-end validation pass; fixed with smaller, OOM-safe inference
+batches). Results on 200 k val stage-2 pairs:
+
+| | AUC | log loss |
+|---|---|---|
+| stage 1 (p1) | 0.99608 | |
+| stage 2 (v2.6 p2) | 0.99886 | ~0.031 |
+| cross-encoder, epoch 1 / 2 | 0.97341 / **0.97452** | 0.306 / 0.307 |
+
+Training log loss was ~0.075 against 0.307 on val: the transformer generalises poorly from
+the training regions to new ones (street and city strings), and it sees house numbers only
+as word pieces ("848" vs "843"), where the lookalike decoys differ. **As a standalone
+matcher it is clearly worse than the GBM cascade.** Complementarity on all 1.11 M val
+pairs (5-fold logistic stacking grouped by S1): log loss 0.03574 → 0.03526, AUC 0.998869 →
+0.998891; in the uncertain band (p2 0.05–0.95, 69 k pairs) the cross-encoder alone has AUC
+0.683 (p2 0.862, stacked 0.864): the remaining hard cases are ambiguous in the text itself.

@@ -136,6 +136,10 @@ class RerankConfig:
                                     # complete-group pairs only (as every test group is complete)
     bags: int = 1                   # > 1: repeat the cross-fit with other fold splits and seeds;
                                     # val = mean of the bags' out-of-fold p2, test = mean of all models
+    learner: str = "lgb"            # explore: lgb | xgb (XGBoost, GPU) | both (mean of the two p)
+    extra_scores: str | None = None  # explore/cross-encoder: dir with val/hold/test_<country>.parquet
+                                    # (q_id, s1_id, ce) in stage 2's row order: an external pair score
+                                    # (cross-encoder logit) + its query / S1-group context as features
     learning_rate: float = 0.05
     num_leaves: int = 63
     min_data_in_leaf: int = 200
@@ -144,6 +148,21 @@ class RerankConfig:
     num_boost_round: int = 2000
     early_stopping: int = 50
     raw_features: list[str] = field(default_factory=lambda: ["all"])  # or a feature list
+
+
+@dataclass
+class CrossencConfig:
+    """``ber crossenc`` (explore/cross-encoder): a transformer cross-encoder whose pair score
+    feeds stage 2 (``rerank.extra_scores: crossenc``)."""
+    base_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Apache-2.0, 22 M parameters
+    max_len: int = 64               # tokens per pair (record text + S1 text)
+    batch_size: int = 256
+    learning_rate: float = 5e-5
+    weight_decay: float = 0.01
+    warmup: float = 0.05            # share of the steps with a linear warm-up
+    epochs: int = 2
+    infer_batch: int = 2048         # halved automatically on CUDA out-of-memory
+    chunk: int = 1_000_000          # pairs tokenised at a time
 
 
 @dataclass
@@ -200,6 +219,7 @@ class Config:
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
     scorer: ScorerConfig = field(default_factory=ScorerConfig)
     rerank: RerankConfig = field(default_factory=RerankConfig)
+    crossenc: CrossencConfig = field(default_factory=CrossencConfig)
     decide: DecideConfig = field(default_factory=DecideConfig)
     llm: LlmConfig = field(default_factory=LlmConfig)
     france: FranceConfig = field(default_factory=FranceConfig)

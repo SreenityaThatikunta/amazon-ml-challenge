@@ -71,6 +71,11 @@ def cmd_scorer(cfg: Config, args: argparse.Namespace) -> None:
     run_scorer(cfg)
 
 
+def cmd_crossenc(cfg: Config, args: argparse.Namespace) -> None:
+    from .crossenc.stage import run_crossenc
+    run_crossenc(cfg)
+
+
 def cmd_rerank(cfg: Config, args: argparse.Namespace) -> None:
     from .rerank.stage import run_rerank
     run_rerank(cfg)
@@ -122,6 +127,7 @@ COMMANDS: dict[str, Command] = {
     "features-hold": Command(cmd_features_hold,
                              "v2.4: features of the held-out train regions (rerank.hold_frac)"),
     "scorer": Command(cmd_scorer, "stage 2: train/apply LightGBM scorer"),
+    "crossenc": Command(cmd_crossenc, "explore: transformer cross-encoder pair scores for stage 2"),
     "rerank": Command(cmd_rerank, "stage 2b: re-rank with S1/query group context (cross-fitted)"),
     "llm-export": Command(cmd_llm_export, "stage 3: route uncertain queries, export prompts"),
     "llm-import": Command(cmd_llm_import, "stage 3: import Kaggle LLM scores, blend on val"),
