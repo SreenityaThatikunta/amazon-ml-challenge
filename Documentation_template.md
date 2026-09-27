@@ -192,7 +192,7 @@ cross-fitting** grouped by the record's top S1: every val pair gets an out-of-fo
 model is the cross-encoder below (22.7 M parameters, Apache-2.0), far below the 8 B
 parameter limit.
 
-**Cross-encoder (`ber crossenc`, `src/ber/crossenc/stage.py`).** A transformer that reads
+**Cross-encoder (stage `crossenc`, `src/ber/crossenc/stage.py`).** A transformer that reads
 both records at once: `cross-encoder/ms-marco-MiniLM-L-6-v2` (Hugging Face, Apache-2.0,
 6 layers, 22.7 M parameters), each record written as its normalised
 `name core + legal form ; address + region` (at most 64 word-piece tokens per pair; 3 %
@@ -220,12 +220,12 @@ fewer false links), and the public leaderboard from 0.982344 to 0.98316.
 
 **Which run is submitted.** The submitted file is the first run of this configuration:
 its cross-encoder was fine-tuned and scored with our prototype scripts for this stage
-(included unmodified in `tools/crossenc_prototype/`), stages 2–4 by this package
-(`rerank.extra_scores` pointing at the scripts' scores). `ber crossenc` is the same logic
-as a pipeline stage (same pair selection, text, model and hyper-parameters) and is what the
+(included unmodified in `src/tools/crossenc_prototype/`), stages 2–4 by this package
+(`rerank.extra_scores` pointing at the scripts' scores). The `crossenc` stage is the same
+logic as a pipeline stage (same pair selection, text, model and hyper-parameters) and is what the
 default configuration runs. GPU fine-tuning is not bit-for-bit reproducible, and the
 prototype's batch order differs, so every run is a slightly different draw: a re-run with
-`ber crossenc` scored val F0.5 0.99060 (cross-encoder AUC 0.97417, stage-2 out-of-fold AUC
+the `crossenc` stage scored val F0.5 0.99060 (cross-encoder AUC 0.97417, stage-2 out-of-fold AUC
 0.999059) against 0.99078 (0.97485, 0.999088), and public leaderboard 0.982681 against
 0.98316. We submit the first run: it is better on the labelled validation set (paired
 per-entity difference +0.00018, z ≈ 3.9; 1,121 S1 better, 703 worse), and the public
@@ -407,23 +407,22 @@ feature of the pair can resolve.
 
 ### A. Code Artefacts
 
-`code/business_entity_resolution/` (Python ≥ 3.11; `requirements.txt` pinned,
-`requirements-crossenc.txt` for the cross-encoder (torch, transformers), `requirements-gpu.txt`
-optional): package `ber`, one CLI command per stage, each reading the previous stage's
-artifacts from `artifacts/<run>/<stage>/` and writing its own with a `manifest.json`
-(config hash, git commit, timings, peak memory, metrics). All thresholds live in
-`configs/default.yaml`, which runs the submitted configuration (`rerank.extra_scores:
-crossenc`; `null` gives the pipeline without the cross-encoder, no torch needed). The
+`code/business_entity_resolution/` (Python ≥ 3.11) holds `README.md`, `requirements.txt`
+(every dependency pinned) and `src/`: the pipeline package `ber` (one command per stage,
+run as `python -m ber <stage>`), its tests (`src/tests/`) and tools (`src/tools/`). Each
+stage reads the previous stage's artifacts from `artifacts/<run>/<stage>/` and writes its
+own with a `manifest.json` (config hash, git commit, timings, peak memory, metrics). All
+thresholds live in `src/ber/configs/default.yaml`, which runs the submitted configuration
+(`rerank.extra_scores: crossenc`; `null` gives the pipeline without the cross-encoder). The
 submitted file's cross-encoder was trained and scored by the prototype scripts in
-`tools/crossenc_prototype/` (exact copies; their README gives the commands), stages 2–4
-by `ber rerank / decide / submit --set rerank.extra_scores=<the scripts' score dir>`.
+`src/tools/crossenc_prototype/` (exact copies; their README gives the commands), stages
+2–4 by `python -m ber rerank / decide / submit --set rerank.extra_scores=<the scripts'
+score dir>`.
 
 ```bash
-pip install -r code/business_entity_resolution/requirements.txt
-pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126   # CUDA build
-pip install -r code/business_entity_resolution/requirements-crossenc.txt
-pip install -e code/business_entity_resolution
-B=ber   # run from the directory that contains dataset/
+pip install -r code/business_entity_resolution/requirements.txt   # includes torch (CUDA 12.6 build)
+export PYTHONPATH="$PWD/code/business_entity_resolution/src"      # run from the directory that contains dataset/
+B="python -m ber"
 $B split --run main && $B normalize --run main && $B candidates --run main
 $B features --run main && $B features-hold --run main   # held-out train regions for stage 2
 $B scorer --run main
@@ -433,14 +432,14 @@ $B decide --run main && $B submit --run main   # -> output/matching_results.tsv,
 ```
 
 `--set data.phase=train` / `test` run the train/val side and the test side separately
-(same outputs). `ber explain <entity_id>` traces one record through every stage.
-Main modules: `normalize/` (text, address, geo, transliteration, lookup tables),
+(same outputs). `python -m ber explain <entity_id>` traces one record through every
+stage. Main modules (in `src/ber/`): `normalize/` (text, address, geo, transliteration, lookup tables),
 `candidates/` (TF-IDF, region blocking, GPU top-k), `features/` (pair + context features),
 `scorer/` (stage 1), `crossenc/` (transformer cross-encoder: training pairs, fine-tuning,
 scoring), `rerank/` (stage 2), `decide/` (one owner, expected F0.5), `submit.py` (TSVs +
-official validator), `eval/` (geographic split, macro F0.5); `tools/crossenc_prototype/`
+official validator), `eval/` (geographic split, macro F0.5); `src/tools/crossenc_prototype/`
 (the scripts behind the submitted file's cross-encoder). Dependency licenses:
-`tools/check_licenses.py` (all MIT/BSD/Apache/PSF except two MPL-2.0 packages used
+`src/tools/check_licenses.py` (all MIT/BSD/Apache/PSF except two MPL-2.0 packages used
 unmodified as transitive dependencies: `tqdm`, `certifi`); the model is Apache-2.0
 (22.7 M parameters).
 
@@ -490,9 +489,10 @@ the test's higher decoy density.
 **Environment.** Python 3.11–3.13 (tested with 3.12 on macOS arm64 and 3.13 on Windows 11,
 where `PYTHONUTF8=1` must be set). Our runs used one laptop with 16 CPU threads, 16 GB RAM
 and an NVIDIA RTX 4050 Laptop GPU (6 GB). The cross-encoder needs PyTorch with CUDA
-(`torch==2.14.0`, CUDA 12.6 build from the PyTorch index; `transformers==5.17.0`; pinned in
-`requirements-crossenc.txt`); the CPU build works, but scoring ~15 M pairs then takes many
-hours. Retrieval can use the GPU through CuPy (`requirements-gpu.txt`, CUDA 13 toolkit;
+(pinned in `requirements.txt`: `torch==2.14.0`, CUDA 12.6 build through the PyTorch
+index; `transformers==5.17.0`); the CPU build works, but scoring ~15 M pairs then takes many
+hours. Retrieval can use the GPU through CuPy (optional, listed at the end of
+`requirements.txt`; CUDA 13 toolkit;
 `candidates.device: auto` falls back to the CPU, which roughly doubles its runtime). The
 cross-encoder checkpoint is downloaded from Hugging Face on first use; offline, pass a local
 copy with `--set crossenc.base_model=<dir>` and set `HF_HUB_OFFLINE=1`.
@@ -518,11 +518,11 @@ training/validation side and the test side separately; the test pass reuses the 
 region neighbourhoods and decision parameters of the training pass:
 
 ```bash
-for s in candidates features features-hold scorer crossenc rerank decide; do ber $s --run main --set data.phase=train; done
-for s in candidates features scorer crossenc rerank decide submit; do ber $s --run main --set data.phase=test; done
+for s in candidates features features-hold scorer crossenc rerank decide; do python -m ber $s --run main --set data.phase=train; done
+for s in candidates features scorer crossenc rerank decide submit; do python -m ber $s --run main --set data.phase=test; done
 ```
 
-**Main configuration options** (`configs/default.yaml` documents every key):
+**Main configuration options** (`src/ber/configs/default.yaml` documents every key):
 
 | Key | Value | Role |
 |---|---|---|
@@ -540,12 +540,14 @@ for s in candidates features scorer crossenc rerank decide submit; do ber $s --r
 | `decide.method`, `min_p` | expected_f, null | per-S1 expected-F0.5 selection; `min_p` chosen on validation (0.02) |
 | `decide.prior_shift` | anchor | label-free prior correction per name-change kind (`none` switches it off) |
 
-**Other entry points.** `-c configs/dev.yaml` runs every stage on a small slice of states in
+**Other entry points.** `-c code/business_entity_resolution/src/ber/configs/dev.yaml` runs
+every stage on a small slice of states in
 minutes; `--set decide.scores_stage=scorer` gives the pipeline without the re-ranker (its
-`candidate_pairs.tsv` then holds every TF-IDF candidate, ~3 GB); `ber config` prints the
-resolved configuration; `ber explain <entity_id>` traces one record through every stage.
+`candidate_pairs.tsv` then holds every TF-IDF candidate, ~3 GB); `python -m ber config`
+prints the resolved configuration; `python -m ber explain <entity_id>` traces one record
+through every stage.
 
 **The submitted file.** Its cross-encoder was fine-tuned and scored by the scripts in
-`tools/crossenc_prototype/` (`prep.py`, `train.py 2`, `score.py`; the same procedure as
-`ber crossenc`), and stages 2–4 by `ber rerank / decide / submit --set
+`src/tools/crossenc_prototype/` (`prep.py`, `train.py 2`, `score.py`; the same procedure
+as the `crossenc` stage), and stages 2–4 by `python -m ber rerank / decide / submit --set
 rerank.extra_scores=<the scripts' score directory>` (section 4, "Which run is submitted").

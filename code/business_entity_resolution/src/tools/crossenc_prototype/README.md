@@ -3,7 +3,7 @@
 These three scripts are **exact, unmodified copies** of the scripts that fine-tuned and
 scored the cross-encoder behind the submitted `output/matching_results.tsv` (v2.7, first
 run, 2026-09-27; public leaderboard 0.98316). Stages 2–4 of that file (re-ranker, decision,
-submission) ran with this package's own code (`ber rerank / decide / submit`).
+submission) ran with this package's own code (`python -m ber rerank / decide / submit`).
 
 | Script | What it does |
 |---|---|
@@ -17,19 +17,19 @@ features), `v25` (scorer, features-hold) and `v25b` (stage-2 row order). Adapt `
 
 ```bash
 python prep.py && python train.py 2 && python score.py      # -> D:\aml\ce\scores_v1
-ber rerank --run <run> --set rerank.extra_scores=D:/aml/ce/scores_v1   # reads <dir>/{val,hold,test_<country>}.parquet
-ber decide --run <run> --set rerank.extra_scores=D:/aml/ce/scores_v1
-ber submit --run <run> --set rerank.extra_scores=D:/aml/ce/scores_v1
+python -m ber rerank --run <run> --set rerank.extra_scores=D:/aml/ce/scores_v1   # reads <dir>/{val,hold,test_<country>}.parquet
+python -m ber decide --run <run> --set rerank.extra_scores=D:/aml/ce/scores_v1
+python -m ber submit --run <run> --set rerank.extra_scores=D:/aml/ce/scores_v1
 ```
 
-**The pipeline stage `ber crossenc` (`src/ber/crossenc/stage.py`) is the same logic**
+**The pipeline stage `crossenc` (`src/ber/crossenc/stage.py`) is the same logic**
 packaged as a stage: the same pair selection rule (both runs: 982,265 training pairs,
 68.0 % true), text, model and hyper-parameters; the default config runs it
 (`rerank.extra_scores: crossenc`).
 The only difference: `train.py` draws a 200,000-pair validation sample from its random
 generator before training (for an epoch-end AUC printout), so its batch order differs.
 GPU fine-tuning is not bit-for-bit reproducible either, so every run is a slightly
-different draw: a re-run with `ber crossenc` gave validation macro F0.5 0.99060 (public
+different draw: a re-run with the `crossenc` stage gave validation macro F0.5 0.99060 (public
 leaderboard 0.982681) against 0.99078 (0.98316) for this run. We submit this run: it is
 better on the labelled validation set (paired per-entity difference +0.00018, z ≈ 3.9)
 and the public leaderboard agrees.

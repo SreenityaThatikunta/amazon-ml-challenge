@@ -1,4 +1,0 @@
-# Optional: GPU top-k search in stage 1 (candidates.device = auto | gpu). MIT licence.
-# Needs an NVIDIA GPU and the CUDA 13 toolkit (CUDA_PATH); without it the CPU path is used.
-cupy-cuda13x==14.2.0
-cuda-pathfinder==1.8.2

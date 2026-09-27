@@ -2,12 +2,12 @@
 
     <team>_submission.zip
     ├── output/matching_results.tsv, output/candidate_pairs.tsv
-    ├── code/business_entity_resolution/   (src/, README.md, requirements*.txt, configs/, tests/, tools/, pyproject.toml)
+    ├── code/business_entity_resolution/   (src/, README.md, requirements.txt)
     └── Documentation_template.md
 
 Run from the project root (the directory with dataset/ and output/):
 
-    python code/business_entity_resolution/tools/make_submission_zip.py --team pootato
+    python code/business_entity_resolution/src/tools/make_submission_zip.py --team pootato
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ import os
 import zipfile
 from pathlib import Path
 
-CODE = Path(__file__).resolve().parents[1]           # code/business_entity_resolution
+CODE = Path(__file__).resolve().parents[2]           # code/business_entity_resolution
 SKIP_DIRS = {"__pycache__", ".pytest_cache", "build", "dist"}
 SKIP_SUFFIXES = {".pyc", ".pyo"}
 

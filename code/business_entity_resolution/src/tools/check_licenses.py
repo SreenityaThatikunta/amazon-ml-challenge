@@ -5,7 +5,7 @@ Allowed: MIT, BSD, Apache, PSF/Python, ISC, and similar permissive licenses.
 Everything else (GPL/AGPL/LGPL, MPL, unknown, CC-BY-NC, ...) is flagged for
 manual review. Exit code 1 if anything is flagged.
 
-    python tools/check_licenses.py
+    python src/tools/check_licenses.py
 """
 
 import re

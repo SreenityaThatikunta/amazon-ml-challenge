@@ -6,7 +6,7 @@ import pytest
 
 from ber.eval.metrics import f05, macro_f05, per_entity, summarize
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[4]  # the directory with dataset/ and utils/
 
 
 @pytest.fixture(scope="module")

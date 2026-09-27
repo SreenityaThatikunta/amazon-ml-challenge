@@ -73,19 +73,20 @@ root of the submission package.
 
 ## Architecture
 
-| Step | Command | Code | What it does |
+| Step | Stages | Code | What it does |
 |---|---|---|---|
-| Normalize | `ber split`, `ber normalize` | `eval/split.py`, `normalize/` | Geographic train/validation split (whole states); canonical names, legal forms, addresses and regions |
-| Retrieve | `ber candidates` | `candidates/` | Region-blocked character-trigram TF-IDF, top 10 per index |
-| Score | `ber features`, `ber features-hold`, `ber scorer` | `features/`, `scorer/` | 102 pair features and the LightGBM scorer; pairs with p ≥ 0.001 form `candidate_pairs.tsv` |
-| Cross-encode | `ber crossenc` | `crossenc/` | Fine-tunes the MiniLM cross-encoder and scores every candidate pair |
-| Re-rank | `ber rerank` | `rerank/` | Cross-fitted LightGBM with S1-group context and cross-encoder margins |
-| Assign | `ber decide`, `ber submit` | `decide/`, `submit.py` | One owner per record, expected F0.5 per S1, prior correction; writes `output/` and runs the official validator |
+| Normalize | `split`, `normalize` | `eval/split.py`, `normalize/` | Geographic train/validation split (whole states); canonical names, legal forms, addresses and regions |
+| Retrieve | `candidates` | `candidates/` | Region-blocked character-trigram TF-IDF, top 10 per index |
+| Score | `features`, `features-hold`, `scorer` | `features/`, `scorer/` | 102 pair features and the LightGBM scorer; pairs with p ≥ 0.001 form `candidate_pairs.tsv` |
+| Cross-encode | `crossenc` | `crossenc/` | Fine-tunes the MiniLM cross-encoder and scores every candidate pair |
+| Re-rank | `rerank` | `rerank/` | Cross-fitted LightGBM with S1-group context and cross-encoder margins |
+| Assign | `decide`, `submit` | `decide/`, `submit.py` | One owner per record, expected F0.5 per S1, prior correction; writes `output/` and runs the official validator |
 
-Each command reads the previous stage's artifacts from `artifacts/<run>/<stage>/` and
-writes its own, with a `manifest.json` recording the configuration hash, git commit,
-timings, peak memory and metrics. Every parameter lives in
-[`configs/default.yaml`](configs/default.yaml), which is the submitted configuration.
+Each stage runs as `python -m ber <stage> --run <run>`, reads the previous stage's
+artifacts from `artifacts/<run>/<stage>/` and writes its own, with a `manifest.json`
+recording the configuration hash, git commit, timings, peak memory and metrics. Every
+parameter lives in [`src/ber/configs/default.yaml`](src/ber/configs/default.yaml), which is
+the submitted configuration.
 
 ## Reproducibility
 
@@ -96,25 +97,24 @@ cross-encoder. Run from the directory that contains `dataset/` (with `train/` an
 and this `code/` folder.
 
 ```bash
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate, set PYTHONUTF8=1
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r code/business_entity_resolution/requirements.txt
-pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126
-pip install -r code/business_entity_resolution/requirements-crossenc.txt
-pip install -e code/business_entity_resolution
+export PYTHONPATH="$PWD/code/business_entity_resolution/src"   # Windows: set PYTHONPATH=%CD%\code\business_entity_resolution\src
+export PYTHONUTF8=1
 
 for s in split normalize candidates features features-hold scorer crossenc rerank decide submit; do
-    ber $s --run main || break
+    python -m ber $s --run main || break
 done
 ```
 
 This writes `output/matching_results.tsv` and `output/candidate_pairs.tsv` and checks them
 with the official validator. Run the stages one at a time, as several need 8–10 GB of RAM.
-`pytest` (in this folder) checks the installation, and `ber explain <entity_id> --run main`
-traces one record through every stage.
+`python -m pytest code/business_entity_resolution/src/tests` checks the installation, and
+`python -m ber explain <entity_id> --run main` traces one record through every stage.
 
 The cross-encoder of the submitted file was trained with the scripts in
-[`tools/crossenc_prototype/`](tools/crossenc_prototype/README.md), the same procedure as
-`ber crossenc`. GPU training is not bit-for-bit deterministic, so a re-run gives a very
+[`src/tools/crossenc_prototype/`](src/tools/crossenc_prototype/README.md), the same
+procedure as the `crossenc` stage. GPU training is not bit-for-bit deterministic, so a re-run gives a very
 close but not identical file. Per-stage runtime and memory, running the training and test
 sides separately, and the main configuration options are described in
 `Documentation_template.md`, Appendix C.
@@ -123,37 +123,33 @@ sides separately, and the main configuration options are described in
 
 ```
 code/business_entity_resolution/
-├── README.md, LICENSE, pyproject.toml
-├── requirements.txt            core dependencies (pinned)
-├── requirements-crossenc.txt   torch and transformers for the cross-encoder
-├── requirements-gpu.txt        optional CuPy for GPU retrieval
-├── configs/
-│   ├── default.yaml            every parameter, documented (the submitted configuration)
-│   └── dev.yaml                a small slice of states for quick runs
-├── src/ber/
-│   ├── cli.py, config.py, artifacts.py, io.py, log.py, explain.py
-│   ├── eval/                   geographic split, macro F0.5
-│   ├── normalize/              names, addresses, regions, transliteration, lookup tables
-│   ├── candidates/             TF-IDF retrieval (CPU or GPU)
-│   ├── features/               pair features
-│   ├── scorer/                 LightGBM scorer and learned filter
-│   ├── crossenc/               transformer cross-encoder
-│   ├── rerank/                 group-aware re-ranker
-│   ├── decide/                 one owner per record, expected F0.5, prior correction
-│   └── submit.py               output files and the official validator
-├── tests/                      pytest suite
-└── tools/
-    ├── check_licenses.py       dependency license audit
-    ├── make_submission_zip.py  builds the submission zip
-    ├── validate_submission.py  copy of the official validator (used by ber submit)
-    └── crossenc_prototype/     the scripts that trained the submitted cross-encoder
+├── README.md
+├── requirements.txt              every dependency, pinned
+└── src/
+    ├── ber/                      the pipeline package (python -m ber <stage>)
+    │   ├── cli.py, config.py, artifacts.py, io.py, log.py, explain.py, submit.py
+    │   ├── configs/              default.yaml (the submitted configuration), dev.yaml
+    │   ├── eval/                 geographic split, macro F0.5
+    │   ├── normalize/            names, addresses, regions, transliteration, lookup tables
+    │   ├── candidates/           TF-IDF retrieval (CPU or GPU)
+    │   ├── features/             pair features
+    │   ├── scorer/               LightGBM scorer and learned filter
+    │   ├── crossenc/             transformer cross-encoder
+    │   ├── rerank/               group-aware re-ranker
+    │   └── decide/               one owner per record, expected F0.5, prior correction
+    ├── tests/                    pytest suite
+    └── tools/
+        ├── check_licenses.py     dependency license audit
+        ├── make_submission_zip.py  builds the submission zip
+        ├── validate_submission.py  copy of the official validator (used by the submit stage)
+        └── crossenc_prototype/   the scripts that trained the submitted cross-encoder
 ```
 
 ## Team and license
 
 - Team **pootato**: Sreenitya Thatikunta, Rudraksha Dev Sharma.
-- Code: MIT License ([LICENSE](LICENSE)).
-- Dependencies: MIT, BSD, Apache-2.0 or PSF licenses, audited by `tools/check_licenses.py`
+- Code: MIT License.
+- Dependencies: MIT, BSD, Apache-2.0 or PSF licenses, audited by `src/tools/check_licenses.py`
   (two MPL-2.0 packages, `tqdm` and `certifi`, are used unmodified).
 - Model: `cross-encoder/ms-marco-MiniLM-L-6-v2`, Apache-2.0, 22.7 M parameters (the
   challenge allows MIT or Apache-2.0 models up to 8 B parameters).

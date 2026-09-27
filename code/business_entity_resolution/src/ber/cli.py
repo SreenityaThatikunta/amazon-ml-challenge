@@ -121,7 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name, help=c.help, description=c.help)
         sp.add_argument("--config", "-c", action="append", default=None,
                         help="YAML config file(s), merged in order "
-                             "(default: configs/default.yaml)")
+                             "(default: ber/configs/default.yaml)")
         sp.add_argument("--set", "-s", action="append", default=[], metavar="KEY=VALUE",
                         help="override a config value, e.g. --set candidates.k_name=20")
         sp.add_argument("--run", "-r", default=None, help="run id (artifacts/<run>/)")

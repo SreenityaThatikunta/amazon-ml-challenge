@@ -100,10 +100,10 @@ def _validate(st, cfg: Config, out) -> None:
     cand = out / "candidate_pairs.tsv"
     if cfg.submit.write_candidates and cfg.decide.scores_stage != "scorer" and cand.exists():
         cmd += ["--candidate", str(cand)]
-    # the organisers' utils/ next to dataset/, else the copy shipped in tools/
+    # the organisers' utils/ next to dataset/, else the copy shipped in src/tools/
     vdir = cfg.root / "utils"
     if not (vdir / "validate_submission.py").exists():
-        vdir = Path(__file__).resolve().parents[2] / "tools"
+        vdir = Path(__file__).resolve().parents[1] / "tools"
     res = subprocess.run(cmd, capture_output=True, text=True, cwd=vdir)
     st.log.info("validator output:\n%s%s", res.stdout, res.stderr)
     st.metric("validator", "PASS" if res.returncode == 0 else "FAIL")

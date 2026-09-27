@@ -21,7 +21,7 @@ from typing import Any
 import yaml
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-CONFIG_DIR = PACKAGE_DIR.parents[1] / "configs"
+CONFIG_DIR = PACKAGE_DIR / "configs"
 DEFAULT_CONFIG = CONFIG_DIR / "default.yaml"
 
 
