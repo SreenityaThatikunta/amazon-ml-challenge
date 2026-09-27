@@ -1,132 +1,161 @@
-# business_entity_resolution
+# Business Entity Resolution (team pootato, Amazon ML Challenge 2026)
 
-Pipeline for the Amazon ML Challenge 2026 Business Entity Resolution task.
-Design: [../../plan.md](../../plan.md) · status and metrics: [../../progress.md](../../progress.md) ·
-EDA: [../../eda/FINDINGS.md](../../eda/FINDINGS.md).
+This pipeline links every noisy business record from two secondary sources (S2, S3) to the
+entity it describes in a deduplicated reference source (S1), across the US, India and
+France, a country that appears only in the test data. Character-trigram retrieval and a
+learned filter cut the search to 5.5 candidates per entity while keeping 99 % of the true
+matches; a group-aware LightGBM re-ranker, informed by a fine-tuned transformer
+cross-encoder, then decides. It reaches a macro F0.5 of **0.99078** on held-out states and
+**0.98316** on the public leaderboard.
 
-## Setup
-
-From the `student_resource/` directory (the directory that contains `dataset/`;
-Python 3.11–3.13, tested with 3.12 on macOS and 3.13 on Windows 11):
-
-```bash
-python -m venv .venv
-.venv/bin/pip install -r code/business_entity_resolution/requirements.txt      # Windows: .venv\Scripts\pip
-.venv/bin/pip install -e code/business_entity_resolution
-# cross-encoder stage (part of the default pipeline since v2.7; NVIDIA GPU strongly advised):
-.venv/bin/pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126
-.venv/bin/pip install -r code/business_entity_resolution/requirements-crossenc.txt
-# optional, NVIDIA GPU + CUDA 13 toolkit: GPU top-k search in stage 1 (~2x faster end to end)
-.venv/bin/pip install -r code/business_entity_resolution/requirements-gpu.txt
-```
-
-Check the environment:
-
-```bash
-cd code/business_entity_resolution && ../../.venv/bin/pytest && ../../.venv/bin/python tools/check_licenses.py
-```
-
-## Reproduce end-to-end
-
-Every stage is one command that reads the previous stage's artifacts from
-`artifacts/<run>/` and writes its own (with `manifest.json` + `log.txt`).
-Run them one at a time: heavy stages in parallel swap on a 16 GB machine
-(peak memory: candidates ~8 GB, features ~10 GB, features-hold ~9 GB, scorer ~9 GB,
-crossenc ~10.6 GB RAM + ≤ 6 GB GPU, rerank ~8 GB, decide ≤ 5 GB).
-`configs/default.yaml` runs the submitted configuration (v2.7); `--set rerank.extra_scores=null`
-gives v2.6 (no cross-encoder stage, no torch). The submitted file's cross-encoder was
-fine-tuned and scored by the prototype scripts in `tools/crossenc_prototype/` (exact copies,
-same logic as `ber crossenc`; their README gives the commands and the run-to-run spread).
-
-```bash
-B=.venv/bin/ber            # Windows: .venv\Scripts\ber.exe (set PYTHONUTF8=1)
-$B split       --run main  # geographic train/val split + dev slice            (~3 min)
-$B normalize   --run main  # normalise 24M records, learn Indic dictionary     (~7 min)
-$B candidates  --run main  # region-blocked TF-IDF top-k + recall report       (~1.5 h GPU / ~4 h CPU, train+test)
-$B features    --run main  # 102 pair + context features                       (~4 h, train+test)
-$B features-hold --run main  # all pairs of the held-out train regions (rerank.hold_frac) (~1.3 h)
-$B scorer      --run main  # stage-1 LightGBM (without the held-out regions), scores val + hold + test (~25 min)
-$B crossenc    --run main  # v2.7: fine-tune the MiniLM cross-encoder, score every stage-2 pair (GPU, ~2.5 h)
-$B rerank      --run main  # stage-2 re-ranker (cross-fitted on val + held-out regions) + test (~25 min)
-$B decide      --run main  # one owner per record + expected F0.5 (+ anchor prior correction); val F0.5 (~10 min)
-$B submit      --run main  # output/matching_results.tsv + candidate_pairs.tsv + official validator
-```
-
-The train/val side and the test side can also run as two passes (the test pass reuses
-the model, region neighbourhoods and decision parameters of the train pass):
-
-```bash
-for s in candidates features features-hold scorer crossenc rerank decide; do $B $s --run main --set data.phase=train; done
-for s in candidates features scorer crossenc rerank decide submit; do $B $s --run main --set data.phase=test; done
-```
-
-Stage 2 (`rerank`) trains on the validation regions and on ~40 % more whole train-side
-regions that stage 1 never sees (`rerank.hold_frac: 0.4`, `rerank.train_sides: [val,
-hold]`; `hold_frac: 0` gives the v2.2 setup: validation regions only, no `features-hold`).
-Held-out S2/S3 records follow their owner's region, as in the validation split
-(`rerank.hold_by: owner`; v2.4 used `query_region`), and stage 2 trains only on pairs
-whose S1 group is complete (`rerank.train_complete: true`), as every group is at test time;
-the domain normalisation takes the scale of the S1-group counts from those pairs too
-(`rerank.norm_complete: true`).
-**Cross-encoder (v2.7, `ber crossenc`).** A pretrained MiniLM cross-encoder
-(`cross-encoder/ms-marco-MiniLM-L-6-v2`, Apache-2.0, 22 M parameters) reads both records'
-normalised text jointly and is fine-tuned on stage 1's own out-of-sample pairs; its logit
-and the logit's margin/rank among the record's candidates and within the S1's group are
-stage-2 features (`rerank.extra_scores: crossenc`). Install its dependencies first
-(`requirements-crossenc.txt`; torch with CUDA from the PyTorch index); the model is
-downloaded on first use (or `--set crossenc.base_model=<local dir>`). Needs an NVIDIA GPU
-for reasonable run time (RTX 4050 laptop: fine-tuning ~20 min, scoring ~15 M pairs ~2 h).
-`decide.prior_shift: anchor` corrects a name-change kind's probabilities when the
-house-number evidence in the test data says the model misjudges how often it is a true
-copy (on current data only France's generic-word swaps; `none` switches it off).
-
-`output/candidate_pairs.tsv` is the input of the final model: the pairs that passed the
-stage-1 filter (`rerank.min_p1`), ~1 per S2/S3 record. `decide.scores_stage=scorer` gives
-the stage-1-only pipeline (then candidate_pairs.tsv holds every TF-IDF candidate, ~3 GB).
-
-LLM stage (optional, on Kaggle; see [kaggle/README.md](kaggle/README.md)):
-
-```bash
-$B llm-export  --run main   # routed prompts -> Kaggle
-# ... train + infer on Kaggle, put llm_scores_{val,test}.parquet in artifacts/llm_scores/
-$B llm-import  --run main   # blend LLM + scorer, weight chosen on val
-$B decide      --run main --set decide.scores_stage=llm-import
-$B submit      --run main
-```
-
-Fast iteration on a small slice of states (whole pipeline in minutes):
-
-```bash
-$B normalize -c code/business_entity_resolution/configs/dev.yaml   # likewise for every stage
-```
-
-France validation proxy (synthetic labelled French data, scored with the main model):
-
-```bash
-$B synth-france --run main
-P=code/business_entity_resolution/configs/france_proxy.yaml
-for s in split normalize candidates features scorer decide; do $B $s -c $P; done
-```
-
-Debugging: `$B explain <entity_id> --run main` traces one record through every
-stage. `$B config` prints the resolved configuration.
-
-## Layout
-
-| Path | Contents |
+| Metric | Value |
 |---|---|
-| `src/ber/normalize/` | Stage 0: text/address normalisation, region detection, Indic transliteration, lookup tables (`tables/*.tsv`) |
-| `src/ber/candidates/` | Stage 1: per-country, region-blocked char-TF-IDF top-k candidates (CPU or GPU) |
-| `src/ber/features/` | Stage 2: pair + context features |
-| `src/ber/scorer/` | Stage 2: stage-1 LightGBM scorer (also the learned candidate filter) |
-| `src/ber/crossenc/` | v2.7: transformer cross-encoder stage (training pairs, fine-tuning, scoring) |
-| `src/ber/rerank/` | Stage 2b: re-ranker with S1/record group context, cross-fitted on val |
-| `src/ber/llm/` | Stage 3: routing, select-prompts, LLM score import/blend |
-| `src/ber/decide/` | Stage 4: one-owner assignment, expected-F0.5 selection, val metrics |
-| `src/ber/france/` | Synthetic French labelled data (validation proxy / LLM training) |
-| `src/ber/eval/` | Metrics (same as `utils/score.py`), geographic split |
-| `src/ber/{config,artifacts,io,log,cli,submit,explain}.py` | Infrastructure |
-| `configs/` | `default.yaml` (every key documented), `dev.yaml`, `france_proxy.yaml` |
-| `kaggle/` | LoRA training / inference scripts for Kaggle GPUs |
-| `tools/` | License check, submission zip, `crossenc_prototype/` (the scripts behind the submitted file's cross-encoder) |
-| `tests/` | pytest suite |
+| Validation macro F0.5 (222,624 S1 entities in whole held-out states) | **0.99078** |
+| Public leaderboard F0.5 | **0.98316** |
+| Candidate recall (true pairs kept in `candidate_pairs.tsv`, validation) | **99.02 %**, with 5.53 candidates per S1 on test |
+| Runtime / hardware | ≈ 11 h end to end on one laptop (16 threads, 16 GB RAM, NVIDIA RTX 4050 with 6 GB) |
+
+```mermaid
+flowchart LR
+    A[Normalize] --> B[Retrieve] --> C[Score] --> D[Cross-encode] --> E[Re-rank] --> F[Assign]
+```
+
+## Problem
+
+S1 is a deduplicated list of businesses; S2 and S3 hold independent, noisy copies of them
+mixed with unrelated records. For every S1 entity the task is to list its S2/S3 records.
+Names vary through abbreviations, legal forms, typos, OCR errors, aliases, trade names and
+Indian-script transliterations; addresses through abbreviations, missing or reordered
+parts and altered house numbers; lookalike decoys (same name and street, house number off
+by a few units) are planted on purpose. The score is macro F0.5 per S1 entity, so
+precision counts twice as much as recall and an entity without matches must be predicted
+empty. Training data covers the US and India; the test set (1.73 M S1, 10 M S2/S3 records)
+adds France, for which no labels exist.
+
+## Solution and innovation
+
+- **Noise-aware normalisation.** Legal forms, OCR digits, aliases, injected ids and phone
+  numbers are handled by rules; filler words are learned from the data; Indian-script
+  names are romanised with a dictionary learned from training pairs; regions (states,
+  codes, French départements) are extracted from addresses.
+- **Small candidate sets without losing recall.** Three character-trigram TF-IDF indexes
+  (name, address, both) are searched within a learned neighbourhood of the record's region
+  (99.05 % of true pairs retrieved). A LightGBM scorer on 102 pair features then serves as
+  the final, learned blocking filter: 5.53 candidates per S1 remain and 99.97 % of the
+  retrieved true pairs survive.
+- **Transformer evidence where it is strong.** A 22.7 M-parameter MiniLM cross-encoder,
+  fine-tuned only on pairs the scorer never trained on, reads both records jointly. On its
+  own it is the weaker matcher (AUC 0.975 against 0.999), but its margin over the
+  competing candidates is strong evidence for the re-ranker.
+- **Group-aware re-ranking.** A second LightGBM sees the competition for each S1 entity
+  (how many records claim it, how strongly, from which source) together with the
+  cross-encoder margins. It is trained on whole held-out states whose S1 groups are
+  complete, as every group is at test time, and its size-dependent features are
+  normalised per country and split, because the test set is denser than the training set.
+- **Decision.** Each record gets one owner; for each S1 the set of records with the
+  highest expected F0.5 is kept. A label-free correction, estimated from house-number
+  evidence in the unlabelled test data, handles a French name-change pattern that the
+  training countries do not have.
+
+## Results
+
+| Evaluation | Macro F0.5 |
+|---|---|
+| Validation: 222,624 S1 in whole held-out states | **0.99078** |
+| US / India | 0.99147 / 0.98970 |
+| S1 entities without a true match | 0.99343 |
+| Validation with every state unseen by the model that scores it | 0.98988 |
+| Public leaderboard | **0.98316** |
+
+Pair precision on validation is 0.99898 and pair recall 0.97408. Ablations, error analysis
+and the reasoning behind each design decision are in `Documentation_template.md`, at the
+root of the submission package.
+
+## Architecture
+
+| Step | Command | Code | What it does |
+|---|---|---|---|
+| Normalize | `ber split`, `ber normalize` | `eval/split.py`, `normalize/` | Geographic train/validation split (whole states); canonical names, legal forms, addresses and regions |
+| Retrieve | `ber candidates` | `candidates/` | Region-blocked character-trigram TF-IDF, top 10 per index |
+| Score | `ber features`, `ber features-hold`, `ber scorer` | `features/`, `scorer/` | 102 pair features and the LightGBM scorer; pairs with p ≥ 0.001 form `candidate_pairs.tsv` |
+| Cross-encode | `ber crossenc` | `crossenc/` | Fine-tunes the MiniLM cross-encoder and scores every candidate pair |
+| Re-rank | `ber rerank` | `rerank/` | Cross-fitted LightGBM with S1-group context and cross-encoder margins |
+| Assign | `ber decide`, `ber submit` | `decide/`, `submit.py` | One owner per record, expected F0.5 per S1, prior correction; writes `output/` and runs the official validator |
+
+Each command reads the previous stage's artifacts from `artifacts/<run>/<stage>/` and
+writes its own, with a `manifest.json` recording the configuration hash, git commit,
+timings, peak memory and metrics. Every parameter lives in
+[`configs/default.yaml`](configs/default.yaml), which is the submitted configuration.
+
+## Reproducibility
+
+### Quick start
+
+Requirements: Python 3.11–3.13, 16 GB RAM, an NVIDIA GPU with at least 6 GB for the
+cross-encoder. Run from the directory that contains `dataset/` (with `train/` and `test/`)
+and this `code/` folder.
+
+```bash
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate, set PYTHONUTF8=1
+pip install -r code/business_entity_resolution/requirements.txt
+pip install torch==2.14.0 --index-url https://download.pytorch.org/whl/cu126
+pip install -r code/business_entity_resolution/requirements-crossenc.txt
+pip install -e code/business_entity_resolution
+
+for s in split normalize candidates features features-hold scorer crossenc rerank decide submit; do
+    ber $s --run main || break
+done
+```
+
+This writes `output/matching_results.tsv` and `output/candidate_pairs.tsv` and checks them
+with the official validator. Run the stages one at a time, as several need 8–10 GB of RAM.
+`pytest` (in this folder) checks the installation, and `ber explain <entity_id> --run main`
+traces one record through every stage.
+
+The cross-encoder of the submitted file was trained with the scripts in
+[`tools/crossenc_prototype/`](tools/crossenc_prototype/README.md), the same procedure as
+`ber crossenc`. GPU training is not bit-for-bit deterministic, so a re-run gives a very
+close but not identical file. Per-stage runtime and memory, running the training and test
+sides separately, and the main configuration options are described in
+`Documentation_template.md`, Appendix C.
+
+## Repository structure
+
+```
+code/business_entity_resolution/
+├── README.md, LICENSE, pyproject.toml
+├── requirements.txt            core dependencies (pinned)
+├── requirements-crossenc.txt   torch and transformers for the cross-encoder
+├── requirements-gpu.txt        optional CuPy for GPU retrieval
+├── configs/
+│   ├── default.yaml            every parameter, documented (the submitted configuration)
+│   └── dev.yaml                a small slice of states for quick runs
+├── src/ber/
+│   ├── cli.py, config.py, artifacts.py, io.py, log.py, explain.py
+│   ├── eval/                   geographic split, macro F0.5
+│   ├── normalize/              names, addresses, regions, transliteration, lookup tables
+│   ├── candidates/             TF-IDF retrieval (CPU or GPU)
+│   ├── features/               pair features
+│   ├── scorer/                 LightGBM scorer and learned filter
+│   ├── crossenc/               transformer cross-encoder
+│   ├── rerank/                 group-aware re-ranker
+│   ├── decide/                 one owner per record, expected F0.5, prior correction
+│   └── submit.py               output files and the official validator
+├── tests/                      pytest suite
+└── tools/
+    ├── check_licenses.py       dependency license audit
+    ├── make_submission_zip.py  builds the submission zip
+    ├── validate_submission.py  copy of the official validator (used by ber submit)
+    └── crossenc_prototype/     the scripts that trained the submitted cross-encoder
+```
+
+## Team and license
+
+- Team **pootato**: Sreenitya Thatikunta, Rudraksha Dev Sharma.
+- Code: MIT License ([LICENSE](LICENSE)).
+- Dependencies: MIT, BSD, Apache-2.0 or PSF licenses, audited by `tools/check_licenses.py`
+  (two MPL-2.0 packages, `tqdm` and `certifi`, are used unmodified).
+- Model: `cross-encoder/ms-marco-MiniLM-L-6-v2`, Apache-2.0, 22.7 M parameters (the
+  challenge allows MIT or Apache-2.0 models up to 8 B parameters).
+- Data: only the challenge's training and test files. No external data sources, lookups
+  or APIs are used; the only external artefact is the pretrained cross-encoder checkpoint.

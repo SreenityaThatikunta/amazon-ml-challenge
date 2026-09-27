@@ -136,8 +136,8 @@ class RerankConfig:
                                     # complete-group pairs only (as every test group is complete)
     bags: int = 1                   # > 1: repeat the cross-fit with other fold splits and seeds;
                                     # val = mean of the bags' out-of-fold p2, test = mean of all models
-    learner: str = "lgb"            # explore: lgb | xgb (XGBoost, GPU) | both (mean of the two p)
-    extra_scores: str | None = None  # explore/cross-encoder: dir with val/hold/test_<country>.parquet
+    learner: str = "lgb"            # lgb | xgb (XGBoost, GPU) | both (mean of the two p)
+    extra_scores: str | None = None  # "crossenc" (that stage's scores) or a dir with val/hold/test_<country>.parquet
                                     # (q_id, s1_id, ce) in stage 2's row order: an external pair score
                                     # (cross-encoder logit) + its query / S1-group context as features
     learning_rate: float = 0.05
@@ -152,7 +152,7 @@ class RerankConfig:
 
 @dataclass
 class CrossencConfig:
-    """``ber crossenc`` (explore/cross-encoder): a transformer cross-encoder whose pair score
+    """``ber crossenc``: a transformer cross-encoder whose pair score
     feeds stage 2 (``rerank.extra_scores: crossenc``)."""
     base_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Apache-2.0, 22 M parameters
     max_len: int = 64               # tokens per pair (record text + S1 text)
@@ -177,28 +177,9 @@ class DecideConfig:
     anchor_min_ratio: float = 2.0   # anchor: correct a kind only if its de-biased odds ratio is beyond this
     anchor_min_pairs: int = 2000    # anchor: ... and it has at least this many same-street pairs
     anchor_max_ratio: float = 6.0   # anchor: cap on the applied odds ratio
-    scores_stage: str = "rerank"    # "scorer" (stage 1 only), "rerank" (stage 2) or "llm-import"
+    scores_stage: str = "rerank"    # "scorer" (stage 1 only) or "rerank" (stage 2)
     sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
                                                         0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])
-
-
-@dataclass
-class LlmConfig:
-    route_low: float = 0.05       # queries whose best scorer p is in [low, high] go to the LLM
-    route_high: float = 0.95
-    n_candidates: int = 5         # candidates shown per prompt (top by scorer p)
-    easy_frac: float = 0.1        # train prompts: share of non-routed queries also included
-    model_name: str = "Qwen/Qwen3-1.7B"   # Apache-2.0, <= 8B
-    scores_dir: str = "artifacts/llm_scores"  # where Kaggle's llm_scores_<split>.parquet go
-    blend_weight: float | None = None     # None = best on val
-    blend_sweep: list[float] = field(default_factory=lambda: [0.0, 0.25, 0.5, 0.6, 0.7, 0.8,
-                                                              0.9, 1.0])
-
-
-@dataclass
-class FranceConfig:
-    n_entities: int = 20_000        # test S1 France records to synthesise S2/S3 for
-    distractor_rate: float = 0.35   # per S1 and source: chance of one lookalike distractor
 
 
 @dataclass
@@ -221,8 +202,6 @@ class Config:
     rerank: RerankConfig = field(default_factory=RerankConfig)
     crossenc: CrossencConfig = field(default_factory=CrossencConfig)
     decide: DecideConfig = field(default_factory=DecideConfig)
-    llm: LlmConfig = field(default_factory=LlmConfig)
-    france: FranceConfig = field(default_factory=FranceConfig)
     submit: SubmitConfig = field(default_factory=SubmitConfig)
 
     # ------------------------------------------------------ derived paths

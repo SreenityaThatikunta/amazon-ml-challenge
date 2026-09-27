@@ -35,8 +35,8 @@ only pretrained model is the 22.7 M-parameter cross-encoder.
 
 ### 2.1 Problem Analysis
 
-Findings that shaped the design (EDA scripts in `eda/`, summary in `eda/FINDINGS.md`,
-v2 checks in `progress.md`):
+Findings that shaped the design (from our exploratory analysis of the training and test
+files):
 
 - **Structure.** Every S2/S3 record belongs to at most one S1 (all 7.6 M matched ids are
   unique) and true pairs never cross countries → one owner per record, blocking within
@@ -484,3 +484,68 @@ among test pairs without labels. On the largest US test segment (same street, sa
 key; 1.78 M records, twice the lookalikes of validation) it is 0.756 against the model's
 mean p2 of 0.762 (model without the cross-encoder): the re-ranker stays calibrated under
 the test's higher decoy density.
+
+### C. Reproduction details
+
+**Environment.** Python 3.11–3.13 (tested with 3.12 on macOS arm64 and 3.13 on Windows 11,
+where `PYTHONUTF8=1` must be set). Our runs used one laptop with 16 CPU threads, 16 GB RAM
+and an NVIDIA RTX 4050 Laptop GPU (6 GB). The cross-encoder needs PyTorch with CUDA
+(`torch==2.14.0`, CUDA 12.6 build from the PyTorch index; `transformers==5.17.0`; pinned in
+`requirements-crossenc.txt`); the CPU build works, but scoring ~15 M pairs then takes many
+hours. Retrieval can use the GPU through CuPy (`requirements-gpu.txt`, CUDA 13 toolkit;
+`candidates.device: auto` falls back to the CPU, which roughly doubles its runtime). The
+cross-encoder checkpoint is downloaded from Hugging Face on first use; offline, pass a local
+copy with `--set crossenc.base_model=<dir>` and set `HF_HUB_OFFLINE=1`.
+
+**Runtime and peak memory per stage** (our runs; training/validation pass + test pass):
+
+| Stage | Runtime | Peak RAM |
+|---|---|---|
+| split, normalize | 3 + 7 min | 4 GB |
+| candidates (GPU top-k) | 145 + 78 min | 8 GB |
+| features | 64 + 115 min | 10 GB |
+| features-hold | 79 min | 9 GB |
+| scorer | 11 + 12 min | 9 GB |
+| crossenc (GPU) | 54 + 60 min | 10.6 GB (GPU ≤ 6 GB) |
+| rerank | 14 + 10 min | 8 GB |
+| decide, submit | 6 + 1 min | 5 GB |
+| **Total** | **≈ 11 h** | |
+
+Run one stage at a time: two heavy stages in parallel exceed 16 GB.
+
+**Two passes.** After `ber split` and `ber normalize`, every stage can run the
+training/validation side and the test side separately; the test pass reuses the models,
+region neighbourhoods and decision parameters of the training pass:
+
+```bash
+for s in candidates features features-hold scorer crossenc rerank decide; do ber $s --run main --set data.phase=train; done
+for s in candidates features scorer crossenc rerank decide submit; do ber $s --run main --set data.phase=test; done
+```
+
+**Main configuration options** (`configs/default.yaml` documents every key):
+
+| Key | Value | Role |
+|---|---|---|
+| `candidates.k_name`, `k_addr`, `k_combo` | 10, 10, 10 | top-k per TF-IDF index (`k_name_noaddr`: 30 for records without an address) |
+| `candidates.block_by_region` | true | search only the S1 of the record's region neighbourhood |
+| `features.train_query_frac` | 0.2 | share of train-side records featurised |
+| `scorer.train_query_frac` | 0.14 | share of those the scorer trains on (the rest train the cross-encoder) |
+| `rerank.min_p1` | 0.001 | learned blocking filter; defines `candidate_pairs.tsv` |
+| `rerank.hold_frac`, `hold_by` | 0.4, owner | whole train-side states held out for the re-ranker; records follow their owner's state |
+| `rerank.train_sides`, `train_complete` | [val, hold], true | re-ranker training data: complete S1 groups of the validation and held-out states |
+| `rerank.domain_norm`, `norm_complete` | true, true | size-dependent features divided by their per-country, per-split scale (taken from complete groups) |
+| `rerank.extra_scores` | crossenc | cross-encoder evidence; `null` gives the pipeline without it (no torch needed) |
+| `rerank.folds`, `fold_by` | 4, s1 | cross-fitting folds, grouped by the record's top S1 |
+| `crossenc.*` | MiniLM, 64 tokens, batch 256, lr 5e-5, 2 epochs | fine-tuning settings |
+| `decide.method`, `min_p` | expected_f, null | per-S1 expected-F0.5 selection; `min_p` chosen on validation (0.02) |
+| `decide.prior_shift` | anchor | label-free prior correction per name-change kind (`none` switches it off) |
+
+**Other entry points.** `-c configs/dev.yaml` runs every stage on a small slice of states in
+minutes; `--set decide.scores_stage=scorer` gives the pipeline without the re-ranker (its
+`candidate_pairs.tsv` then holds every TF-IDF candidate, ~3 GB); `ber config` prints the
+resolved configuration; `ber explain <entity_id>` traces one record through every stage.
+
+**The submitted file.** Its cross-encoder was fine-tuned and scored by the scripts in
+`tools/crossenc_prototype/` (`prep.py`, `train.py 2`, `score.py`; the same procedure as
+`ber crossenc`), and stages 2–4 by `ber rerank / decide / submit --set
+rerank.extra_scores=<the scripts' score directory>` (section 4, "Which run is submitted").

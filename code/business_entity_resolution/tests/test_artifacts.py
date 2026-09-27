@@ -61,4 +61,6 @@ def test_cli_config_error_exit_code(capsys):
 
 def test_all_stages_implemented():
     from ber.cli import COMMANDS
-    assert all(c.task is None for c in COMMANDS.values())
+    stages = ["split", "normalize", "candidates", "features", "features-hold", "scorer",
+              "crossenc", "rerank", "decide", "submit"]
+    assert all(s in COMMANDS and callable(COMMANDS[s].func) for s in stages)

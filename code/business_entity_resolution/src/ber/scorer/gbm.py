@@ -5,9 +5,8 @@ scores the val pairs (``scores_val.parquet``) and every test pair
 (``scores_test/``). Saves the model, feature list and feature importance.
 
 With ``oof_folds > 1`` it also writes out-of-fold scores for the train-side
-pairs (``scores_train_oof.parquet``; folds by query). The LLM stage needs
-honest probabilities for its training prompts: in-sample predictions would be
-overconfident, so routing would behave differently on train than on test.
+pairs (``scores_train_oof.parquet``; folds by query): honest probabilities for
+train-side analyses, where in-sample predictions would be overconfident.
 """
 
 from __future__ import annotations
@@ -182,7 +181,7 @@ def run_scorer(cfg: Config) -> None:
         feat_dir = st.input_path("features", "features_train")
         first = pd.read_parquet(next(iter(sorted(feat_dir.glob("*.parquet"))))).head(1)
         feats = feature_columns(first, cfg.scorer.drop_features)
-        if cfg.scorer.model_from_run:  # apply an existing model (e.g. France proxy)
+        if cfg.scorer.model_from_run:  # apply the model trained in another run
             path = st.input_path("scorer", "model", run=cfg.scorer.model_from_run)
             model = lgb.Booster(model_file=str(path))
             missing = set(model.feature_name()) - set(feature_columns(first))

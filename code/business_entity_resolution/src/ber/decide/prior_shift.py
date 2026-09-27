@@ -1,8 +1,8 @@
 """Prior-shift correction of pair probabilities per lookalike segment (v2.2).
 
 Why: test has about twice as many lookalike distractors per S1 as train/val, mostly
-"same name, same street, house number shifted by a few units" and legal-form swaps
-(progress.md, shift analysis). Among such pairs the share of true matches is
+"same name, same street, house number shifted by a few units" and legal-form swaps.
+Among such pairs the share of true matches is
 therefore lower on test than on val, so probabilities calibrated on val are too
 high there. Within a segment we assume p(features | match) and p(features | no
 match) are unchanged and only the class balance moved (label shift), the setting

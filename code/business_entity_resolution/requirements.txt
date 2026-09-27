@@ -1,7 +1,6 @@
-# Pinned runtime + dev dependencies (Python 3.12, macOS arm64 / Linux x86_64).
-# Licenses verified with tools/check_licenses.py (see progress.md, T0.1).
-# LLM-stage dependencies (torch, transformers, peft, vllm) are pinned separately
-# in kaggle/requirements.txt at T5.4.
+# Pinned runtime + dev dependencies (tested with Python 3.12 on macOS arm64 and 3.13 on
+# Windows 11). Licenses verified with tools/check_licenses.py.
+# Cross-encoder stage: requirements-crossenc.txt (torch, transformers).
 numpy==2.5.3
 pandas==3.0.6
 pyarrow==25.0.1

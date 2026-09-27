@@ -1,4 +1,4 @@
-"""``ber crossenc`` (explore/cross-encoder): a transformer cross-encoder next to the GBMs.
+"""``ber crossenc``: a transformer cross-encoder next to the GBMs.
 
 A pretrained MiniLM cross-encoder (``crossenc.base_model``, Apache-2.0) reads both records'
 normalised text jointly ("name core + legal form ; address + region" of the S2/S3 record

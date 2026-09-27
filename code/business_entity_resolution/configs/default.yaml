@@ -64,8 +64,8 @@ scorer:               # stage 2 (T3.4): LightGBM pair scorer
   num_boost_round: 3000
   early_stopping: 100   # rounds without val logloss improvement
   n_threads: 0          # 0 = cpu_count - 2
-  oof_folds: 1          # >1: out-of-fold scores for train-side pairs (only llm-export needs them; set 3)
-  model_from_run: null  # apply the model trained in that run instead of training (e.g. France proxy)
+  oof_folds: 1          # >1: also write out-of-fold scores for train-side pairs (not needed by the pipeline)
+  model_from_run: null  # apply the model trained in that run instead of training
   train_query_frac: 0.14  # share of featurised train-side queries (outside the hold regions) used to
                           # train: ~3.6M rows, ~1.5 GB float32 (v2.4: 0.1 with hold_frac 0.2, same size)
   es_query_frac: 0.05     # share of val-side queries used for early stopping (all val pairs are scored)
@@ -138,22 +138,8 @@ decide:               # stage 4 (T3.5/T4.1)
   anchor_min_ratio: 2.0   # anchor: correct a kind only if its de-biased odds ratio is beyond 2x (or 1/2x)
   anchor_min_pairs: 2000  # anchor: ... and it has at least this many same-street pairs
   anchor_max_ratio: 6.0   # anchor: cap on the applied odds ratio
-  scores_stage: rerank  # scorer (stage 1 only) | rerank (stage 2) | llm-import (after the LLM round trip)
+  scores_stage: rerank  # scorer (stage 1 only) | rerank (stage 2)
   sweep: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8]
-
-llm:                  # stage 3 (T3.6, T5.x): routed select-prompts for the LLM matcher
-  route_low: 0.05     # a query goes to the LLM if its best scorer p is in [route_low, route_high]
-  route_high: 0.95
-  n_candidates: 5     # candidates per prompt (top by scorer p, shown in seeded shuffled order)
-  easy_frac: 0.1      # train prompts: share of non-routed queries also included
-  model_name: Qwen/Qwen3-1.7B   # Apache-2.0, <= 8B parameters
-  scores_dir: artifacts/llm_scores  # put Kaggle outputs llm_scores_{val,test}.parquet here
-  blend_weight: null  # weight of the LLM in the blend; null = best on val
-  blend_sweep: [0.0, 0.25, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-
-france:               # T5.1: synthetic French validation proxy (from unlabelled test S1 France)
-  n_entities: 20000   # S1 France records to generate S2/S3 copies and lookalikes for
-  distractor_rate: 0.35  # per S1 and source: chance of one lookalike distractor
 
 submit:
   write_candidates: true   # output/candidate_pairs.tsv = pairs the final model scores (required in the final zip)
