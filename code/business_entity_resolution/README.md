@@ -33,8 +33,10 @@ Every stage is one command that reads the previous stage's artifacts from
 Run them one at a time: heavy stages in parallel swap on a 16 GB machine
 (peak memory: candidates ~8 GB, features ~10 GB, features-hold ~9 GB, scorer ~9 GB,
 crossenc ~10.6 GB RAM + ≤ 6 GB GPU, rerank ~8 GB, decide ≤ 5 GB).
-`configs/default.yaml` reproduces the submitted file (v2.7); `--set rerank.extra_scores=null`
-gives v2.6 (no cross-encoder stage, no torch).
+`configs/default.yaml` runs the submitted configuration (v2.7); `--set rerank.extra_scores=null`
+gives v2.6 (no cross-encoder stage, no torch). The submitted file's cross-encoder was
+fine-tuned and scored by the prototype scripts in `tools/crossenc_prototype/` (exact copies,
+same logic as `ber crossenc`; their README gives the commands and the run-to-run spread).
 
 ```bash
 B=.venv/bin/ber            # Windows: .venv\Scripts\ber.exe (set PYTHONUTF8=1)
@@ -117,6 +119,7 @@ stage. `$B config` prints the resolved configuration.
 | `src/ber/candidates/` | Stage 1: per-country, region-blocked char-TF-IDF top-k candidates (CPU or GPU) |
 | `src/ber/features/` | Stage 2: pair + context features |
 | `src/ber/scorer/` | Stage 2: stage-1 LightGBM scorer (also the learned candidate filter) |
+| `src/ber/crossenc/` | v2.7: transformer cross-encoder stage (training pairs, fine-tuning, scoring) |
 | `src/ber/rerank/` | Stage 2b: re-ranker with S1/record group context, cross-fitted on val |
 | `src/ber/llm/` | Stage 3: routing, select-prompts, LLM score import/blend |
 | `src/ber/decide/` | Stage 4: one-owner assignment, expected-F0.5 selection, val metrics |
@@ -125,5 +128,5 @@ stage. `$B config` prints the resolved configuration.
 | `src/ber/{config,artifacts,io,log,cli,submit,explain}.py` | Infrastructure |
 | `configs/` | `default.yaml` (every key documented), `dev.yaml`, `france_proxy.yaml` |
 | `kaggle/` | LoRA training / inference scripts for Kaggle GPUs |
-| `tools/` | License check |
+| `tools/` | License check, submission zip, `crossenc_prototype/` (the scripts behind the submitted file's cross-encoder) |
 | `tests/` | pytest suite |
