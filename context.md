@@ -14,6 +14,18 @@ architectures go on separate branches.
 
 ## 0. Where we left off (do this first)
 
+**Update 16:10 IST: the v26 run finished OK** (`D:ml\logs26_run.log`, exit 0).
+`ber crossenc` rebuilt the same 982,265 training pairs; its cross-encoder has val AUC
+0.97417 (prototype 0.97485); stage 2 OOF AUC 0.999059 / logloss 0.0320; **val F0.5 0.99060**
+(India 0.98936, US 0.99138; prototype v2.7: 0.99078). Test file
+**`D:ml\submissions2.7_ber\`**: validator PASS, 5,895,646 links, candidate_pairs.tsv
+unchanged (9,582,745). vs the uploaded prototype v2.7 (LB 0.98316): S1 changed France 3.7 %,
+India 1.0 %, US 0.8 %; links per S1 France 3.522 / India 3.371 / US 3.395 (prototype 3.500 /
+3.368 / 3.393): retraining noise, as expected. **Steps 1–2 below are done: v2.7_ber is the
+final file** (its code is what goes in the zip); continue with step 3 (packaging, section 9).
+Optionally the user uploads v2.7_ber once as a check.
+
+
 1. **A pipeline-native reproduction of v2.7 is running** (started 13:45 in the background of
    the old chat: `bash D:\aml\run_v26.sh` → log `D:\aml\logs\v26_run.log`, stage logs
    `artifacts\v26\<stage>\log.txt`). It runs `ber crossenc` (fine-tune done; scoring val/hold,

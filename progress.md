@@ -882,3 +882,9 @@ crossenc` rebuilt the identical 982,265 training pairs (68.0 % positive) and fin
 the same speed (loss 0.060 at step 7,000 of 7,674); scoring and the stage-2/test passes
 follow (expected done ~16:25 → `D:\aml\submissions\v2.7_ber\`). Remaining steps: context.md
 section 8.
+
+**v26 done (16:09):** pipeline-native v2.7: crossenc val AUC 0.97417, stage 2 OOF AUC
+0.999059 / logloss 0.0320, **val F0.5 0.99060** (India 0.98936, US 0.99138); test file
+`D:ml\submissions2.7_ber\` (validator PASS, 5,895,646 links, same candidate set);
+vs the prototype v2.7 (LB 0.98316) S1 changed France 3.7 %, India 1.0 %, US 0.8 %
+(retraining noise). v2.7_ber = the final file; packaging next (context.md section 9).
