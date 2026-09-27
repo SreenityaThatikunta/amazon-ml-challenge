@@ -529,6 +529,26 @@ house numbers vs 20 % in val's true copies; French decoys are 11 % shifted vs 82
 **France's blocking** is not losing matches: records with and without a detected region
 (the latter search all of France) have a kept candidate equally often (78.7 % vs 78.9 %).
 
+**Bagging stage 2 (`rerank.bags 2`: a second fold split, early-stopping split and seed;
+val = mean of the two out-of-fold p2; run v25c `E1b_nc_bag2`): no measurable gain.** OOF
+AUC 0.998892 vs 0.998869 / 0.998875 per bag, logloss 0.035677 vs 0.035901; val 0.98920 vs
+0.98918, clean 0.99265 vs 0.99263 (singletons −0.0004). Not worth doubling training and
+test time; stays off (default 1).
+
+**v2.6 on unseen regions** (run v25c `E3b_nc`): val 0.98817, clean 0.99163 (v2.5's E3b:
+0.98822 / 0.99170): neutral, as a change validation cannot see must be.
+
+**Stage-1 domain normalisation: not pursued.** Stage 1 barely uses the density-dependent
+features (1.2 % of its gain together; s_name_freq 0.34 %, rank 13); it is dominated by
+relative features (cos_combo_margin 71.5 %, cos_combo_gap 8.7 %, hn_best_rel 5.2 %), so
+normalising them would hardly move p1 (and val cannot check it).
+
+**Decision (2026-09-27 ~10:40): v2.6 is the final file.** Every principled change that
+validation can measure is now flat (tree cap, second round, regularisation, bagging,
+smaller candidate set); the remaining test-alignment checks found no further mismatch
+(US calibration anchor, France blocking). Official validator with `--check-ids`: PASS
+(1,732,544 rows each; 97,150 empty S1 = 5.6 %; 25,130 S1 without candidates).
+
 **LB probe prepared:** `D:\aml\submissions\probe_v24_france_empty\` = the v2.4 file with
 all 259,452 French S1 (14.98 % of test S1) left empty (v2.4 left 5.35 % of them empty).
 LB(v2.4) − LB(probe) = 0.1498 × (F_France − s_France), so F_France ≈ Δ / 0.1498 +

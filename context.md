@@ -191,11 +191,17 @@ rejected (India −0.0011 on unseen regions); stronger regularisation flat/sligh
 `D:\aml\submissions\v2.6_normcomplete\` (run `v25b` = v25's stage 1 via junctions; its
 stage-2 models in `v25b\rerank` and `v25b\exp\E1b_nc`).
 
-1. **Morning: the user uploads v2.6_normcomplete once as the LB check.** Adopt if LB ≥
-   0.981708 − 0.0002: then copy it to `output\`, set `norm_complete: true` in
-   `configs/default.yaml`, update docs, rebuild the zip, push. Else keep v2.5.
-2. Final packaging (section 9) well before the deadline; overnight runs must end by 05:30.
-3. No heavier runs (user: hold_frac 0.6 at 9–11 GB is too much for the laptop).
+v2.6 uploaded 2026-09-27 ~09:00: **LB 0.982344 → adopted** (default config, output\, docs,
+zip). Morning 27 Sep (progress "v2.6 → next"): v2.6 error budget, self-estimate (France
+lowest, 0.9845 expected), label-free calibration check (US largest test segment calibrated,
+π 0.756 vs p2 0.762), France blocking fine, bagging no gain, v2.6 unseen-region 0.98817;
+stage-1 normalisation not pursued (stage 1 uses those features for 1.2 % of its gain).
+**v2.6 is the final file**; validator with `--check-ids` PASS.
+
+1. Only if the user wants more: the remaining ideas are unvalidatable or small (stage-1
+   domain normalisation; a transformer cross-encoder on the uncertain band, which needs
+   downloads and GPU time). No heavier runs (user: hold_frac 0.6 at 9–11 GB is too much).
+2. Ask the user about a PR / merge of `improve/v2` into `main` (not done so far).
 
 ## 9. Before the deadline (leave ≥ 3 h)
 

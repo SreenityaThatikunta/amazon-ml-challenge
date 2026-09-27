@@ -20,7 +20,7 @@ it is at test time), so it has seen many regions and scores unseen ones well. A 
 expected-F0.5 rule (one owner per record) produces the final links, with a label-free
 prior correction for a French name-noise pattern that the training countries do not
 have. Validation macro F0.5 is **0.98918** on a geographic hold-out (10 % of the S1
-entities, whole states), **0.98822 with every validation state unseen by the model that
+entities, whole states), **0.98817 with every validation state unseen by the model that
 scores it**, up from 0.98211 for our first submission; public leaderboard **0.982344**. Everything runs on one laptop
 (16 GB RAM; optional NVIDIA GPU for the retrieval step) with MIT/BSD/Apache dependencies
 and no pretrained model.
@@ -244,7 +244,7 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
   India 0.98726; singletons 0.98846; pair precision 0.99836, recall 0.97141; 0.98923 without the
   normalisation-scale fix, which validation cannot see, see section 4). With every
   validation state unseen by the model that scores it (whole regions held out per
-  cross-fitting fold, the harsher test-like check): **0.98822**.
+  cross-fitting fold, the harsher test-like check): **0.98817** (0.98822 without the fix).
   Progression: first submission 0.98211 → v2 features, stage 1 only 0.98337 → + stage-2
   re-ranker on 25 stage-1 features 0.98748 → on all 102 features 0.98895 → re-ranker
   trained on validation + 20 % held-out train regions 0.98911 (0.98776 unseen-region, vs
@@ -265,6 +265,7 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
   | + 20 % held-out regions | whole regions held out | 0.98776 | 0.99125 | 0.99401 | 0.98684 |
   | + 40 % held-out regions (owner rule) | whole regions held out | 0.98789 | 0.99156 | 0.99410 | 0.98750 |
   | + complete groups only | whole regions held out | **0.98822** | **0.99171** | 0.99417 | 0.98778 |
+  | + normalisation scale from complete groups (final) | whole regions held out | 0.98817 | 0.99163 | 0.99408 | 0.98773 |
   | + 20 % held-out regions | by S1 | 0.98911 | 0.99241 | 0.99400 | 0.98987 |
   | + 40 % held-out regions (owner rule) | by S1 | 0.98896 | 0.99261 | 0.99421 | 0.99005 |
   | + complete groups only | by S1 | **0.98923** | **0.99270** | 0.99424 | 0.99025 |
@@ -283,7 +284,8 @@ odds × 5.4); every US/India kind stays within 0.9–1.7×, below the threshold.
   validation + 20 % held-out regions, French prior correction **0.980973** (val 0.98911,
   unseen-region 0.98776); final model (40 % held-out regions, records following their
   owner, complete groups only) 0.981708 (val 0.98923, unseen-region 0.98822); final model
-  (+ normalisation scale from complete groups) **0.982344** (val 0.98918). The widening
+  (+ normalisation scale from complete groups) **0.982344** (val 0.98918, unseen-region
+  0.98817). The widening
   val-LB gap led to adversarial validation (a classifier separates val from test pairs with
   AUC 0.99): test US has half the S1 of train US and 23 % more S2/S3 records per S1, so
   count- and IDF-based features sit on a different scale. Dividing them by their
@@ -302,8 +304,12 @@ Measuring the generator's noise in the raw data and encoding it (filler words, b
 names, prepended house numbers, injected ids) gave the pair model better evidence; the
 largest single gain came from letting a second model see the competition for each S1
 entity. The cascade keeps the candidate set to about one S1 per record while retaining
-99.97 % of the retrieved true pairs. The main remaining loss is records without an
-address whose name is shared by many S1, which no feature of the pair can resolve.
+99.97 % of the retrieved true pairs. The late gains came from making the re-ranker's
+training data look like test data: many held-out regions, every S1 group complete, and
+feature scales taken from the same kind of pairs as at test. These moved the public
+leaderboard (0.980 → 0.982) by more than validation could show, because validation shares
+the training set's artefacts. The main remaining loss is records without an address whose
+name is shared by many S1, which no feature of the pair can resolve.
 
 ---
 
@@ -322,7 +328,8 @@ pip install -r code/business_entity_resolution/requirements.txt
 pip install -e code/business_entity_resolution
 B=ber   # run from the directory that contains dataset/
 $B split --run main && $B normalize --run main && $B candidates --run main
-$B features --run main && $B scorer --run main && $B rerank --run main
+$B features --run main && $B features-hold --run main   # held-out train regions for stage 2
+$B scorer --run main && $B rerank --run main
 $B decide --run main && $B submit --run main   # -> output/matching_results.tsv, candidate_pairs.tsv
 ```
 
@@ -339,8 +346,29 @@ Main modules: `normalize/` (text, address, geo, transliteration, lookup tables),
 |---|---|---|
 | All S1 of the country | ~10⁶ | 100 % |
 | TF-IDF top-k union | 24.6 | 99.05 % |
-| Stage-1 filter (p1 ≥ 0.001) = `candidate_pairs.tsv` | 1.08 | 99.02 % |
-| Final links | 0.72 | 97.31 % |
+| Stage-1 filter (p1 ≥ 0.001) = `candidate_pairs.tsv` | 1.07 | 99.02 % |
+| Final links | 0.72 | 97.14 % |
 
 Stage-2 features by gain: record margin over its other candidates, p1, then the S1-side
 claim features (`c_expected`, `c_best_other`, `c_sum_other`).
+
+**Evaluated and not adopted** (all on the validation regions, same stage 1; "clean" = the
+validation S1 whose groups are complete in every variant; the final model: val 0.98918,
+clean 0.99263, unseen-region 0.98817 / clean 0.99163):
+
+| Variant | Result | Why not |
+|---|---|---|
+| Stage 2 up to 3,500 trees (folds stopped at 2,280–2,400 instead of ≤ 2,000) | unseen-region clean 0.99168 vs 0.99170 | flat |
+| Second stage-2 round, group features recomputed from out-of-fold p2 | unseen-region clean 0.99134 vs 0.99170, India −0.0011 | stacking shift: an unseen region's round-1 p2 looks unlike the training regions' |
+| Stronger regularisation (min 2,000 per leaf, L2 10, 70 % features) | clean 0.99261 vs 0.99270 | flat / slightly worse |
+| Two bags of cross-fitting (8 models) | clean 0.99265 vs 0.99263 | no measurable gain for twice the cost |
+| Stage-1 filter at p1 ≥ 0.003 (−9 % candidates) | clean 0.99260 vs 0.99268; 0.05 % of true pairs lost | small F0.5 cost; 5.5 candidates per S1 is already small |
+| Label-shift EM per lookalike segment | odds ratios at their bounds | the feature distribution shifts within segments |
+| Importance weights from adversarial validation | effective sample 11 % | degenerate |
+
+**Label-free calibration check on test.** Given the match status, the house-number
+relation profile does not depend on the pair's segment, so the true-copy and decoy
+profiles measured on labelled validation pairs let us estimate the share of true copies
+among test pairs without labels. On the largest US test segment (same street, same name
+key; 1.78 M records, twice the lookalikes of validation) it is 0.756 against the model's
+mean p2 of 0.762: the re-ranker stays calibrated under the test's higher decoy density.
