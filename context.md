@@ -15,6 +15,13 @@ architectures go on separate branches.
 
 ## 0. Where we left off (do this first)
 
+**Update ~20:20 IST: package layout fixed to the brief (commit 5889cc5).** The zip's
+`code/business_entity_resolution/` now holds exactly `src/`, `README.md`, `requirements.txt`
+(configs in `src/ber/configs`, tests in `src/tests`, tools in `src/tools`; run as `python -m
+ber <stage>` with `PYTHONPATH=code/business_entity_resolution/src`; zip builder
+`src/tools/make_submission_zip.py`). Zip rebuilt (73 files), still v2.7_crossenc, all
+structure checks pass. HARD RULE: verify any zip against the brief's structure first.
+
 **Update ~19:45 IST: package trimmed + README rewritten (commit dcbaee8, pushed).** Deleted
 never-used parts (kaggle/, LLM stage, synthetic-France proxy); README rewritten for reviewers
 (details moved to Documentation_template.md Appendix C). `pootato_submission.zip` rebuilt: 76
@@ -255,7 +262,7 @@ On branch `explore/cross-encoder`:
   Appendix A run commands with `ber crossenc`, license: Apache-2.0, 22 M params ≤ 8 B).
   README already documents the stage (`requirements-crossenc.txt` pins torch etc.).
 - `progress.md` final entry; rebuild the zip (`.venv/Scripts/python.exe
-  code/business_entity_resolution/tools/make_submission_zip.py --team pootato`, checks CRC;
+  code/business_entity_resolution/src/tools/make_submission_zip.py --team pootato`, checks CRC;
   it zips the working tree's code, so the branch must be checked out), run the official
   validator (`.venv/Scripts/python.exe utils/validate_submission.py --matching
   output/matching_results.tsv --candidate output/candidate_pairs.tsv --test-dir dataset/test

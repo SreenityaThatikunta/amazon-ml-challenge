@@ -987,3 +987,18 @@ per-stage runtime and memory from the manifests, two passes, main configuration 
 other entry points, submitted-file provenance). Zip rebuilt from dcbaee8: 76 files (was 89),
 TSVs = v2.7_crossenc (sha256 faf49d17…), 73 code files = HEAD, a bare extraction passes its
 tests (139 + 1 skip).
+
+**Package layout fixed to the organisers' pattern (2026-09-27 ~20:20; commit 5889cc5).**
+The user pointed out that the zip broke the required structure
+(`code/business_entity_resolution/` = `src/` + `README.md` + pinned `requirements.txt`):
+tools/, tests/, configs/, pyproject.toml, a LICENSE copy and three requirements files sat
+beside src/, and requirements.txt lacked torch/transformers. Fixed: configs →
+`src/ber/configs` (CONFIG_DIR), tests → `src/tests` (conftest puts src/ on sys.path),
+tools → `src/tools` (submit's validator fallback + zip builder paths), one
+`requirements.txt` pinning everything (torch via `--extra-index-url` cu126; CuPy, xgboost
+as optional comments), pyproject.toml / LICENSE / extra requirements removed, CLI as
+`python -m ber <stage>` (`src/ber/__main__.py`, PYTHONPATH=src). README, documentation
+and prototype README updated. Zip (73 files) checked entry by entry against the brief
+(all PASS) and from a bare extraction (139 tests pass without install; `python -m ber`
+config/help OK). Packaging commands now: `python
+code/business_entity_resolution/src/tools/make_submission_zip.py --team pootato`.
