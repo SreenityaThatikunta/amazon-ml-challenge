@@ -965,3 +965,25 @@ features 4/5/9 of 132; ce alone AUC 0.97485 / log loss 0.3026, band 0.683 → p2
 byte-identical). Backups: `D:\aml\submissions\pootato_submission_v2.7_ber.zip`,
 `pootato_submission_v2.6.zip`. Uploads 2026-09-27: v2.6, v2.7, v2.7_ber (3 of 5); the user
 re-uploads v2.7_crossenc as the last upload (best + last, = the zip's file).
+
+**Package trimmed, README rewritten (2026-09-27 ~19:45; commit dcbaee8).** The user asked
+to delete what the submission never used and to rewrite the README for reviewers.
+Removed: `kaggle/` (LLM LoRA scripts; the Kaggle fine-tune T5.4 was never run, no LLM
+scores exist in any run), the LLM stage (`src/ber/llm`, `llm-export`/`llm-import`,
+`llm:` config, its test), the synthetic-France proxy (`src/ber/france`, `synth-france`,
+`france:` config, `configs/france_proxy.yaml`, its test; only an early recall check ever
+ran), and the unused "planned stage" CLI helper (its `--help` epilog pointed at plan.md).
+Kept: everything the pipeline, tests, tools or documented experiments use (incl.
+`tools/validate_submission.py`: identical to the organisers' validator, `ber submit`'s
+fallback). Comments naming the branch / progress.md / deleted parts updated; no stage logic
+changed. `test_all_stages_implemented` now checks that every pipeline stage is a registered
+command. 140 tests pass; license check "all permissive". Config hashes change (two config
+sections removed): artifacts built before warn on reuse, nothing else.
+README (package): pitch, metrics table, one mermaid pipeline diagram, Problem / Solution and
+innovation / Results / Architecture / Reproducibility (quick start) / Repository structure
+/ Team and license, only in-package links (LICENSE copied in); checked rendered (marked +
+mermaid). The moved details are Documentation_template.md Appendix C (environment,
+per-stage runtime and memory from the manifests, two passes, main configuration options,
+other entry points, submitted-file provenance). Zip rebuilt from dcbaee8: 76 files (was 89),
+TSVs = v2.7_crossenc (sha256 faf49d17…), 73 code files = HEAD, a bare extraction passes its
+tests (139 + 1 skip).

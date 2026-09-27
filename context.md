@@ -15,6 +15,11 @@ architectures go on separate branches.
 
 ## 0. Where we left off (do this first)
 
+**Update ~19:45 IST: package trimmed + README rewritten (commit dcbaee8, pushed).** Deleted
+never-used parts (kaggle/, LLM stage, synthetic-France proxy); README rewritten for reviewers
+(details moved to Documentation_template.md Appendix C). `pootato_submission.zip` rebuilt: 76
+files, still v2.7_crossenc (sha256 faf49d17…), verified. See progress.md "Package trimmed".
+
 **Update ~18:40 IST: FINAL FILE = v2.7_crossenc (the first v2.7 run, public LB 0.98316),
 not v2.7_ber.** The user uploaded v2.7_ber: LB 0.982681. Same method, two draws of the
 cross-encoder fine-tuning; the first run is better on labelled val too (paired z 3.9) and
