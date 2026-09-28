@@ -11,12 +11,12 @@ import pandas as pd
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-sys.path.insert(0, r"D:\aml\ce")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import DATA, MODEL as DEFAULT_MODEL, SCORES  # noqa: E402
 from train import encode, log, predict  # noqa: E402
 
-MODEL = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(r"D:\aml\models\ce_v1")
-OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(r"D:\aml\ce\scores_v1")
-DATA = Path(r"D:\aml\ce\data")
+MODEL = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_MODEL
+OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else SCORES
 CHUNK = 1_000_000
 NAMES = sys.argv[3].split(",") if len(sys.argv) > 3 else ["val", "hold", "test_France", "test_India", "test_US"]
 

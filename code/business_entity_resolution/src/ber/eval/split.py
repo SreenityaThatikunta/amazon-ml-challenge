@@ -97,30 +97,21 @@ def hold_regions(regions: pd.DataFrame, frac: float, seed: int) -> pd.DataFrame:
         columns=["country", "geo", "n_s1"])
 
 
-HOLD_BY = ("query_region", "owner")
-
-
-def hold_queries(queries: pd.DataFrame, s1: pd.DataFrame, hold: pd.DataFrame,
-                 by: str) -> pd.DataFrame:
+def hold_queries(queries: pd.DataFrame, s1: pd.DataFrame, hold: pd.DataFrame) -> pd.DataFrame:
     """Train-side queries (S2/S3 records) of the hold regions, as rows (entity_id,
     country, geo = the hold region they belong to).
 
-    ``by="owner"`` (v2.5) is the val split's rule: a matched query belongs to its
-    owner's region, an unmatched one to the region in its own address. Every hold S1
-    then has all its true copies loaded, also those whose address names no region
-    (4-5 % of true copies in US/India: the records that search the whole country,
-    like 35 % of France's) or another region. ``by="query_region"`` (v2.4) uses the
-    query's own region only: it misses those copies (5 % of the hold S1's) and takes
-    in copies of S1 outside the hold regions, whose groups are then incomplete.
+    The val split's rule (v2.5): a matched query belongs to its owner's region, an
+    unmatched one to the region in its own address. Every hold S1 then has all its
+    true copies loaded, also those whose address names no region (4-5 % of true
+    copies in US/India: the records that search the whole country, like 35 % of
+    France's) or another region; the query's own region alone (v2.4) missed 5 % of
+    the hold S1's copies and left their groups incomplete.
     queries: entity_id, country, geo, side, owner ("" if unmatched); s1: entity_id, geo."""
-    if by not in HOLD_BY:
-        raise ValueError(f"unknown rerank.hold_by {by!r}; valid: {HOLD_BY}")
     tr = queries.loc[(queries.side == "train").to_numpy(), ["entity_id", "country", "geo", "owner"]]
-    geo = tr.geo.to_numpy(dtype=object)
-    if by == "owner":
-        owner_geo = s1.set_index("entity_id").geo.reindex(tr.owner.to_numpy()).to_numpy(dtype=object)
-        matched = (tr.owner != "").to_numpy()
-        geo = np.where(matched, owner_geo, geo)
+    owner_geo = s1.set_index("entity_id").geo.reindex(tr.owner.to_numpy()).to_numpy(dtype=object)
+    matched = (tr.owner != "").to_numpy()
+    geo = np.where(matched, owner_geo, tr.geo.to_numpy(dtype=object))
     out = pd.DataFrame({"entity_id": tr.entity_id.to_numpy(), "country": tr.country.to_numpy(),
                         "geo": geo})
     return out.merge(hold[["country", "geo"]].drop_duplicates(), on=["country", "geo"])

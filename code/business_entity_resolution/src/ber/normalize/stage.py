@@ -15,7 +15,6 @@ from __future__ import annotations
 import os
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict
-from pathlib import Path
 
 import pandas as pd
 
@@ -139,7 +138,3 @@ def run_normalize(cfg: Config) -> None:
                         cfg.data.with_test)
 
 
-def read_records(path: Path, columns: list[str] | None = None,
-                 filters: list | None = None) -> pd.DataFrame:
-    """Read a ``records_<split>`` directory (all parts)."""
-    return pd.read_parquet(path, columns=columns, filters=filters)

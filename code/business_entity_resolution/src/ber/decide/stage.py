@@ -25,7 +25,6 @@ from ..eval.split import slice_mask
 from ..log import timed
 from . import anchor
 from .expected_f import select
-from .prior_shift import SEG_COLS, adjust, segment_priors
 
 ANCHOR_COLS = ("hn_rel", "a_tsr")  # stage-2 score columns the anchor correction needs
 
@@ -204,12 +203,6 @@ def _decide_val(st: StageRun, cfg: Config) -> dict:
               "min_p": best_m if dc.min_p is None else dc.min_p}
     st.metric("chosen", chosen)
     chosen.update(chosen_extra)
-    if all(c in scores for c in SEG_COLS):  # val priors per lookalike segment (prior shift)
-        cty = recs.set_index("entity_id").country
-        sc_c = scores.assign(country=cty.reindex(scores.q_id).to_numpy())
-        chosen["segment_priors"] = {"pooled": segment_priors(sc_c)}
-        for c, g in sc_c.groupby("country"):
-            chosen["segment_priors"][str(c)] = segment_priors(g)
     st.write_json(chosen, "decision_params")
 
     kept = decide(assigned, dc.method, chosen["threshold"], chosen["min_p"], dc.empty_prior)
@@ -238,17 +231,14 @@ def run_decide(cfg: Config) -> None:
                 # stream: every scores part holds complete queries, so the best row
                 # per query can be taken part by part (~10M rows kept, not ~250M)
                 src = st.input_path(dc.scores_stage, "scores_test")
-                if dc.prior_shift not in ("none", "segment_em", "anchor"):
+                if dc.prior_shift not in ("none", "anchor"):
                     raise ValueError(f"unknown decide.prior_shift {dc.prior_shift!r}")
                 s1_country = None
                 rec_test = st.input_path("normalize", "records_test")
-                if dc.prior_shift == "segment_em" and "segment_priors" not in chosen:
-                    raise ValueError("decide.prior_shift=segment_em needs segment priors: "
-                                     "re-run the train pass after `ber rerank`")
                 if dc.prior_shift == "anchor" and "anchor" not in chosen:
                     raise ValueError("decide.prior_shift=anchor needs the val bias factors: "
                                      "re-run the train pass of `ber decide` on rerank scores")
-                if dc.prior_shift != "none":
+                if dc.prior_shift == "anchor":
                     rt = pd.read_parquet(rec_test, columns=["entity_id", "country"],
                                          filters=[("source", "==", 1)])
                     s1_country = rt.set_index("entity_id").country
@@ -257,10 +247,6 @@ def run_decide(cfg: Config) -> None:
                 for f in sorted(src.glob("*.parquet")):
                     d = pd.read_parquet(f).astype({"q_id": str, "s1_id": str})
                     c = str(s1_country[d.s1_id.iloc[0]]) if s1_country is not None and len(d) else ""
-                    if dc.prior_shift == "segment_em" and len(d):
-                        pri = chosen["segment_priors"].get(c, chosen["segment_priors"]["pooled"])
-                        d, rep = adjust(d, pri)
-                        reports[f"{c}:{f.name}"] = rep
                     a = one_owner(d)
                     del d
                     if dc.prior_shift == "anchor" and len(a):

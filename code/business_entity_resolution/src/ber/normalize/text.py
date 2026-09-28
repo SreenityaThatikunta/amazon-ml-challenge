@@ -60,10 +60,6 @@ def tokens(folded: str) -> list[str]:
     return _NON_WORD.sub(" ", folded).split()
 
 
-def is_indic(s: str) -> bool:
-    return bool(INDIC_RE.search(s))
-
-
 @lru_cache(maxsize=1)
 def _units() -> frozenset[str]:
     return frozenset(legal_forms()) | frozenset(r["token"] for r in read_table("credentials.tsv"))

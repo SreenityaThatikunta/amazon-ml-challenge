@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 import pandas as pd
@@ -44,46 +43,6 @@ def read_ground_truth(cfg: Config) -> pd.DataFrame:
     if list(df.columns) != GT_COLUMNS:
         raise ValueError(f"ground truth: unexpected columns {list(df.columns)}")
     return df
-
-
-def read_id_lists(path: Path) -> dict[str, list[str]]:
-    """Read a 2-column TSV of `id <tab> comma-separated ids` (GT or submission)."""
-    out: dict[str, list[str]] = {}
-    with open(path, encoding="utf-8") as f:
-        next(f, None)
-        for line in f:
-            line = line.rstrip("\r\n")
-            if not line.strip():
-                continue
-            key, _, ids = line.partition("\t")
-            out[key.strip()] = [i.strip() for i in ids.split(",") if i.strip()]
-    return out
-
-
-def write_id_lists(path: Path, lists: Mapping[str, Iterable[str]],
-                   all_keys: Iterable[str], header: tuple[str, str]) -> int:
-    """Write one row per key in ``all_keys`` (keys missing from ``lists`` get an
-    empty list), dropping duplicate ids while keeping order. Enforces the
-    submission rules; returns the number of rows written."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    n = 0
-    seen_keys: set[str] = set()
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        f.write("\t".join(header) + "\n")
-        for key in all_keys:
-            if key in seen_keys:
-                raise ValueError(f"duplicate key {key}")
-            seen_keys.add(key)
-            ids = list(dict.fromkeys(lists.get(key, ())))
-            bad = [i for i in ids if not (i.startswith("S2-") or i.startswith("S3-"))]
-            if bad:
-                raise ValueError(f"{key}: non S2/S3 ids {bad[:3]}")
-            f.write(f"{key}\t{','.join(ids)}\n")
-            n += 1
-    extra = set(lists) - seen_keys
-    if extra:
-        raise ValueError(f"{len(extra)} keys not in all_keys, e.g. {sorted(extra)[:3]}")
-    return n
 
 
 def write_parquet(df: pd.DataFrame, path: Path) -> None:

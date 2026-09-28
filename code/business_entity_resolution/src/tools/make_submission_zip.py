@@ -20,6 +20,7 @@ from pathlib import Path
 CODE = Path(__file__).resolve().parents[2]           # code/business_entity_resolution
 SKIP_DIRS = {"__pycache__", ".pytest_cache", "build", "dist"}
 SKIP_SUFFIXES = {".pyc", ".pyo"}
+SKIP_FILES = {".DS_Store"}
 
 
 def main() -> None:
@@ -38,7 +39,7 @@ def main() -> None:
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.endswith(".egg-info")]
             for f in files:
                 p = Path(base) / f
-                if p.suffix in SKIP_SUFFIXES:
+                if p.suffix in SKIP_SUFFIXES or f in SKIP_FILES:
                     continue
                 z.write(p, "code/business_entity_resolution/" + p.relative_to(CODE).as_posix())
         z.write(root / "Documentation_template.md", "Documentation_template.md")

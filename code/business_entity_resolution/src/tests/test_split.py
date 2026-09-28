@@ -103,7 +103,7 @@ def test_choose_regions_falls_back_to_closest_region():
     assert sizes[chosen].sum() > 4400 and "PB" in chosen
 
 
-def test_hold_queries_by_owner_or_query_region():
+def test_hold_queries_follow_their_owner():
     from ber.eval.split import hold_queries
     s1 = pd.DataFrame({"entity_id": ["S1-a", "S1-b", "S1-c"], "geo": ["AA", "BB", "AA"]})
     q = pd.DataFrame({
@@ -115,10 +115,6 @@ def test_hold_queries_by_owner_or_query_region():
         "owner": ["S1-a", "S1-a", "S1-b", "", "", "S1-c"],
         "side": ["train"] * 5 + ["val"]})
     hold = pd.DataFrame({"country": ["X"], "geo": ["AA"], "n_s1": [2]})
-    by_owner = hold_queries(q, s1, hold, "owner")
+    by_owner = hold_queries(q, s1, hold)
     assert sorted(by_owner.entity_id) == ["S2-1", "S2-2", "S2-4"]
     assert set(by_owner.geo) == {"AA"}
-    by_region = hold_queries(q, s1, hold, "query_region")
-    assert sorted(by_region.entity_id) == ["S2-3", "S2-4"]
-    with pytest.raises(ValueError):
-        hold_queries(q, s1, hold, "nope")

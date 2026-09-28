@@ -3,10 +3,6 @@
 Trains on train-side candidate pairs, early-stops on val-side pairs, then
 scores the val pairs (``scores_val.parquet``) and every test pair
 (``scores_test/``). Saves the model, feature list and feature importance.
-
-With ``oof_folds > 1`` it also writes out-of-fold scores for the train-side
-pairs (``scores_train_oof.parquet``; folds by query): honest probabilities for
-train-side analyses, where in-sample predictions would be overconfident.
 """
 
 from __future__ import annotations
@@ -66,7 +62,7 @@ def _matrix(df: pd.DataFrame, feats: list[str]) -> np.ndarray:
     return np.ascontiguousarray(df[feats].to_numpy(dtype=np.float32))
 
 
-def load_sampled(path, cfg: Config, log, feats: list[str], keep_s1: bool = False,
+def load_sampled(path, cfg: Config, log, feats: list[str],
                  exclude: set[str] | None = None) -> dict:
     """Stream feature parts; keep a query-level sample of train-side rows and of
     val-side rows (the latter for early stopping) as float32 matrices, so memory
@@ -98,7 +94,6 @@ def load_sampled(path, cfg: Config, log, feats: list[str], keep_s1: bool = False
     n_e = int(sum(e.sum() for _, e in masks))
     out = {"Xtr": np.empty((n_t, len(feats)), np.float32), "ytr": np.empty(n_t, np.int8),
            "Xes": np.empty((n_e, len(feats)), np.float32), "yes": np.empty(n_e, np.int8)}
-    qtr, s1tr = [], []
     it = ie = 0
     for f, (t, e) in zip(files, masks):
         if not (t.any() or e.any()):
@@ -108,9 +103,6 @@ def load_sampled(path, cfg: Config, log, feats: list[str], keep_s1: bool = False
             k = int(t.sum())
             out["Xtr"][it:it + k] = d.loc[t, feats].to_numpy(dtype=np.float32)
             out["ytr"][it:it + k] = d.y.to_numpy()[t]
-            qtr.append(d.q_id.astype(str).to_numpy()[t])
-            if keep_s1:
-                s1tr.append(d.s1_id.astype(str).to_numpy()[t])
             it += k
         if e.any():
             k = int(e.sum())
@@ -118,8 +110,6 @@ def load_sampled(path, cfg: Config, log, feats: list[str], keep_s1: bool = False
             out["yes"][ie:ie + k] = d.y.to_numpy()[e]
             ie += k
         del d
-    out["qtr"] = np.concatenate(qtr) if qtr else np.empty(0, dtype=object)
-    out["str"] = np.concatenate(s1tr) if s1tr else np.empty(0, dtype=object)
     log.info("sampled %d train rows, %d early-stopping rows", n_t, n_e)
     return out
 
@@ -181,34 +171,20 @@ def run_scorer(cfg: Config) -> None:
         feat_dir = st.input_path("features", "features_train")
         first = pd.read_parquet(next(iter(sorted(feat_dir.glob("*.parquet"))))).head(1)
         feats = feature_columns(first, cfg.scorer.drop_features)
-        if cfg.scorer.model_from_run:  # apply the model trained in another run
-            path = st.input_path("scorer", "model", run=cfg.scorer.model_from_run)
-            model = lgb.Booster(model_file=str(path))
-            missing = set(model.feature_name()) - set(feature_columns(first))
-            if missing:
-                raise ValueError(f"features missing for model: {sorted(missing)}")
-            feats = model.feature_name()
-            sv = predict_side(model, feat_dir, "val", feats)
-            st.metric("val_auc", round(float(roc_auc_score(sv.y, sv.p)), 6))
-            st.write_parquet(sv, "scores_val")
-            return
-        oof = cfg.scorer.oof_folds > 1
         hold_ids = None
         if cfg.rerank.hold_frac > 0:  # v2.4: held-out regions stay out of stage 1
             hold_ids = set(st.read_input("features_hold", "hold_queries",
                                          columns=["entity_id"]).entity_id.astype(str))
             st.metric("hold_queries_excluded", len(hold_ids))
         with timed(st.log, "load sampled train features"):
-            S = load_sampled(feat_dir, cfg, st.log, feats, keep_s1=oof, exclude=hold_ids)
+            S = load_sampled(feat_dir, cfg, st.log, feats, exclude=hold_ids)
         st.metric("rows", {"train": len(S["ytr"]), "val": len(S["yes"]),
                            "train_pos": int(S["ytr"].sum()), "val_pos": int(S["yes"].sum())})
         st.metric("n_features", len(feats))
         with timed(st.log, "train LightGBM"):
-            if oof:  # the folds need the matrix again
-                model = train_model(S["Xtr"], S["ytr"], S["Xes"], S["yes"], feats, cfg, st.log)
-            else:  # hand the matrices over, so they are freed once binned
-                model = train_model(S.pop("Xtr"), S["ytr"], S.pop("Xes"), S["yes"], feats,
-                                    cfg, st.log)
+            # hand the matrices over, so they are freed once binned
+            model = train_model(S.pop("Xtr"), S["ytr"], S.pop("Xes"), S["yes"], feats,
+                                cfg, st.log)
         model.save_model(str(st.path("model.txt")))
         st.register("model", st.path("model.txt"))
         imp = pd.DataFrame({"feature": feats,
@@ -217,20 +193,6 @@ def run_scorer(cfg: Config) -> None:
                            ).sort_values("gain", ascending=False)
         st.write_parquet(imp, "importance")
         st.log.info("top features by gain:\n%s", imp.head(40).to_string(index=False))
-
-        if oof:
-            with timed(st.log, f"out-of-fold scores ({cfg.scorer.oof_folds} folds)"):
-                fold = (stable_unit(pd.Series(S["qtr"]), cfg.seed + 2)
-                        * cfg.scorer.oof_folds).astype(int)
-                p_oof = np.empty(len(S["ytr"]), dtype=np.float32)
-                for k in range(cfg.scorer.oof_folds):
-                    m = fold == k
-                    mk = train_model(S["Xtr"][~m], S["ytr"][~m], S["Xes"], S["yes"], feats,
-                                     cfg, st.log)
-                    p_oof[m] = mk.predict(S["Xtr"][m], num_iteration=mk.best_iteration)
-                st.write_parquet(pd.DataFrame({"q_id": S["qtr"], "s1_id": S["str"],
-                                               "y": S["ytr"], "p": p_oof}), "scores_train_oof")
-                st.metric("train_oof_auc", round(float(roc_auc_score(S["ytr"], p_oof)), 6))
 
         del S
         with timed(st.log, "score all val pairs"):

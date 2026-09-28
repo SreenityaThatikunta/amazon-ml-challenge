@@ -9,25 +9,30 @@ what separates a true match from a lookalike distractor sitting next to it
 one-letter edit, so both records score high against the same S1), and a
 singleton S1 from one that attracts a stray record.
 
-Stage 2 is a small LightGBM on:
+Stage 2 is a LightGBM on:
   * p1 (stage-1 probability) and its logit;
   * query context: rank of the pair in the query, best / sum of the query's
     other p1, number of strong candidates;
   * S1 context: rank of the query among all records listing the S1, best / sum
     / count of the other records' p1, the same restricted to the query's own
     source, and "claims" (records whose best S1 is this one);
-  * a few stage-1 features (source, number relation, name/address equality...),
-    so stage 2 can condition the context on the kind of pair.
+  * the stage-1 features (``rerank.raw_features``, all by default), so stage 2 can
+    condition the context on the kind of pair;
+  * optionally an external pair score and its context (``rerank.extra_scores``: the
+    cross-encoder's logit, margins and ranks).
 
-Training data must hold *complete* S1 groups, so it is the val side (every val
-query was featurised and scored by a stage-1 model that never saw it). The val
-side is cross-fitted (``folds`` folds grouped by the query's top S1): every val
-pair gets an out-of-fold p2, so the val F0.5 computed by ``ber decide`` on p2 is
-honest. Test pairs get the mean of the fold models. Pairs with p1 < ``min_p1``
-are dropped first (they are never selected; this keeps the test pass in memory).
+Training data must hold *complete* S1 groups, and stage 1 must never have seen it:
+the val side plus the held-out train regions (``rerank.hold_frac``,
+``rerank.train_sides``), restricted to pairs whose S1 group is complete
+(``rerank.train_complete``). It is cross-fitted (``folds`` folds grouped by the
+query's top S1): every val pair gets an out-of-fold p2, so the val F0.5 computed by
+``ber decide`` on p2 is honest. Test pairs get the mean of the fold models. Pairs with
+p1 < ``min_p1`` are dropped first (they are never selected; this keeps the test pass
+in memory). Size-dependent features are divided by their per-country, per-split scale
+(``rerank.domain_norm``).
 
-Outputs ``scores_val.parquet`` and ``scores_test/`` with the scorer's schema
-(``p`` = p2), so ``ber decide --set decide.scores_stage=rerank`` consumes them.
+Outputs ``scores_val.parquet``, ``scores_hold.parquet`` and ``scores_test/`` with the
+scorer's schema (``p`` = p2), which ``ber decide`` consumes.
 """
 
 from __future__ import annotations
@@ -50,10 +55,9 @@ from ..features.build import _best_other
 from ..log import timed
 
 HI = 0.5  # "strong" candidate / claim
-# stage-1 features copied to the stage-2 score files: they define the segments of the
-# prior-shift correction in ber decide (lookalike type: house-number relation, legal
-# conflict, exact name key, address similarity)
-SEGMENT_COLS = ["hn_rel", "l_conflict", "k_eq", "a_tsr", "n_core_eq"]
+# stage-1 features copied to the stage-2 score files: the anchor prior correction in
+# ber decide needs the house-number relation and the address similarity
+SEGMENT_COLS = ["hn_rel", "a_tsr"]
 
 
 def _group_stats(key: np.ndarray, v: np.ndarray) -> dict[str, np.ndarray]:
@@ -126,17 +130,14 @@ IDF_COLS = ["k_idf_unmatched_q", "k_idf_unmatched_s", "a_idf_unmatched_q", "a_id
 # the counts over an S1's group: too small wherever the group is incomplete (training only)
 S1_GROUP_COUNT_COLS = ["s_n", "s_sum_other", "s_n_hi_other", "ss_sum_other", "ss_n_hi_other",
                        "c_sum_other", "c_n_hi_other", "c_expected", "cs_n_hi_other"]
-# second-round group features (rerank.rounds = 2): the same columns computed from p2
-G2 = "g2_"
 
 
 def domain_normalize(M: np.ndarray, cols: list[str], groups: np.ndarray | None = None,
                      complete: np.ndarray | None = None) -> np.ndarray:
     """Count-like columns / their mean, IDF-like columns / their 99th percentile of
     non-zero values, within each group (country) of the rows of the float32 matrix
-    ``M`` whose first columns are named ``cols`` (in place; returns M). Columns named
-    "" (or beyond ``cols``) are left alone; second-round copies (``g2_`` prefix) are
-    normalised like their first-round column.
+    ``M`` whose first columns are named ``cols`` (in place; returns M). Columns
+    beyond ``cols`` are left alone.
 
     ``complete`` (training, ``rerank.norm_complete``): rows whose S1 group is complete;
     the S1-group counts then take their scale from those rows only. The other rows'
@@ -145,8 +146,7 @@ def domain_normalize(M: np.ndarray, cols: list[str], groups: np.ndarray | None =
     than test's, where every group is complete."""
     groups = np.zeros(len(M), dtype=np.int8) if groups is None else groups
     ug = np.unique(groups)
-    for j, name in enumerate(cols):
-        c = name.removeprefix(G2)
+    for j, c in enumerate(cols):
         if c not in COUNT_COLS and c not in IDF_COLS:
             continue
         v = np.ascontiguousarray(M[:, j])  # contiguous float32 copy of the column
@@ -164,13 +164,6 @@ def domain_normalize(M: np.ndarray, cols: list[str], groups: np.ndarray | None =
     return M
 
 
-def _codes(values: pd.Series, dtype: pd.CategoricalDtype) -> np.ndarray:
-    c = pd.Categorical(values.astype(str), dtype=dtype).codes
-    if (c < 0).any():
-        raise ValueError("pair ids missing from the records")
-    return c.astype(np.int32)
-
-
 def _arrow_codes(ids: pa.ChunkedArray) -> np.ndarray:
     """Integer codes of string ids (Arrow dictionary encoding: no Python strings).
     Only the grouping matters to the stage-2 features, not the code values."""
@@ -184,11 +177,11 @@ def group_columns() -> list[str]:
 
 
 def _fill_group(M: np.ndarray, q: np.ndarray, s: np.ndarray, src: np.ndarray,
-                p: np.ndarray, col0: int = 0) -> None:
-    """Write the group features into M[:, col0:] (in place)."""
+                p: np.ndarray) -> None:
+    """Write the group features into the first columns of M (in place)."""
     G = group_features(q, s, src, p)
     for j, c in enumerate(G.columns):
-        M[:, col0 + j] = G[c].to_numpy()
+        M[:, j] = G[c].to_numpy()
 
 
 def _fill_raw(M: np.ndarray, row: int, col0: int, table: pa.Table, raw_cols: list[str],
@@ -377,85 +370,43 @@ def _raw_columns(st: StageRun, wanted: list[str]) -> list[str]:
 
 
 def _cross_fit(st: StageRun, cfg: Config, M: np.ndarray, cols: list[str], y: np.ndarray,
-               folds: tuple, is_val: np.ndarray, tag: str,
-               seed_offset: int = 0) -> tuple[np.ndarray, np.ndarray]:
+               fold: np.ndarray, u: np.ndarray, trainable: np.ndarray,
+               is_val: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Cross-fitted stage-2 models on the first ``len(cols)`` columns of M: fold k's
     model trains on the trainable rows of the other folds (early stopping on 10 % of
     their groups, never the held-out fold) and predicts fold k. Saves
-    ``model{tag}_fold{k}.txt``; returns (out-of-fold p, gain importance over folds)."""
+    ``model_fold{k}.txt``; returns (out-of-fold p, gain importance over folds)."""
     rc = cfg.rerank
-    fold, u, trainable, w = folds
     nc = len(cols)
     oof = np.zeros(len(M), dtype=np.float64)
     imp = np.zeros(nc)
     params = _params(cfg)
-    params["seed"] = cfg.seed + seed_offset
-    if rc.learner not in LEARNERS:
-        raise ValueError(f"rerank.learner must be one of {LEARNERS}, got {rc.learner!r}")
     for k in range(rc.folds):
         tr, te = (fold != k) & trainable, fold == k
         es = tr & (u * 10 % 1 < 0.1)
         fit = tr & ~es
-        preds = []
-        if rc.learner in ("lgb", "both"):
-            dtr = lgb.Dataset(M[fit, :nc], y[fit], feature_name=cols, free_raw_data=True,
-                              weight=None if w is None else w[fit])
-            des = lgb.Dataset(M[es, :nc], y[es], reference=dtr,
-                              weight=None if w is None else w[es])
-            m = lgb.train(params, dtr, num_boost_round=rc.num_boost_round,
-                          valid_sets=[des], valid_names=["es"],
-                          callbacks=[lgb.early_stopping(rc.early_stopping, verbose=False)])
-            del dtr, des
-            preds.append(m.predict(M[te, :nc], num_iteration=m.best_iteration))
-            imp += m.feature_importance("gain")
-            m.save_model(str(st.path(f"model{tag}_fold{k}.txt")))
-            st.log.info("fold %d%s lgb: best iteration %d", k, tag, m.best_iteration)
-        if rc.learner in ("xgb", "both"):
-            bx = _train_xgb(cfg, M[fit, :nc], y[fit], M[es, :nc], y[es], cols,
-                            None if w is None else w[fit], None if w is None else w[es],
-                            cfg.seed + seed_offset)
-            preds.append(bx.inplace_predict(M[te, :nc]).astype(np.float64))
-            if rc.learner == "xgb":
-                gain = bx.get_score(importance_type="total_gain")
-                imp += np.array([gain.get(c, 0.0) for c in cols])
-            bx.save_model(str(st.path(f"xgb{tag}_fold{k}.json")))
-            st.log.info("fold %d%s xgb: %d trees", k, tag, bx.num_boosted_rounds())
-        oof[te] = np.mean(preds, axis=0)
+        dtr = lgb.Dataset(M[fit, :nc], y[fit], feature_name=cols, free_raw_data=True)
+        des = lgb.Dataset(M[es, :nc], y[es], reference=dtr)
+        m = lgb.train(params, dtr, num_boost_round=rc.num_boost_round,
+                      valid_sets=[des], valid_names=["es"],
+                      callbacks=[lgb.early_stopping(rc.early_stopping, verbose=False)])
+        del dtr, des
+        oof[te] = m.predict(M[te, :nc], num_iteration=m.best_iteration)
+        imp += m.feature_importance("gain")
+        m.save_model(str(st.path(f"model_fold{k}.txt")))
         tv = te & is_val
-        st.log.info("fold %d%s: held-out val AUC %.6f", k, tag, roc_auc_score(y[tv], oof[tv]))
+        st.log.info("fold %d: best iteration %d, held-out val AUC %.6f", k, m.best_iteration,
+                    roc_auc_score(y[tv], oof[tv]))
     return oof, imp
 
 
-LEARNERS = ("lgb", "xgb", "both")
-
-
-def _train_xgb(cfg: Config, X, y, Xes, yes, cols, w, wes, seed: int):
-    """XGBoost (GPU hist, leaf-wise like LightGBM) with early stopping on the same split;
-    returns the booster cut at its best iteration."""
-    import xgboost as xgb
-    rc = cfg.rerank
-    names = [c.replace("<", "_lt_").replace("[", "(").replace("]", ")") for c in cols]
-    dtr = xgb.QuantileDMatrix(X, y, weight=w, feature_names=names, max_bin=256)
-    des = xgb.QuantileDMatrix(Xes, yes, weight=wes, feature_names=names, ref=dtr)
-    params = {"objective": "binary:logistic", "eval_metric": "logloss", "tree_method": "hist",
-              "device": "cuda", "learning_rate": rc.learning_rate, "grow_policy": "lossguide",
-              "max_leaves": rc.num_leaves, "max_depth": 0, "min_child_weight": 5.0,
-              "subsample": 0.8, "colsample_bytree": rc.feature_fraction, "lambda": rc.lambda_l2,
-              "max_bin": 256, "seed": seed, "verbosity": 0}
-    b = xgb.train(params, dtr, num_boost_round=rc.num_boost_round, evals=[(des, "es")],
-                  early_stopping_rounds=rc.early_stopping, verbose_eval=False)
-    del dtr, des
-    return b[: b.best_iteration + 1]
-
-
-def _predict_mean(models: list, M: np.ndarray, nc: int, step: int = 500_000) -> np.ndarray:
-    """Mean of the fold models' predictions on the first ``nc`` columns of M (LightGBM
-    boosters, or XGBoost boosters already cut at their best iteration)."""
+def _predict_mean(models: list[lgb.Booster], M: np.ndarray, nc: int,
+                  step: int = 500_000) -> np.ndarray:
+    """Mean of the fold models' predictions on the first ``nc`` columns of M."""
     p = np.zeros(len(M), dtype=np.float64)
     for a in range(0, len(M), step):
         p[a:a + step] = np.mean([m.predict(M[a:a + step, :nc], num_iteration=m.best_iteration)
-                                 if isinstance(m, lgb.Booster) else
-                                 m.inplace_predict(M[a:a + step, :nc]) for m in models], axis=0)
+                                 for m in models], axis=0)
     return p
 
 
@@ -471,18 +422,10 @@ def run_rerank(cfg: Config) -> None:
             if not set(rc.train_sides) <= set(sides) or not rc.train_sides:
                 raise ValueError(f"rerank.train_sides {rc.train_sides} must be a non-empty "
                                  f"subset of the loaded sides {sides} (hold needs hold_frac > 0)")
-            if rc.rounds not in (1, 2):
-                raise ValueError(f"rerank.rounds must be 1 or 2, got {rc.rounds}")
-            if rc.bags < 1 or (rc.bags > 1 and rc.rounds == 2):
-                raise ValueError("rerank.bags must be >= 1 (and 1 with rounds = 2)")
-            g2cols = [G2 + c for c in group_columns()] if rc.rounds == 2 else []
-            for pat in ("model_r2_fold*.txt", "model_b*_fold*.txt", "xgb*_fold*.json"):  # never reuse
-                for old in st.dir.glob(pat):                          # pick up round-2 / bag
-                    old.unlink()                                      # models of another run
             xcols = EXTRA_COLS if rc.extra_scores else []
             with timed(st.log, f"load pairs ({'+'.join(sides)})"):
                 keys, M, cols = _read_pairs(st, cfg, raw_cols, sides,
-                                            n_extra=len(xcols) + len(g2cols))
+                                            n_extra=len(xcols))
                 q = pd.factorize(keys.q_id)[0]
                 s = pd.factorize(keys.s1_id)[0]
                 src = M[:, cols.index("q_source")].copy()
@@ -544,46 +487,8 @@ def run_rerank(cfg: Config) -> None:
                 fold = np.array([fold_of[r] for r in top_reg.reindex(q).to_numpy()])
                 st.metric("fold_regions", {k: sorted(r for r, f in fold_of.items() if f == k)
                                            for k in range(rc.folds)})
-            w = None
-            if rc.weights_file:  # e.g. adversarial-validation weights (val rows made test-shaped)
-                wf = pd.read_parquet(rc.weights_file)
-                w = (keys[["q_id", "s1_id"]].astype(str)
-                     .merge(wf.astype({"q_id": str, "s1_id": str}), on=["q_id", "s1_id"], how="left")
-                     .w.fillna(1.0).to_numpy(dtype=np.float64))
-                st.metric("train_weights", {"file": rc.weights_file,
-                                            "q": np.quantile(w, [0.01, 0.5, 0.99]).round(3).tolist()})
-            folds = (fold, u, trainable, w)
             with timed(st.log, f"cross-fit {rc.folds} folds (train on {'+'.join(rc.train_sides)})"):
-                oof, imp = _cross_fit(st, cfg, M, cols, y, folds, is_val, "")
-            if rc.bags > 1:
-                st.metric("val_auc_p2_bag0", round(float(roc_auc_score(y[is_val], oof[is_val])), 6))
-            for b in range(1, rc.bags):
-                # another fold split (and early-stopping split, LightGBM seed): each val pair
-                # gets one more out-of-fold p2; the bags' mean is still out-of-fold
-                ub = pd.Series(stable_unit(top.s1_id.astype(str), cfg.seed + 7 + 101 * b),
-                               index=top.q.to_numpy()).reindex(q).to_numpy()
-                fb = fold if rc.fold_by == "region" else np.minimum((ub * rc.folds).astype(int),
-                                                                    rc.folds - 1)
-                with timed(st.log, f"bag {b}: cross-fit {rc.folds} folds"):
-                    ob, ib = _cross_fit(st, cfg, M, cols, y, (fb, ub, trainable, w), is_val,
-                                        f"_b{b}", seed_offset=b)
-                st.metric(f"val_auc_p2_bag{b}", round(float(roc_auc_score(y[is_val], ob[is_val])), 6))
-                oof, imp = oof + ob, imp + ib
-            if rc.bags > 1:
-                oof = oof / rc.bags
-            p_r1 = None
-            if g2cols:
-                # round 2: the group context again, from the round-1 out-of-fold p2 (sharper
-                # claims and competition than p1), next to the round-1 columns
-                with timed(st.log, "round 2: group features from p2 + cross-fit"):
-                    n1 = len(cols)
-                    _fill_group(M, q, s, src, oof, col0=n1)
-                    if groups is not None:
-                        domain_normalize(M, [""] * n1 + g2cols, groups, norm_ref)
-                    st.metric("val_auc_p2_round1", round(float(roc_auc_score(y[is_val], oof[is_val])), 6))
-                    p_r1 = oof
-                    oof, imp = _cross_fit(st, cfg, M, cols + g2cols, y, folds, is_val, "_r2")
-                    cols = cols + g2cols
+                oof, imp = _cross_fit(st, cfg, M, cols, y, fold, u, trainable, is_val)
             st.register("models", st.dir)
             yv, pv, ov = y[is_val], keys.p.to_numpy()[is_val], oof[is_val]
             st.metric("val_auc_p1", round(float(roc_auc_score(yv, pv)), 6))
@@ -600,9 +505,7 @@ def run_rerank(cfg: Config) -> None:
             st.log.info("stage-2 features by gain:\n%s", imp_df.to_string(index=False))
             out = keys[["q_id", "s1_id", "y"]].assign(p=oof.astype(np.float32),
                                                       p1=keys.p.to_numpy())
-            if p_r1 is not None:
-                out["p_r1"] = p_r1.astype(np.float32)
-            for c in SEGMENT_COLS:  # kept for the prior-shift corrections in decide
+            for c in SEGMENT_COLS:  # kept for the anchor prior correction in decide
                 if c in cols:
                     out[c] = M[:, cols.index(c)]
             del M
@@ -625,25 +528,13 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
                          columns=["entity_id", "country"], filters=[("source", "==", 1)])
     s1_country = rt.set_index("entity_id").country
     del rt
-    models = [lgb.Booster(model_file=str(st.path(f"model{'' if b == 0 else f'_b{b}'}_fold{k}.txt")))
-              for b in range(rc.bags) for k in range(rc.folds)] if rc.learner != "xgb" else []
-    xmodels = []
-    if rc.learner in ("xgb", "both"):
-        import xgboost as xgb
-        for b in range(rc.bags):
-            for k in range(rc.folds):
-                bx = xgb.Booster(model_file=str(st.path(f"xgb{'' if b == 0 else f'_b{b}'}_fold{k}.json")))
-                bx.set_param({"device": "cuda"})
-                xmodels.append(bx)
-    models2 = [lgb.Booster(model_file=str(st.path(f"model_r2_fold{k}.txt")))
-               for k in range(rc.folds)] if rc.rounds == 2 else []
+    models = [lgb.Booster(model_file=str(st.path(f"model_fold{k}.txt"))) for k in range(rc.folds)]
     gcols = group_columns()
     xcols = EXTRA_COLS if rc.extra_scores else []
     cols = gcols + raw_cols + xcols
-    g2cols = [G2 + c for c in gcols] if models2 else []
-    if (models and models[0].feature_name() != cols) or (models2 and models2[0].feature_name() != cols + g2cols):
+    if models[0].feature_name() != cols:
         raise RuntimeError("the stage-2 models were trained on other features than "
-                           "rerank.raw_features / rounds / extra_scores give now")
+                           "rerank.raw_features / extra_scores give now")
     sc_dir = st.input_path("scorer", "scores_test")
     ft_dir = st.input_path("features", "features_test")
     by_country: dict[str, list] = {}
@@ -660,7 +551,7 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
         with timed(st.log, f"test {country}: {len(files)} parts"):
             n = sum(int((pq.read_table(f, columns=["p"]).column("p").to_numpy()
                          >= rc.min_p1).sum()) for f in files)
-            M = np.empty((n, len(cols) + len(g2cols)), dtype=np.float32)
+            M = np.empty((n, len(cols)), dtype=np.float32)
             qs, ss, ps = [], [], []
             row = 0
             for f in files:
@@ -690,19 +581,12 @@ def _score_test(st: StageRun, cfg: Config, raw_cols: list[str]) -> None:
                 del ce
             if rc.domain_norm:  # this matrix is one country of the test split
                 domain_normalize(M, cols)
-            p2 = np.mean([_predict_mean(ms, M, len(cols)) for ms in (models, xmodels) if ms], axis=0)
-            extra = {}
-            if models2:  # round 2: group features from the round-1 p2
-                _fill_group(M, qc, sc_, src, p2, col0=len(cols))
-                if rc.domain_norm:
-                    domain_normalize(M, [""] * len(cols) + g2cols)
-                extra["p_r1"] = p2.astype(np.float32)
-                p2 = _predict_mean(models2, M, len(cols) + len(g2cols))
+            p2 = _predict_mean(models, M, len(cols))
             del qc, sc_, src
             seg = {c: M[:, cols.index(c)].copy() for c in SEGMENT_COLS if c in cols}
             del M
             out = pa.table({"q_id": q_ids, "s1_id": s_ids, "p": p2.astype(np.float32),
-                            "p1": p1, **extra, **seg})
+                            "p1": p1, **seg})
             pq.write_table(out, out_dir / f"part-{country}.parquet")
             n_total += n
             st.metric(f"test_pairs_kept.{country}", n)

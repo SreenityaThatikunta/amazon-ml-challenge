@@ -250,9 +250,8 @@ def run_features_hold(cfg: Config) -> None:
         qs = st.read_input("split", "queries", run=cfg.data.split_run,
                            columns=["entity_id", "country", "geo", "side", "owner"])
         s1s = st.read_input("split", "s1", run=cfg.data.split_run, columns=["entity_id", "geo"])
-        hq = hold_queries(qs, s1s, hold, cfg.rerank.hold_by)
+        hq = hold_queries(qs, s1s, hold)
         st.write_parquet(hq, "hold_queries")
-        st.metric("hold_by", cfg.rerank.hold_by)
         del qs, s1s
         fillers = brand_units = None
         if fc.name_key:

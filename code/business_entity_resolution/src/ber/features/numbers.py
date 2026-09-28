@@ -24,7 +24,6 @@ from rapidfuzz.distance import Levenshtein
 
 # house-number relation codes (categorical feature)
 MISSING, EQUAL, PADDED, TRUNCATED, SHIFTED, DIFFERENT = range(6)
-RELATION_NAMES = ["missing", "equal", "padded", "truncated", "shifted", "different"]
 SHIFT_MAX = 50  # |a - b| at or below this (same digit count) counts as a small shift
 
 

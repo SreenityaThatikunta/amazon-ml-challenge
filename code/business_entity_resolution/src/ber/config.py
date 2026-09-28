@@ -107,9 +107,7 @@ class ScorerConfig:
     num_boost_round: int = 3000
     early_stopping: int = 100
     n_threads: int = 0
-    oof_folds: int = 3            # >1: also write out-of-fold scores for train-side pairs
-    model_from_run: str | None = None  # apply that run's model instead of training
-    train_query_frac: float = 0.1   # share of featurised train-side queries used for training
+    train_query_frac: float = 0.14  # share of featurised train-side queries used for training
     es_query_frac: float = 0.05     # share of val-side queries used for early stopping
     drop_features: list[str] = field(default_factory=list)  # ablations: names or "prefix*"
 
@@ -119,25 +117,16 @@ class RerankConfig:
     min_p1: float = 0.001           # drop pairs below this stage-1 p before stage 2
     folds: int = 4                  # cross-fitting folds on the val side
     fold_by: str = "s1"             # "s1" (groups by the record's top S1) | "region" (check)
-    weights_file: str | None = None  # parquet (q_id, s1_id, w): training weights for val pairs
     domain_norm: bool = True        # size-dependent features / their per-country-split scale
-    hold_frac: float = 0.0          # v2.4: share of each country's S1 in extra held-out train regions
+    hold_frac: float = 0.4          # v2.4: share of each country's S1 in extra held-out train regions
                                     # (ber features-hold; stage 1 trains without them)
-    hold_by: str = "query_region"   # which queries belong to a hold region: "query_region" (v2.4: the
-                                    # query's own region) | "owner" (v2.5: the owner's region if
-                                    # matched, as in the val split; complete hold S1 groups)
-    train_sides: list[str] = field(default_factory=lambda: ["val"])  # stage-2 training pairs:
+    train_sides: list[str] = field(default_factory=lambda: ["val", "hold"])  # stage-2 training pairs:
                                     # val and/or hold; a side not trained on is scored by the fold mean
-    train_complete: bool = False    # v2.5: train only on pairs whose S1 group is complete (S1 in a val
+    train_complete: bool = True     # v2.5: train only on pairs whose S1 group is complete (S1 in a val
                                     # or hold region); the others are still scored
-    rounds: int = 1                 # v2.5: 2 = a second stage-2 round whose group features are
-                                    # recomputed from the first round's (out-of-fold) p2
-    norm_complete: bool = False     # domain_norm: S1-group counts take their training scale from
+    norm_complete: bool = True      # domain_norm: S1-group counts take their training scale from
                                     # complete-group pairs only (as every test group is complete)
-    bags: int = 1                   # > 1: repeat the cross-fit with other fold splits and seeds;
-                                    # val = mean of the bags' out-of-fold p2, test = mean of all models
-    learner: str = "lgb"            # lgb | xgb (XGBoost, GPU) | both (mean of the two p)
-    extra_scores: str | None = None  # "crossenc" (that stage's scores) or a dir with val/hold/test_<country>.parquet
+    extra_scores: str | None = "crossenc"  # "crossenc" (that stage's scores) or a dir with val/hold/test_<country>.parquet
                                     # (q_id, s1_id, ce) in stage 2's row order: an external pair score
                                     # (cross-encoder logit) + its query / S1-group context as features
     learning_rate: float = 0.05
@@ -172,8 +161,7 @@ class DecideConfig:
     min_p: float | None = None      # expected_f: drop p below this; None = best on val sweep
     empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
     tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
-    prior_shift: str = "none"       # "none" | "segment_em" (EM per lookalike segment) |
-                                    # "anchor" (per name-change kind, from the hn_rel mixture)
+    prior_shift: str = "anchor"     # "none" | "anchor" (per name-change kind, from the hn_rel mixture)
     anchor_min_ratio: float = 2.0   # anchor: correct a kind only if its de-biased odds ratio is beyond this
     anchor_min_pairs: int = 2000    # anchor: ... and it has at least this many same-street pairs
     anchor_max_ratio: float = 6.0   # anchor: cap on the applied odds ratio

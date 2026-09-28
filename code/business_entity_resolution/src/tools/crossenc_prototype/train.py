@@ -17,9 +17,10 @@ from sklearn.metrics import log_loss, roc_auc_score
 from transformers import (AutoModelForSequenceClassification, AutoTokenizer,
                           get_linear_schedule_with_warmup)
 
-BASE = Path(r"D:\aml\models\ms-marco-MiniLM-L-6-v2")
-DATA = Path(r"D:\aml\ce\data")
-EPOCHS, OUT = 2, Path(r"D:\aml\models\ce_v1")  # overridden by argv in main()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import ARTIFACTS, BASE_MODEL as BASE, DATA, MODEL, RUN_RERANK  # noqa: E402
+
+EPOCHS, OUT = 2, MODEL  # overridden by argv in main()
 MAX_LEN, BS, LR, WD, WARMUP, SEED = 64, 256, 5e-5, 0.01, 0.05, 42
 N_VAL = 200_000
 
@@ -51,7 +52,7 @@ def batches(ids, tt, ln, idx, bs, dev):
 @torch.no_grad()
 def predict(model, ids, tt, ln, dev, bs=512):
     """Logits in the input order; batches of similar length; halves the batch on a CUDA
-    out-of-memory error (the laptop GPU has 6 GB, shared with training state)."""
+    out-of-memory error (GPU memory is shared with the training state)."""
     model.eval()
     torch.cuda.empty_cache()
     out = np.empty(len(ids), dtype=np.float32)
@@ -93,7 +94,7 @@ def main():
     log(f"lengths: median {np.median(ln):.0f}, 99% {np.quantile(ln, 0.99):.0f}, "
         f"truncated {(ln >= MAX_LEN).mean():.4f}")
     va = pd.read_parquet(DATA / "val.parquet", columns=["q_text", "s_text", "y"])
-    sv = pd.read_parquet(Path(r"D:\aml\amazon-ml-challenge\artifacts\v25b\rerank\scores_val.parquet"),
+    sv = pd.read_parquet(ARTIFACTS / RUN_RERANK / "rerank" / "scores_val.parquet",
                          columns=["y", "p", "p1"])
     assert (sv.y.to_numpy() == va.y.to_numpy()).all()
     vi = np.sort(rng.choice(len(va), size=min(N_VAL, len(va)), replace=False))

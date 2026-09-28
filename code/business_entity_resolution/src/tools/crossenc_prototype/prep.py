@@ -2,11 +2,11 @@
 
 (1) Training pairs from stage 1's own regions: train-side records outside the hold regions
     and NOT in stage 1's training sample (stable_unit(q_id, seed + 4) >= 0.14), so their p1
-    (v25 stage-1 model) is out-of-sample; kept at p1 >= 0.001, exactly how stage 2's inputs
+    (stage-1 model) is out-of-sample; kept at p1 >= 0.001, exactly how stage 2's inputs
     are chosen. Stage 2 trains on val + hold and is applied to test, so a cross-encoder
     trained here is out-of-sample on every pair stage 2 ever sees.
-(2) The stage-2 pairs to score: val and hold (v25b rerank outputs, in their row order) and
-    test (v25b rerank scores_test parts, one per country, in their row order).
+(2) The stage-2 pairs to score: val and hold (rerank outputs of a run without the
+    cross-encoder, in their row order) and test (its scores_test parts, one per country).
 Text of a record = normalised name core + legal form " ; " normalised address + region.
 """
 import sys
@@ -21,11 +21,12 @@ import pyarrow.compute as pc
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 
-sys.path.insert(0, r"D:\aml\amazon-ml-challenge\code\business_entity_resolution\src")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import ARTIFACTS as A, DATA as OUT, RUN_FEATURES, RUN_RERANK, RUN_SCORER, SRC  # noqa: E402
+
+sys.path.insert(0, str(SRC))
 from ber.eval.split import stable_unit  # noqa: E402
 
-A = Path(r"D:\aml\amazon-ml-challenge\artifacts")
-OUT = Path(r"D:\aml\ce\data")
 OUT.mkdir(parents=True, exist_ok=True)
 SEED, TRAIN_FRAC, MIN_P1 = 42, 0.14, 0.001
 
@@ -36,7 +37,7 @@ def log(msg):
 
 def texts(split: str, ids) -> pd.Series:
     """entity_id -> "name core legal ; address region" for the given ids."""
-    d = ds.dataset(A / "v2" / "normalize" / f"records_{split}", format="parquet")
+    d = ds.dataset(A / RUN_FEATURES / "normalize" / f"records_{split}", format="parquet")
     arr = pa.array(sorted(set(ids)), type=pa.large_string())
     t = d.to_table(columns=["entity_id", "name_core", "name_legal", "addr_norm", "region"],
                    filter=ds.field("entity_id").isin(arr))
@@ -56,13 +57,13 @@ def with_text(pairs: pd.DataFrame, split: str) -> pd.DataFrame:
 
 
 def train_pairs() -> pd.DataFrame:
-    model = lgb.Booster(model_file=str(A / "v25" / "scorer" / "model.txt"))
+    model = lgb.Booster(model_file=str(A / RUN_SCORER / "scorer" / "model.txt"))
     feats = model.feature_name()
-    hold = pd.read_parquet(A / "v25" / "features_hold" / "hold_queries.parquet",
+    hold = pd.read_parquet(A / RUN_SCORER / "features_hold" / "hold_queries.parquet",
                            columns=["entity_id"]).entity_id.astype(str)
     hold = pa.array(sorted(hold), type=pa.large_string())
     rows, n_seen = [], 0
-    files = sorted((A / "v2" / "features" / "features_train").glob("*.parquet"))
+    files = sorted((A / RUN_FEATURES / "features" / "features_train").glob("*.parquet"))
     for i, f in enumerate(files):
         t = pq.read_table(f, columns=["q_id", "side"])
         m = pc.equal(t.column("side"), "train").to_numpy(zero_copy_only=False)
@@ -98,11 +99,11 @@ def main():
     log(f"wrote train.parquet {len(tr):,}")
     del tr
     for side in ("val", "hold"):
-        p = pd.read_parquet(A / "v25b" / "rerank" / f"scores_{side}.parquet",
+        p = pd.read_parquet(A / RUN_RERANK / "rerank" / f"scores_{side}.parquet",
                             columns=["q_id", "s1_id", "y"]).astype({"q_id": str, "s1_id": str})
         with_text(p, "train").to_parquet(OUT / f"{side}.parquet", index=False)
         log(f"wrote {side}.parquet {len(p):,}")
-    for f in sorted((A / "v25b" / "rerank" / "scores_test").glob("part-*.parquet")):
+    for f in sorted((A / RUN_RERANK / "rerank" / "scores_test").glob("part-*.parquet")):
         p = pd.read_parquet(f, columns=["q_id", "s1_id"]).astype({"q_id": str, "s1_id": str})
         with_text(p, "test").to_parquet(OUT / f"test_{f.stem.split('-', 1)[1]}.parquet", index=False)
         log(f"wrote test {f.stem} {len(p):,}")

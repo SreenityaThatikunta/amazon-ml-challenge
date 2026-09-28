@@ -1,8 +1,8 @@
-# Pinned dependencies of the whole pipeline (tested with Python 3.12 on macOS arm64 and
-# 3.13 on Windows 11). Licenses verified with src/tools/check_licenses.py.
+# Pinned dependencies of the whole pipeline (tested with Python 3.12 and 3.13).
+# Licenses verified with src/tools/check_licenses.py.
 #
-# torch: the extra index below provides the CUDA 12.6 build (used for our runs, needs an
-# NVIDIA GPU for reasonable speed); where no CUDA build exists (macOS), pip installs the
+# torch: the extra index below provides the CUDA 12.6 build (needs an NVIDIA GPU for
+# reasonable speed); where no CUDA build exists (macOS), pip installs the
 # CPU build of the same version from PyPI.
 --extra-index-url https://download.pytorch.org/whl/cu126
 
@@ -27,4 +27,3 @@ pytest==9.1.1
 # Optional, not needed for the submitted configuration:
 #   GPU top-k retrieval (candidates.device: auto uses it when present; needs an NVIDIA GPU
 #   and the CUDA 13 toolkit):  cupy-cuda13x==14.2.0  cuda-pathfinder==1.8.2  (MIT)
-#   rerank.learner: xgb | both:  xgboost==3.4.1  (Apache-2.0)

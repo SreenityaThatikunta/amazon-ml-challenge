@@ -159,7 +159,7 @@ def _batches(ids, tt, ln, idx, bs, dev):
 
 def predict(model, ids, tt, ln, dev, bs: int, log=None) -> np.ndarray:
     """Logits in input order; batches of similar length; the batch is halved on a CUDA
-    out-of-memory error (a 6 GB laptop GPU)."""
+    out-of-memory error."""
     import torch
     model.eval()
     torch.cuda.empty_cache()
