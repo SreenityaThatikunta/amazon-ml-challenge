@@ -16,7 +16,7 @@ architectures go on separate branches.
 ## 0. Where we left off (do this first)
 
 **Update 2026-09-28 ~22:30 IST: the team's final zip was reviewed and synced (e1d5796),
-writeups rewritten + 5 fixes (486a84f), zip rebuilt from the repo (73 files, identical to
+writeups = team text + 5 fixes (60d1b8d; the Gen-Z voice was dropped), zip rebuilt (73 files, identical to
 the team's except README / documentation / prototype README).** Organisers' email: code +
 methodology submission for the Top-1000 teams due **29 Sep 10:00 AM**. See progress.md
 "Team's final zip reviewed".

@@ -1023,3 +1023,7 @@ trained", "teammate baseline" → Rudraksha's, section 5 empty-address figures a
 the v2.6 analysis (57 % kept, ~60 % of misses). New zip `pootato_submission.zip` (73
 files): identical to the team's except the three writeups; structure checks PASS; TSVs =
 v2.7_crossenc; bare extraction 134 tests pass.
+Follow-up (2026-09-28, commit 60d1b8d): the user dropped the Gen-Z voice. The writeups are
+the team's plain text again (e1d5796) plus only the five fixes (10 lines); the prototype
+README is the team's, unchanged. Zip rebuilt: differs from the team's zip only in the README
+and Documentation_template.md; structure checks PASS; bare extraction 134 tests pass.
