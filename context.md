@@ -15,6 +15,12 @@ architectures go on separate branches.
 
 ## 0. Where we left off (do this first)
 
+**Update 2026-09-28 ~22:30 IST: the team's final zip was reviewed and synced (e1d5796),
+writeups rewritten + 5 fixes (486a84f), zip rebuilt from the repo (73 files, identical to
+the team's except README / documentation / prototype README).** Organisers' email: code +
+methodology submission for the Top-1000 teams due **29 Sep 10:00 AM**. See progress.md
+"Team's final zip reviewed".
+
 **Update ~19:55 IST: package layout fixed to the brief (commit 5889cc5).** The zip's
 `code/business_entity_resolution/` now holds exactly `src/`, `README.md`, `requirements.txt`
 (configs in `src/ber/configs`, tests in `src/tests`, tools in `src/tools`; run as `python -m

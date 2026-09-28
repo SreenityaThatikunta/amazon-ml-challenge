@@ -1002,3 +1002,24 @@ and prototype README updated. Zip (73 files) checked entry by entry against the 
 (all PASS) and from a bare extraction (139 tests pass without install; `python -m ber`
 config/help OK). Packaging commands now: `python
 code/business_entity_resolution/src/tools/make_submission_zip.py --team pootato`.
+
+**Team's final zip reviewed (2026-09-28 ~22:30; commits e1d5796, 486a84f).** The team
+prepared `Downloads\pootato_submission.zip` for the organisers' code submission (deadline
+from their email: 29 Sep, 10:00 AM). It differed from our 5889cc5 zip in 24 files (34 more
+differ only in line endings): unused options removed (rerank rounds/bags/XGBoost/weights,
+segment-EM prior shift incl. decide/prior_shift.py, scorer OOF + model_from_run,
+rerank.hold_by → owner rule hard-wired, unused io/normalize helpers), dataclass defaults
+set to the submitted values, crossenc_prototype scripts made path-configurable
+(paths.py; logic unchanged), docs rewritten with the other branches' history. Review: the
+resolved default config differs only by the removed keys; hold_queries keeps the owner
+rule; LightGBM seed unchanged (_params sets it); the anchor needs only hn_rel/a_tsr; no
+references to removed names (AST check); 134 tests pass; all modules import; mermaid
+renders; the new claims match the logs (main/v3/our progress). Synced into the repo
+verbatim (e1d5796). Then (486a84f) the writeups were rewritten in a Gen-Z voice (numbers
+checked by script) with five fixes: **Python 3.12/3.13, not 3.11** (numpy 2.5.3 and scipy
+1.18.1 require >= 3.12: install broke on 3.11 as documented), E31 (~half of French generic
+swaps real) reconciled with the anchor's π = 0.81, the LLM selector "designed, never
+trained", "teammate baseline" → Rudraksha's, section 5 empty-address figures aligned with
+the v2.6 analysis (57 % kept, ~60 % of misses). New zip `pootato_submission.zip` (73
+files): identical to the team's except the three writeups; structure checks PASS; TSVs =
+v2.7_crossenc; bare extraction 134 tests pass.
