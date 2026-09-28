@@ -1,16 +1,16 @@
-# Cross-encoder prototype scripts (the receipts for the submitted file)
+# Cross-encoder prototype scripts (where the submitted file came from)
 
-These three scripts fine-tuned and scored the cross-encoder behind the submitted `output/matching_results.tsv` (v2.7, first run, 2026-09-27; public leaderboard 0.98316). The training logic is untouched. The only changes since that run: our machine's hard-coded file paths are now configurable (`paths.py`), and one comment got edited.
+We used these three scripts to fine-tune and score the cross-encoder behind the submitted `output/matching_results.tsv` (v2.7, first run, 2026-09-27; public leaderboard 0.98316). The training logic is unchanged. We only replaced our machine's file paths with configurable ones (`paths.py`) and edited one comment.
 
-Everything after that (re-ranking, the decision, writing the submission) ran on this package's own code (`python -m ber rerank / decide / submit`).
+Everything after that (re-ranking, the decision and writing the submission) ran with this package's own code (`python -m ber rerank / decide / submit`).
 
 | Script | What it does |
 |---|---|
-| `prep.py` | Picks the training pairs: training-side records outside the held-out regions that stage 1 didn't train on (`stable_unit(q_id, seed + 4) >= 0.14`), kept at p1 ≥ 0.001. That's 982,265 pairs, 68 % of them true. It also writes the record texts (`name core + legal ; address + region`) for those pairs and for every stage-2 pair (val, hold, test), in stage 2's row order |
+| `prep.py` | Picks the training pairs: training-side records outside the held-out regions that stage 1 didn't train on (`stable_unit(q_id, seed + 4) >= 0.14`), kept at p1 ≥ 0.001. That gives 982,265 pairs, 68 % of them true. It also writes the record texts (`name core + legal ; address + region`) for those pairs and for every stage-2 pair (val, hold, test), in stage 2's row order |
 | `train.py` | Fine-tunes `cross-encoder/ms-marco-MiniLM-L-6-v2` (Apache-2.0, 22.7 M parameters): 2 epochs, batch 256, AdamW at lr 5e-5, weight decay 0.01, 5 % linear warm-up, fp16, at most 64 tokens, binary cross-entropy on the match label |
 | `score.py` | Scores every stage-2 pair and writes `<out>/{val,hold,test_France,test_India,test_US}.parquet` (q_id, s1_id, ce) |
 
-**Running them yourself.** Run everything from the project root (the directory with `dataset/`). `paths.py` decides where the scripts read and write, and every location can be overridden with an environment variable:
+**Running them yourself.** Run everything from the project root (the directory with `dataset/`). `paths.py` sets where the scripts read and write; each location can be changed with an environment variable:
 
 | Variable | Default | What it is |
 |---|---|---|
@@ -44,8 +44,8 @@ python -m ber submit --run main --set rerank.extra_scores=$S
 ```
 
 **How they relate to the pipeline's `crossenc` stage** (`src/ber/crossenc/stage.py`):
-- **Same logic, just packaged as a stage.** Pair selection is the same (982,265 training pairs, 68.0 % true, in both), and so are the text, the model and the hyper-parameters. The default config runs it (`rerank.extra_scores: crossenc`).
-- **One tiny difference.** `train.py` draws a 200,000-pair validation sample from its random generator before training, just to print an AUC at the end of each epoch. That shuffles its batch order.
+- **It's the same logic, packaged as a stage.** Pair selection is the same (982,265 training pairs, 68.0 % true, in both), and so are the text, the model and the hyper-parameters. The default config runs it (`rerank.extra_scores: crossenc`).
+- **There's one small difference.** `train.py` draws a 200,000-pair validation sample from its random generator before training, just to print an AUC at the end of each epoch. That changes its batch order.
 - **Every run comes out slightly different anyway,** because GPU fine-tuning isn't bit-for-bit reproducible:
 
   | Run | Validation macro F0.5 | Public LB |
@@ -53,4 +53,4 @@ python -m ber submit --run main --set rerank.extra_scores=$S
   | **These scripts (submitted)** | **0.99078** | **0.98316** |
   | `crossenc` stage re-run | 0.99060 | 0.982681 |
 
-- **Why we submitted this run:** it's better on the labelled validation set (a paired per-entity difference of +0.00018, z ≈ 3.9), and the public leaderboard agrees. Not a coin flip.
+- **Why we submitted this run:** it's better on the labelled validation set (a paired per-entity difference of +0.00018, z ≈ 3.9), and the public leaderboard agrees.
