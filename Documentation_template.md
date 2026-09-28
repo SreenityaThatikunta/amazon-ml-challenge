@@ -12,21 +12,21 @@
 
 ## 1. Executive Summary
 
-Our solution is a cascade that never has to compare every record with every entity. In order, it does six things:
+Comparing every record with every entity? That would take forever, so we don't. Our solution is a cascade that does six things, in order:
 
-1. We clean up names and addresses, targeting the specific kinds of noise we found in the data.
+1. We clean up names and addresses, going after the specific kinds of noise we actually found in the data.
 2. We pull candidates with character-trigram TF-IDF, searching only near the record's region.
 3. A LightGBM pair scorer throws out almost all of those candidates. What's left is 5.53 per S1, and 99.97 % of the true pairs we retrieved are still there.
 4. A small fine-tuned transformer (a MiniLM cross-encoder) reads each remaining pair side by side.
-5. A second LightGBM re-scores every candidate knowing who else is competing for the same entity, and how strongly.
+5. A second LightGBM re-scores every candidate knowing who else is competing for the same entity, and how hard.
 6. For each entity, we keep the set of records that gives the best expected F0.5.
 
-A few ideas made the biggest difference:
+The ideas that actually moved the needle:
 
-- **Our first classifier is also our blocker.** Stage 1 is the first matcher and the last filter at once. It takes about 24 TF-IDF candidates per record down to roughly one, and loses almost nothing on the way.
-- **Looking at the competition.** Stage 2 can see every record that claims the same entity, which a model scoring one pair at a time can't. This was our largest single gain.
+- **Our first classifier is also our blocker.** Stage 1 is the first matcher and the last filter at the same time. It takes about 24 TF-IDF candidates per record down to roughly one, and loses almost nothing on the way. Two jobs, one model.
+- **Looking at the competition.** Stage 2 can see every record that claims the same entity, which a model scoring one pair at a time just can't. This was our single biggest W.
 - **Training on data that looks like the test set.** The re-ranker learns from whole held-out states with every entity's records present. Features that depend on how crowded the data is get rescaled per country and split.
-- **Using a weak model as a hint.** On its own, the transformer is clearly worse (AUC 0.975 against 0.999). But how much it prefers one candidate over the others turned out to be a very useful signal, worth +0.0016 on validation and +0.0008 on the leaderboard.
+- **Using a weak model as a hint.** On its own, the transformer is clearly worse (AUC 0.975 against 0.999). But how much it prefers one candidate over the others turned out to be a super useful signal, worth +0.0016 on validation and +0.0008 on the leaderboard.
 - **Handling France without labels.** France has a kind of name change the US and India don't. We estimate how often it's a real copy by looking at house numbers in the unlabelled test data.
 
 ---
@@ -35,7 +35,7 @@ A few ideas made the biggest difference:
 
 ### 2.1 Problem Analysis
 
-We spent a good amount of time in the raw training and test files before building anything. These were the findings that shaped the design:
+Before building anything, we spent a lot of time just staring at the raw training and test files (highly recommend). These findings shaped the whole design:
 
 | Finding | Evidence | What we did about it |
 |---|---|---|
@@ -45,7 +45,7 @@ We spent a good amount of time in the raw training and test files before buildin
 | The test set isn't shaped like training | France only appears in test. Test also has ~5.7 S2/S3 records per S1 against 4.7 in training (≈ 40 % unmatched vs 26 %) | Validate on held-out regions and rescale features per split |
 | France has its own kind of name noise | At the same address, the *generic* word gets swapped (`Ski College SARL` → `Ski Comite SARL`). That's 6.6 % of French same-street pairs, against 0.1 % in the US and 1.5 % in India | A prior correction that doesn't need labels (section 4.5) |
 
-On the name side, true pairs showed:
+On the name side, true pairs had it all:
 - legal-form swaps and typos in legal words (`PRlVATE`, `Priavte`);
 - OCR-style digit swaps (`Hea1th 5ervices`) and plain letter typos (`Mitllls`);
 - words in a different order, or doubled;
@@ -53,24 +53,24 @@ On the name side, true pairs showed:
 - ids and phone numbers pasted into the name (`(ID: 63317)`, `- 9334025793`), in about 1 % of records;
 - **filler words** that depend on the country (US `Riverside/Holdings`, India `Smt/Shri/Infratech`, France `Participations/Holding`);
 - names written in Indian scripts (23 % of Indian S2 names);
-- **made-up brand names replacing the whole name** (`Grand Physical Therapy` → `Jaxdrexquo`), in 1.6 % of true pairs.
+- **made-up brand names replacing the whole name** (`Grand Physical Therapy` → `Jaxdrexquo`), in 1.6 % of true pairs. Yes, really.
 
-Addresses were messy in their own ways:
+Addresses were chaotic in their own ways:
 - abbreviations (Rd/Road, R./Rue);
 - the same state written as a name, a code, an Indian-script name or a French département;
 - parts reordered or dropped, and zero padding;
 - house numbers cut short (7622 → 762) or with a digit typo (394 → 894);
 - in India, a **fake house number stuck on the front** (`H.NO 937 33, …`);
-- 4 % of S2/S3 addresses were simply empty.
+- 4 % of S2/S3 addresses were just empty.
 
 ### 2.2 Solution Strategy
 
 **Approach Type:** a hybrid. Blocking and a learned filter, then a transformer cross-encoder, a group-aware gradient-boosted re-ranker, and an expected-F0.5 decision at the end.
 
-**Core Innovation:** there are three pieces that make it work.
+**Core Innovation:** three pieces make it work.
 - The stage-1 classifier doubles as the final blocking filter, so the candidate set stays tiny without costing us recall.
 - The stage-2 re-ranker is cross-fitted on *complete* S1 groups, so it can weigh competing claims on the same entity.
-- The transformer isn't asked to decide anything. It only tells the re-ranker how much it prefers each candidate over the alternatives.
+- The transformer isn't asked to decide anything. It only tells the re-ranker how much it prefers each candidate over the alternatives. Hype man, not decision maker.
 
 Here's how the stages fit together:
 
@@ -108,7 +108,7 @@ flowchart TB
 
 **How we validated.** We never split by random records. We split by whole US and Indian states, because lookalikes sit at nearby addresses, and splitting by state keeps them on the same side as the entities they copy.
 
-We also score every validation record. So our validation F0.5 already includes blocking losses, entities with no matches and every stage of the pipeline, the same as the leaderboard does.
+We also score every single validation record. So our validation F0.5 already includes blocking losses, entities with no matches and every stage of the pipeline, same as the leaderboard. No cherry-picking.
 
 | Data part | Share of S1 | What it's used for |
 |---|---|---|
@@ -120,17 +120,17 @@ We also score every validation record. So our validation F0.5 already includes b
 
 ## 3. Candidate Generation (Blocking)
 
-Everything starts with normalisation (`src/ber/normalize/`), because retrieval is only as good as the text it searches.
+Everything starts with normalisation (`src/ber/normalize/`), because retrieval is only as good as the text it searches. Garbage in, garbage out.
 
 - **Names.**
   - We strip Latin accents, turn `&`, `+` and `et` into `and`, and collapse `L.L.C.` to `llc`.
-  - We split out aliases, unwrap domains, and drop ids and phone numbers that were pasted in.
+  - We split out aliases, unwrap domains, and drop ids and phone numbers that got pasted in.
   - OCR-style digits inside words go back to letters.
-  - Legal forms get a canonical spelling and move out of the core name. We tolerate one typo in long legal words.
-  - Stopwords, honorifics and doubled words go.
+  - Legal forms get one canonical spelling and move out of the core name. We tolerate one typo in long legal words.
+  - Stopwords, honorifics and doubled words get dropped.
 - **Indian-script names.**
   - We learn a dictionary of 1,164 words from training pairs. For anything else, we romanise by rule and snap the result to the closest S1 word by consonant skeleton.
-  - On held-out tokens this gets 95.8 % exactly right. Rules alone manage 23 %.
+  - On held-out tokens this gets 95.8 % exactly right. Rules alone only manage 23 %.
 - **Addresses.**
   - We drop placeholders and zero padding, and spell street types the same way within each country.
   - States, state codes, Indian-script states and French régions and départements go into a separate `region` field.
@@ -138,7 +138,7 @@ Everything starts with normalisation (`src/ber/normalize/`), because retrieval i
 
 Blocking then happens in three layers:
 - **TF-IDF indexes.** Each country gets three character-trigram indexes: one on the core name, one on the address words (in any order), and one on both. A record takes the union of the top 10 from each. If its address is empty, it takes the top 30 by name instead.
-- **Region blocking.** A record only searches the S1 in its region's *neighbourhood*, which we learn from training pairs. For example, Andhra Pradesh and Telangana are neighbours, since addresses often mix them up. Records with no recognisable region search the whole country.
+- **Region blocking.** A record only searches the S1 in its region's *neighbourhood*, which we learn from training pairs. For example, Andhra Pradesh and Telangana count as neighbours, since addresses mix them up all the time. Records with no recognisable region search the whole country.
 - **The learned filter.** The stage-1 pair scorer (section 4) keeps only pairs with p1 ≥ 0.001. This is the last cut before the final model, and whatever survives is exactly what's in `candidate_pairs.tsv`.
 
 **How many candidate pairs that leaves on test:**
@@ -149,7 +149,7 @@ Blocking then happens in three layers:
 | TF-IDF top-k union | 243,753,102 | 24.4 | |
 | After the stage-1 filter = **`candidate_pairs.tsv`** | **9,582,745** | **0.96** | **5.53** |
 
-An S1 has 3.4 true matches on average. So 5.53 candidates per S1 is not far from the smallest set that could possibly work.
+An S1 has 3.4 true matches on average, so 5.53 candidates per S1 is pretty close to the smallest set that could possibly work.
 
 **Making sure we didn't lose true matches.** We tracked recall on the validation side after every step:
 - TF-IDF retrieval finds 99.05 % of true pairs (99.3 % in the US, 98.2–99.2 % in India).
@@ -180,17 +180,17 @@ On scale, the pipeline only ever holds one country and one region block in memor
 | **Address** | equality; token-set, ratio and partial ratio; whether the regions agree, conflict or are missing; the **house-number relation** (equal / padded / truncated / shifted / different) and log difference; overlap of number sets; **whether the S1 house number appears anywhere among the record's numbers**; digit edit distance; **the position of the first digit that differs**; PO box and PMB flags; IDF-weighted overlap of address words |
 | **Retrieval context** | the three TF-IDF cosines and ranks. For 8 key similarities we also add the margin over the record's best *other* candidate, the gap to its best, and the rank. Then candidate counts per record and per S1 |
 
-The model itself is LightGBM with 127 leaves and a learning rate of 0.05. It trains on 3.6 M pairs, stops early at iteration 330, and reaches a validation AUC of 0.99994.
+The model itself is LightGBM with 127 leaves and a learning rate of 0.05. It trains on 3.6 M pairs, stops early at iteration 330, and hits a validation AUC of 0.99994.
 
 ### 4.2 Cross-encoder: the transformer's second opinion (`src/ber/crossenc/`)
 
 - **What it is.** We use `cross-encoder/ms-marco-MiniLM-L-6-v2`: 6 layers, 22.7 M parameters, Apache-2.0. Each record becomes one short line, `name core + legal form ; address + region`, and a pair is capped at 64 word pieces.
 - **How we fine-tune it.** Binary cross-entropy with AdamW for 2 epochs, batch size 256, learning rate 5e-5 with a 5 % warm-up, in fp16. That takes about 20 minutes on a single GPU.
 - **What it trains on.** 982,265 pairs (68 % true) from stage 1's own regions, taken from the records stage 1 did *not* train on. It never sees a validation or held-out label, so every score it gives on validation, held-out and test pairs is out-of-sample.
-- **Why it's weak on its own.** Its AUC is 0.975, against 0.999 for the cascade.
+- **Why it's mid on its own.** Its AUC is 0.975, against 0.999 for the cascade.
   - It memorises street and city names from the training regions, and those don't carry over to new regions.
-  - It sees house numbers as word pieces (`848` vs `843`), and that's exactly where the lookalikes differ.
-- **Why it still helps.** We don't give stage 2 just its raw score. We also give how far that score is ahead of the record's other candidates and the S1's other records, and where it ranks (`ce`, `ce_q_margin`, `ce_q_rank`, `ce_s_margin`, `ce_s_rank`). Those features end up 4th, 5th and 9th of 132 by gain.
+  - It sees house numbers as word pieces (`848` vs `843`), which is exactly where the lookalikes differ. Unlucky.
+- **Why it still slaps as a hint.** We don't give stage 2 just its raw score. We also give how far that score is ahead of the record's other candidates and the S1's other records, and where it ranks (`ce`, `ce_q_margin`, `ce_q_rank`, `ce_s_margin`, `ce_s_rank`). Those features end up 4th, 5th and 9th of 132 by gain.
 
 ### 4.3 Stage 2: the group-aware re-ranker (132 features)
 
@@ -202,7 +202,7 @@ Stage 2 sees everything stage 1 saw, and then some:
   - the best, sum and count of competing p1 scores, overall and within the record's own source;
   - **claims**, meaning records whose top pick is this S1, how many of them we'd expect to be real, and the strongest competing claim.
 
-> This S1 context is what tells a true copy apart from the lookalike sitting next to it. Both score high against the same S1, but only one of them should win.
+> This S1 context is what tells a true copy apart from the lookalike sitting right next to it. Both score high against the same S1, but only one of them should win.
 
 **Making training look like test.** Most of our late gains came from getting this right:
 - **Train on many regions.**
@@ -227,7 +227,7 @@ The re-ranker is LightGBM with 63 leaves, **cross-fitted over 4 folds** grouped 
 | Cross-encoder | MiniLM-L6 (Apache-2.0) | 22.7 M params | 982 k out-of-sample pairs from the train regions |
 | Stage 2 | LightGBM binary × 4 folds (63 leaves, lr 0.05) | up to 2,000 trees each | the complete-group pairs among 1.11 M validation + 4.28 M hold pairs |
 
-The cross-encoder is our only pretrained model, and at 22.7 M parameters it's far under the 8 B limit.
+The cross-encoder is our only pretrained model, and at 22.7 M parameters it's way under the 8 B limit.
 
 ### 4.5 Decision and threshold selection
 
@@ -244,17 +244,17 @@ The cross-encoder is our only pretrained model, and at 22.7 M parameters it's fa
 - **The estimate.** That makes each name-change kind's house-number histogram a mix of the "real copy" and "lookalike" profiles. A least-squares fit gives us its share of real copies, π.
 - **When it kicks in.** Only when a kind has at least 2,000 pairs and its de-biased odds ratio, odds(π) / odds(mean p2), is off by more than 2×. We cap the ratio at 6.
 - **How we tested it.**
-  - Across eight simulated label shifts where the model stays calibrated, it never fired.
+  - Across eight simulated label shifts where the model stays calibrated, it never fired. No false alarms.
   - When we deliberately gave one kind the wrong prior, it won back 96–99 % of the lost F0.5.
-- **What happened on test.** It fired **only for France's generic-word swaps**, where π = 0.81 against a mean p2 of 0.57 (odds × 2.7). Every US and India kind stayed under the threshold.
+- **What happened on test.** It fired **only for France's generic-word swaps**, where π = 0.81 against a mean p2 of 0.57 (odds × 2.7). Every US and India kind stayed under the threshold, which is exactly what we wanted.
 
 ### 4.6 Which run we submitted
 
 - **Where the file came from.** It's the first run of the final configuration.
-  - Its cross-encoder was fine-tuned with our prototype scripts, which are in `src/tools/crossenc_prototype/`. The training logic is unchanged; we only replaced our machine's file paths with configurable ones and edited one comment.
+  - Its cross-encoder was fine-tuned with our prototype scripts, which are in `src/tools/crossenc_prototype/`. The training logic is unchanged; we only swapped our machine's file paths for configurable ones and edited one comment.
   - Stages 2–4 ran with this package.
   - The pipeline's own `crossenc` stage does the same thing: same pair selection, text, model and hyper-parameters.
-- **Why not a re-run.** GPU fine-tuning isn't bit-for-bit reproducible, so re-running it gives a slightly different result:
+- **Why not just use a re-run?** GPU fine-tuning isn't bit-for-bit reproducible, so re-running it gives a slightly different result:
 
   | Run | Validation F0.5 | Public LB |
   |---|---:|---:|
@@ -305,11 +305,11 @@ The cross-encoder is our only pretrained model, and at 22.7 M parameters it's fa
 On the hard pairs, the transformer alone is weak (AUC 0.683). Fed into stage 2, though, it lifts them from 0.862 to 0.893. What it adds is *relative*: how much more it likes this pair than the competitors. It also cut down false links on entities with no matches (0.98892 → 0.99385 on the clean subset).
 
 **Where we still make wrong merges.** In our error analysis of the 25-feature re-ranker, 2,765 of 752,513 predicted links were wrong:
-- **1,842 were lookalikes**: same address, with one letter changed in the name or the house number shifted by a few units. Many of them look exactly like a true pair with a digit typo.
+- **1,842 were lookalikes**: same address, with one letter changed in the name or the house number shifted by a few units. Many of them look exactly like a true pair with a digit typo, so honestly, fair.
 - **923 were same-name neighbours**: records of a different S1 with the same generic name at a nearby address.
 
 **Where we still miss matches.** We miss 2.6 % of true pairs:
-- **Empty addresses** cause more than half of the misses. The 4 % of records with no address lose about a third of their true pairs, because with half of all S1 names shared, a name alone often can't decide.
+- **Empty addresses** are the big one. In our v2.6 error analysis, the 4 % of records with no address kept only 57 % of their true pairs and caused about 60 % of all misses. With half of all S1 names shared, a name alone often can't decide.
 - **Noise that looks like a lookalike**, such as a house number off by two with the city renamed.
 - **Made-up brand names** at an address shared by several S1.
 - **Retrieval ties** among dozens of S1 with the same name.
@@ -335,7 +335,7 @@ The gap between validation and the leaderboard is what pushed us to dig deeper:
 
 ## 6. Conclusion
 
-- **Measuring the noise paid off.** We found fillers, brand names, prepended house numbers and pasted-in ids by reading the raw data, and turning each into a feature gave the pair model much better evidence.
+- **Measuring the noise paid off.** We found fillers, brand names, prepended house numbers and pasted-in ids by actually reading the raw data, and turning each one into a feature gave the pair model way better evidence.
 - **Context was the biggest win.** Letting a second model see **who else is competing for each entity** beat every improvement we made to scoring pairs one at a time.
 - **Small candidate set, almost no lost recall.** The cascade keeps about one S1 per record and still holds on to 99.97 % of the true pairs we retrieved.
 - **The late gains came from making training look like test.** That meant many held-out regions, complete S1 groups, and feature scales taken from the same kind of pairs we see at test time.
@@ -344,8 +344,8 @@ The gap between validation and the leaderboard is what pushed us to dig deeper:
 **What we learned** (the full experiment log is in Appendix C):
 1. **Validation gains didn't predict the leaderboard, but fixing the shift did.** One change gained +0.007 on validation and *lost* 0.003 on the LB. Two fixes that did nothing on validation gained +0.003 and +0.0006.
 2. **Context beats scoring pairs in isolation.** Re-ranking with group context added between +0.004 and +0.008 every time we tried it.
-3. **Synthetic data can fool you.** A synthetic French training set improved our French proxy by +0.09, and the leaderboard went down. Pseudo-labels that were 99.8 % correct didn't help either.
-4. **At this level, tuning is noise.** Tree caps, regularisation, bagging, filter levels and extra stacking rounds all landed within ±0.0002, or made things worse.
+3. **Synthetic data can gaslight you.** A synthetic French training set improved our French proxy by +0.09, and the leaderboard went down. Pseudo-labels that were 99.8 % correct didn't help either.
+4. **At this level, tuning is basically noise.** Tree caps, regularisation, bagging, filter levels and extra stacking rounds all landed within ±0.0002, or made things worse.
 
 ---
 
@@ -353,7 +353,7 @@ The gap between validation and the leaderboard is what pushed us to dig deeper:
 
 ### A. Code Artefacts
 
-The code lives in `code/business_entity_resolution/` (Python ≥ 3.11):
+The code lives in `code/business_entity_resolution/` (Python 3.12 or 3.13):
 - `README.md`;
 - `requirements.txt`, with every dependency pinned;
 - `src/`, which has:
@@ -361,10 +361,10 @@ The code lives in `code/business_entity_resolution/` (Python ≥ 3.11):
   - its pytest suite (`src/tests/`);
   - a few tools (`src/tools/`).
 
-A few things about how it's organised:
+How it's organised:
 - Each stage reads the previous stage's output from `artifacts/<run>/<stage>/` and writes its own.
 - Each stage also writes a `manifest.json` with the config hash, git commit, timings, peak memory and metrics, so every run can be traced.
-- Every parameter lives in `src/ber/configs/default.yaml`, which is exactly the configuration we submitted.
+- Every parameter lives in `src/ber/configs/default.yaml`, which is our submitted configuration.
 
 ```bash
 pip install -r code/business_entity_resolution/requirements.txt
@@ -405,7 +405,7 @@ And in `src/tools/`:
 | Stage-1 filter (p1 ≥ 0.001) = `candidate_pairs.tsv` | 1.07 | 99.02 % |
 | Final links | 0.72 | 97.41 % |
 
-**What stage 2 relies on most (by gain):**
+**What stage 2 leans on most (by gain):**
 1. the record's margin over its other candidates (55 % of the gain);
 2. p1 and its logit (37 %);
 3. the cross-encoder's score and its margin within the record (`ce` 1.4 %, `ce_q_margin` 1.2 %);
@@ -429,7 +429,7 @@ And in `src/tools/`:
 | Label-shift EM per lookalike segment | odds ratios hit their bounds | features shift inside segments; the anchor replaced it |
 | Importance weights from adversarial validation | effective sample size 11 % | degenerate |
 
-We removed the code for these from the package to keep it lean. Their results are recorded here and in Appendix C.
+We removed the code for these from the package to keep it lean. Their results live here and in Appendix C.
 
 ### C. How We Got Here: Experiments Across All Branches
 
@@ -439,7 +439,7 @@ We tried a lot of things in parallel git branches. The submitted pipeline lives 
 
 | Version | Branch | Key idea | Val F0.5 | Public LB | Outcome |
 |---|---|---|---:|---:|---|
-| Teammate baseline | `Rudy_commit_1` | A separate polars pipeline: an inverted index over IDF-weighted keys (name tokens and token pairs, prefixes, address bigrams, house number + token), a 2-stage LightGBM, and a random 3 % entity split | n/a | 0.961 | superseded |
+| Rudraksha's baseline | `Rudy_commit_1` | A separate polars pipeline: an inverted index over IDF-weighted keys (name tokens and token pairs, prefixes, address bigrams, house number + token), a 2-stage LightGBM, and a random 3 % entity split | n/a | 0.961 | superseded |
 | v1 | `main` | Region-blocked TF-IDF → ~70 features → LightGBM → one owner → expected F0.5 | 0.98211 | 0.975 | superseded |
 | main v2 | `main` | + lookalike features, cluster-context rescoring, and a separate unseen-country model trained on synthetic French data | 0.98906 | **0.972** | dropped (LB went down) |
 | v2.1 | `improve/v2` | New normalisation and feature set, plus a stage-2 re-ranker on all 102 features | 0.98895 | 0.977 | superseded |
@@ -460,7 +460,7 @@ We tried a lot of things in parallel git branches. The submitted pipeline lives 
 - Stage 1 reached a dev AUC of 0.99992.
 
 *France and synthetic data:*
-- **E1:** our first leaderboard submission went from 0.98211 on validation to 0.975 on the LB. That implied France was scoring around 0.94.
+- **E1:** our first leaderboard submission went from 0.98211 on validation to 0.975 on the LB. That implied France was scoring around 0.94. Oof.
 - **E3–E4:** we dug into France's errors. It has 13.3 % of S1 sharing an exact address with another S1, against 4.6 % in the US. We built a France proxy that stayed within ~1.3× of real France on every statistic we checked.
 - **E5–E6:** a synthetic French training set lifted the proxy from 0.880 to 0.971 but cost −0.0014 on dev, so we moved it into a separate unseen-country model.
 - **E6:** lookalike features took dev from 0.97655 to 0.97823.
@@ -476,7 +476,7 @@ We tried a lot of things in parallel git branches. The submitted pipeline lives 
 
 *Speed, and the v2 regression:*
 - **E7, E12:** we sped up features (285 s → 114 s) and found and fixed a bug in how we used rapidfuzz's `score_cutoff`.
-- **E18:** main v2 scored **0.972 on the LB, despite +0.007 on validation**.
+- **E18:** main v2 scored **0.972 on the LB, despite +0.007 on validation**. Big L, bigger lesson:
   - Test S1 attract about 60 % more candidate records than validation S1, so our per-S1 count features shifted (`s_n_cands` 364 → 576).
   - The synthetic-France model had made France too strict.
   - This was the lesson that shaped everything on `improve/v2`.
@@ -529,7 +529,7 @@ We tried a lot of things in parallel git branches. The submitted pipeline lives 
   - Most of India's loss came from Indic-script names.
   - One round of pseudo-labels (99.8 % correct) gave **no gain**.
   - Calibration held up (predicted 0.660 vs actual 0.665).
-- **E31:** a copy-slot test said roughly half of French generic-word swaps are real copies, so the model's hesitation there was about right. We made no further France-specific change.
+- **E31:** a copy-slot test estimated that roughly half of French generic-word swaps are real copies, so the v3 model's hesitation there (p2 ≈ 0.75) looked about right, and the v3 line made no France-specific change. Heads up: this doesn't agree with the anchor on our final line, which puts its generic-swap kind at π ≈ 0.81 (section 4.5). The two label-free estimates define the pairs differently (same exact address vs same street) and lean on different assumptions, and there are no French labels to settle it. We kept the anchor because it passed its simulation checks (no false alarms, 96–99 % of the loss recovered under a wrong prior).
 - **E32:** we stopped this line, deleted its artifacts and archived the v3 submission file. Work carried on in `improve/v2` and `explore/cross-encoder`.
 
 **`explore/cross-encoder`: v2.7, the final version**
@@ -546,8 +546,8 @@ We tried a lot of things in parallel git branches. The submitted pipeline lives 
 ### D. Reproducing It
 
 **What you need:**
-- Python 3.11–3.13 (on Windows, set `PYTHONUTF8=1`).
-- PyTorch with CUDA for the cross-encoder (`torch==2.14.0`, the CUDA 12.6 build from the PyTorch index). The CPU build works, just slowly.
+- Python 3.12 or 3.13 (the pinned numpy 2.5 and scipy 1.18 need at least 3.12; on Windows, set `PYTHONUTF8=1`).
+- PyTorch with CUDA for the cross-encoder (`torch==2.14.0`, the CUDA 12.6 build from the PyTorch index). The CPU build works, it's just slow.
 - GPU top-k retrieval through CuPy is optional. Without it, the pipeline falls back to the CPU.
 - The model checkpoint downloads from Hugging Face the first time. To run offline, point `--set crossenc.base_model=<local dir>` at a local copy.
 

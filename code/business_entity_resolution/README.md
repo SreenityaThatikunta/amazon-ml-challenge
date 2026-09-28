@@ -1,9 +1,9 @@
 # Business Entity Resolution (team pootato, Amazon ML Challenge 2026)
 
-This is our pipeline for matching messy business records to the entities they describe.
-- **The data.** There's a clean, deduplicated reference list (S1) and two noisy secondary sources (S2, S3). It covers the US and India, plus France, which only shows up in the test set.
-- **How it works.** Character-trigram retrieval and a learned filter narrow the search to about 5.5 candidates per entity, while keeping 99 % of the true matches. A LightGBM re-ranker that knows about competing records makes the final call, helped by a fine-tuned transformer cross-encoder.
-- **How well it does.** Macro F0.5 of **0.99078** on held-out states, and **0.98316** on the public leaderboard.
+tl;dr: we take messy business records and figure out which real business each one belongs to.
+- **The data.** One clean, deduplicated reference list (S1) and two noisy side sources (S2, S3). It covers the US and India, plus France, which only shows up in the test set (surprise).
+- **How it works.** Character-trigram retrieval and a learned filter cut the search down to about 5.5 candidates per entity while keeping 99 % of the real matches. Then a LightGBM re-ranker that can see the competition makes the final call, with a fine-tuned transformer cross-encoder feeding it hints.
+- **How well it does.** Macro F0.5 of **0.99078** on held-out states and **0.98316** on the public leaderboard. Not bad, ngl.
 
 | Metric | Value |
 |---|---|
@@ -44,30 +44,30 @@ flowchart TB
     class CP,MR out;
 ```
 
-## The problem
+## The problem (aka why this is harder than it looks)
 
-S1 is a deduplicated list of businesses. S2 and S3 each hold their own noisy copies of those businesses, mixed in with records that don't match anything. For every S1 entity, we have to list its S2 and S3 records.
+S1 is a deduplicated list of businesses. S2 and S3 each have their own noisy copies of those businesses, mixed in with records that don't match anything at all. For every S1 entity, we have to find all of its S2 and S3 records.
 
-What makes it hard:
-- **Names get mangled.** There are abbreviations, legal forms, typos, OCR errors, aliases, trade names, and names written in Indian scripts.
+Why it's lowkey hard:
+- **Names get mangled.** Abbreviations, legal forms, typos, OCR errors, aliases, trade names, and names written in Indian scripts. Basically every way a name can go wrong.
 - **Addresses get mangled too.** Abbreviations, missing or reordered parts, and changed house numbers.
-- **Some records are deliberate traps.** Lookalikes have the same name and street as a real entity but a house number a few units off.
-- **Precision matters most.** The metric is macro F0.5 per S1 entity, which weighs precision twice as much as recall. An entity with no matches has to be predicted empty.
-- **The test set is different.** Training covers the US and India. The test set (1.73 M S1, 10 M S2/S3 records) adds France, and there are no labels for it.
+- **Some records are straight-up traps.** Lookalikes share a real entity's name and street, but the house number is a few units off. Very sus.
+- **Precision is the main character.** The metric is macro F0.5 per S1 entity, so precision counts twice as much as recall, and an entity with no matches has to be predicted empty.
+- **The test set plays by different rules.** Training covers the US and India. The test set (1.73 M S1, 10 M S2/S3 records) adds France, with zero labels.
 
 ## Our approach
 
-- **Clean the text with the noise in mind.**
+- **Clean the text, noise-aware.**
   - Rules handle legal forms, OCR digits, aliases, and ids and phone numbers pasted into names.
   - Filler words are learned from the data.
   - Indian-script names are romanised with a dictionary learned from training pairs.
-  - Regions (states, state codes, French départements) are pulled out of addresses.
-- **Keep the candidate set small without losing matches.**
+  - Regions (states, state codes, French départements) get pulled out of addresses.
+- **Keep the candidate set tiny without losing matches.**
   - Three character-trigram TF-IDF indexes (name, address, both) are searched near the record's region. Together they find 99.05 % of true pairs.
-  - A LightGBM scorer on 102 pair features then acts as the final blocking filter. 5.53 candidates per S1 are left, and 99.97 % of the true pairs we retrieved survive.
-- **Use the transformer where it's good.**
+  - A LightGBM scorer on 102 pair features then acts as the final blocking filter. 5.53 candidates per S1 are left, and 99.97 % of the true pairs we retrieved make it through.
+- **Let the transformer cook, but only where it's good.**
   - A 22.7 M-parameter MiniLM cross-encoder reads both records together. We fine-tune it only on pairs the scorer never trained on.
-  - As a matcher on its own it's weaker (AUC 0.975 against 0.999). But how far ahead it rates a pair against the competing candidates turns out to be a strong hint for the re-ranker.
+  - As a matcher on its own it's kinda mid (AUC 0.975 vs 0.999). But how far ahead it rates a pair versus the competing candidates? That turns out to be a seriously strong hint for the re-ranker.
 - **Re-rank with the competition in view.**
   - A second LightGBM sees who else is competing for each S1 entity: how many records claim it, how strongly, and from which source. It also gets the cross-encoder's margins.
   - It trains on whole held-out states where every entity's records are all present, just like at test time.
@@ -86,7 +86,7 @@ What makes it hard:
 | Validation with every state unseen by the model scoring it | 0.98988 |
 | Public leaderboard | **0.98316** |
 
-Pair precision on validation is 0.99898 and pair recall is 0.97408. For ablations, error analysis and the reasoning behind each design decision, see `Documentation_template.md` at the root of the submission package.
+Pair precision on validation is 0.99898 and pair recall is 0.97408. Ablations, error analysis and the why behind every design decision live in `Documentation_template.md`, at the root of the submission package.
 
 ### How we got here
 
@@ -98,18 +98,18 @@ Pair precision on validation is 0.99898 and pair recall is 0.97408. For ablation
 | v2.4–v2.6 | re-ranker trained on held-out states with complete S1 groups; French prior correction | 0.98918 | 0.982344 |
 | **v2.7** | **+ MiniLM cross-encoder margins as re-ranker evidence** | **0.99078** | **0.98316** |
 
-We also tried several other ideas in separate branches. They're written up with their numbers in `Documentation_template.md`, Appendix C:
-- a teammate's inverted-index baseline;
+We also tried a bunch of other stuff in separate branches. It's all written up, with numbers, in `Documentation_template.md`, Appendix C:
+- Rudraksha's first baseline, an inverted index over IDF-weighted keys;
 - a separate model for unseen countries, trained on synthetic French data;
 - test-shaped validation, and rehearsing France by leaving one country out;
 - pseudo-labelling;
-- an LLM that picks among the top candidates.
+- an LLM that picks among the top candidates (designed, but never trained).
 
-The code for the ideas we dropped isn't in this package.
+None of the code for the ideas we dropped is in this package.
 
 ## Architecture
 
-Every model is scored on data it never trained on. We split by whole US and Indian states, so lookalikes end up on the same side as the entities they copy.
+Every model gets scored on data it never trained on. We split by whole US and Indian states, so lookalikes land on the same side as the entities they copy. No accidental leakage.
 
 ```mermaid
 %%{init: {"flowchart": {"wrappingWidth": 460, "nodeSpacing": 40, "rankSpacing": 45}}}%%
@@ -144,20 +144,20 @@ flowchart LR
 | Re-rank | `rerank` | `rerank/` | Cross-fitted LightGBM with S1-group context and the cross-encoder's margins |
 | Assign | `decide`, `submit` | `decide/`, `submit.py` | One owner per record, expected F0.5 per S1, prior correction; writes `output/` and runs the official validator |
 
-A few things about how the stages fit together:
+How the stages fit together:
 - You run each stage as `python -m ber <stage> --run <run>`.
 - Each stage reads the previous one's output from `artifacts/<run>/<stage>/` and writes its own there.
-- Every stage also writes a `manifest.json` with the config hash, git commit, timings, peak memory and metrics.
-- All parameters live in [`src/ber/configs/default.yaml`](src/ber/configs/default.yaml), which is exactly what we submitted.
+- Every stage also drops a `manifest.json` with the config hash, git commit, timings, peak memory and metrics, so every run is traceable.
+- All parameters live in [`src/ber/configs/default.yaml`](src/ber/configs/default.yaml), which is our submitted configuration.
 
 ## Reproducing the results
 
 ### Quick start
 
 You'll need:
-- Python 3.11–3.13;
-- a CUDA-capable GPU for the cross-encoder (the CPU build works, just slowly);
-- to run from the directory that contains `dataset/` (with `train/` and `test/`) and this `code/` folder.
+- Python 3.12 or 3.13 (the pinned numpy and scipy need at least 3.12);
+- a CUDA-capable GPU for the cross-encoder (the CPU build works, it's just slow);
+- to run everything from the directory that contains `dataset/` (with `train/` and `test/`) and this `code/` folder.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
@@ -170,17 +170,17 @@ for s in split normalize candidates features features-hold scorer crossenc reran
 done
 ```
 
-This writes `output/matching_results.tsv` and `output/candidate_pairs.tsv`, and checks both with the official validator.
+That writes `output/matching_results.tsv` and `output/candidate_pairs.tsv`, and checks both with the official validator.
 
-Two handy commands:
+Two commands you'll actually use:
 - `python -m pytest code/business_entity_resolution/src/tests` checks that everything installed correctly.
 - `python -m ber explain <entity_id> --run main` follows one record through every stage.
 
-A few notes:
-- Run the stages one at a time, since several of them need 8–10 GB of RAM.
-- The cross-encoder behind the submitted file was trained with the scripts in [`src/tools/crossenc_prototype/`](src/tools/crossenc_prototype/README.md). They follow the same procedure as the `crossenc` stage.
-- GPU training isn't bit-for-bit deterministic, so a re-run gives a very close file, but not an identical one.
-- Runtime and memory per stage, how to run the training and test sides separately, and the main settings are all in `Documentation_template.md`, Appendix D.
+Good to know:
+- Run the stages one at a time; a few of them want 8–10 GB of RAM.
+- The cross-encoder behind the submitted file was trained with the scripts in [`src/tools/crossenc_prototype/`](src/tools/crossenc_prototype/README.md). Same procedure as the `crossenc` stage.
+- GPU training isn't bit-for-bit deterministic, so a re-run gives you a very close file, not an identical one.
+- Runtime and memory per stage, running the training and test sides separately, and the settings that matter are all in `Documentation_template.md`, Appendix D.
 
 ## Repository structure
 
