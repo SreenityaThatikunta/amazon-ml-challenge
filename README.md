@@ -105,7 +105,9 @@ Each leaderboard submission is also tagged (`v1-lb0.975` … `v2.7-lb0.98316`).
 │       ├── ber/               the pipeline package (python -m ber <stage>)
 │       ├── tests/             pytest suite (runs without the challenge data)
 │       └── tools/             license check, submission zip builder, cross-encoder training scripts
-├── docs/methodology.md        full methodology: every experiment, ablation and error analysis
+├── docs/
+│   ├── methodology.md         full methodology: every experiment, ablation and error analysis
+│   └── RESEARCH_NOTES.md      prior art we surveyed before building
 ├── eda/                       exploratory analysis scripts and FINDINGS.md
 └── assets/
 ```
