@@ -79,6 +79,44 @@ def assign_regions(s1: pd.DataFrame, cfg: Config) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def hold_regions(regions: pd.DataFrame, frac: float, seed: int) -> pd.DataFrame:
+    """Whole train-side regions set aside for stage 2 (v2.4, ``rerank.hold_frac``):
+    per country, shuffled regions are added until ~``frac`` of the country's S1 is
+    covered (same greedy rule as the val split, own seed). Stage 1 then trains
+    without them, so their stage-1 scores are out-of-sample like val's and test's,
+    and stage 2 learns from val + these regions (more regions, less region-specific
+    patterns). Returns rows (country, geo, n_s1) of ``regions``."""
+    rng = np.random.default_rng(seed + 11)
+    out = []
+    for country in sorted(regions.country.unique()):
+        r = regions[regions.country == country]
+        sizes = r[r.side == "train"].set_index("geo").n_s1
+        chosen = choose_regions(sizes, frac * r.n_s1.sum(), rng) if frac > 0 else []
+        out.append(r[r.geo.isin(chosen)][["country", "geo", "n_s1"]])
+    return pd.concat(out, ignore_index=True) if out else pd.DataFrame(
+        columns=["country", "geo", "n_s1"])
+
+
+def hold_queries(queries: pd.DataFrame, s1: pd.DataFrame, hold: pd.DataFrame) -> pd.DataFrame:
+    """Train-side queries (S2/S3 records) of the hold regions, as rows (entity_id,
+    country, geo = the hold region they belong to).
+
+    The val split's rule (v2.5): a matched query belongs to its owner's region, an
+    unmatched one to the region in its own address. Every hold S1 then has all its
+    true copies loaded, also those whose address names no region (4-5 % of true
+    copies in US/India: the records that search the whole country, like 35 % of
+    France's) or another region; the query's own region alone (v2.4) missed 5 % of
+    the hold S1's copies and left their groups incomplete.
+    queries: entity_id, country, geo, side, owner ("" if unmatched); s1: entity_id, geo."""
+    tr = queries.loc[(queries.side == "train").to_numpy(), ["entity_id", "country", "geo", "owner"]]
+    owner_geo = s1.set_index("entity_id").geo.reindex(tr.owner.to_numpy()).to_numpy(dtype=object)
+    matched = (tr.owner != "").to_numpy()
+    geo = np.where(matched, owner_geo, tr.geo.to_numpy(dtype=object))
+    out = pd.DataFrame({"entity_id": tr.entity_id.to_numpy(), "country": tr.country.to_numpy(),
+                        "geo": geo})
+    return out.merge(hold[["country", "geo"]].drop_duplicates(), on=["country", "geo"])
+
+
 def _hash_fill(df: pd.DataFrame, mask: pd.Series, regions: pd.DataFrame, cfg: Config) -> None:
     """Side/dev by stable hash for rows in ``mask`` (no usable region), in the
     proportions each country actually got from the region split."""

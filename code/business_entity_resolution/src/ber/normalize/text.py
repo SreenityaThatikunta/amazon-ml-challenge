@@ -6,7 +6,8 @@ catalogue (eda/FINDINGS.md §4):
 1. fold: lowercase, strip Latin accents, ``&``/``+`` -> "and"
 2. alias split: "<x> aka|fka|formerly|dba|doing business as|nee <y>" -> pre/alt parts
 3. domain names: "www.unitedimpex.com" -> "unitedimpex" (flag ``is_domain``)
-4. tokenise (keeping Indic letters and vowel signs), OCR digit fixes in mixed
+4. tokenise (keeping Indic letters and vowel signs), drop injected record ids and
+   phone numbers ("#32038", "(ID: 63317)", "- 9334025793"), OCR digit fixes in mixed
    tokens ("c0mite" -> "comite"), join runs of single letters into known units or
    initials ("l l c" -> "llc", "a p" -> "ap", "d o m d" -> "do md")
 5. transliterate Indic-script tokens to Latin (learned dictionary, then rules)
@@ -20,7 +21,7 @@ import unicodedata
 from dataclasses import dataclass
 from functools import lru_cache
 
-from rapidfuzz.distance import Levenshtein
+from rapidfuzz.distance import OSA
 
 from .lexicon import legal_forms, name_stopwords, ocr_digit_map, read_table
 
@@ -35,6 +36,15 @@ ALIAS_RE = re.compile(
     rf"\b(?:a{_L}k{_L}a|f{_L}k{_L}a|d{_L}b{_L}a|formerly(?:\s+known\s+as)?|"
     r"doing\s+business\s+as|also\s+known\s+as|known\s+as|nee)\b\s*:?")
 DOMAIN_RE = re.compile(r"(?:\bwww\.)?\b([a-z0-9][a-z0-9-]*)\.(?:com|co\.in|in|net|org|fr|biz|info)\b")
+# record ids the noise appends to S2/S3 names ("#32038"); see also _is_injected_number
+HASH_NUM_RE = re.compile(r"#\s?\d{3,}")
+
+
+def _is_injected_number(tok: str) -> bool:
+    """Numbers the noise appends to S2/S3 names: 5-digit record ids ("(ID: 63317)")
+    and 10-digit phone numbers ("... - 9334025793"). S1 names only hold numbers of
+    <= 4 digits (house numbers, union locals), almost never 5 or >= 7 digits."""
+    return tok.isdigit() and (len(tok) == 5 or len(tok) >= 7)
 
 
 def fold(s: str) -> str:
@@ -48,10 +58,6 @@ def fold(s: str) -> str:
 
 def tokens(folded: str) -> list[str]:
     return _NON_WORD.sub(" ", folded).split()
-
-
-def is_indic(s: str) -> bool:
-    return bool(INDIC_RE.search(s))
 
 
 @lru_cache(maxsize=1)
@@ -127,12 +133,14 @@ class NameNormalizer:
         self.translit = translit
         self.legal = legal_forms()
         self.stop = name_stopwords()
-        # long legal words tolerate one typo ("prlvate", "limted"); short ones must be exact
+        # long legal words tolerate one typo ("prlvate", "limted", "priavte"); short ones
+        # must be exact
         self._long_legal = [v for v in self.legal if len(v) >= 6]
         self._fuzzy_cache: dict[str, str | None] = {}
 
     def _legal_variant(self, t: str) -> str | None:
-        """The legal-form variant ``t`` spells (exactly or with one typo), or None."""
+        """The legal-form variant ``t`` spells (exactly or with one typo, an adjacent
+        swap counting as one: "privtae", "prviate"), or None."""
         if t in self.legal:
             return t
         if len(t) < 6 or not t.isalpha():
@@ -140,19 +148,23 @@ class NameNormalizer:
         if t not in self._fuzzy_cache:
             self._fuzzy_cache[t] = next(
                 (v for v in self._long_legal
-                 if Levenshtein.distance(t, v, score_cutoff=1) <= 1), None)
+                 if OSA.distance(t, v, score_cutoff=1) <= 1), None)
         return self._fuzzy_cache[t]
 
     def _toks(self, folded: str) -> tuple[list[str], int]:
         toks, oov = [], 0
-        for t in tokens(folded):
+        for t in tokens(HASH_NUM_RE.sub(" ", folded)):
+            if _is_injected_number(t):
+                continue
             if self.translit is not None and INDIC_RE.search(t):
                 t, known = self.translit(t)
                 oov += not known
                 toks.extend(t.split())
             else:
                 toks.append(ocr_fix(t))
-        return join_single_letters(toks), oov
+        toks = join_single_letters(toks)
+        # the noise doubles words ("Dynamic Dynamic Retail", "Of Of"); S1 never does
+        return [t for i, t in enumerate(toks) if i == 0 or t != toks[i - 1]], oov
 
     def _split(self, toks: list[str]) -> tuple[list[str], list[str], list[str]]:
         variants = [self._legal_variant(t) for t in toks]

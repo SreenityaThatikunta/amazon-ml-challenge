@@ -21,12 +21,15 @@ from typing import Any
 import yaml
 
 PACKAGE_DIR = Path(__file__).resolve().parent
-CONFIG_DIR = PACKAGE_DIR.parents[1] / "configs"
+CONFIG_DIR = PACKAGE_DIR / "configs"
 DEFAULT_CONFIG = CONFIG_DIR / "default.yaml"
 
 
 class ConfigError(ValueError):
     pass
+
+
+PHASES = ("all", "train", "test")
 
 
 # ---------------------------------------------------------------- schema
@@ -47,6 +50,8 @@ class DataConfig:
     slice: str | None = None  # None = full data; "dev" = dev slice (T0.3)
     split_run: str = "main"   # run whose `split` stage defines sides and the dev slice
     with_test: bool = True    # also process the test split (needs full data, no slice)
+    phase: str = "all"        # "all" | "train" (train/val side only) | "test" (test side only,
+                              # reusing the train-side outputs already in the stage dirs)
 
 
 @dataclass
@@ -55,8 +60,6 @@ class NormalizeConfig:
     chunk_size: int = 100_000     # records per worker task
     dict_min_count: int = 2       # translit dictionary: min aligned occurrences
     dict_min_share: float = 0.6   # translit dictionary: min share of the dominant spelling
-    test_dict_all_pairs: bool = True  # test records: dictionary from all train pairs (not
-                                      # only train-side ones; val regions hold all Gurmukhi)
 
 
 @dataclass
@@ -79,13 +82,18 @@ class CandidatesConfig:
     block_by_region: bool = True
     region_min_share: float = 0.001  # neighbourhood: owner regions with >= this share
     k_name_noaddr: int = 30       # name candidates for queries with an empty address
+    device: str = "auto"          # top-k search: "cpu" | "gpu" (CuPy) | "auto"
+    gpu_mem_gb: float = 1.5       # GPU memory for one chunk's dense similarity block
+    gpu_min_s1: int = 50_000      # blocks with fewer S1 records search on the CPU
 
 
 @dataclass
 class FeaturesConfig:
     train_query_frac: float = 0.2  # share of train-side queries used (val side: all)
-    chunk_rows: int = 2_000_000    # candidate pairs per feature chunk
-    workers: int = 0               # processes for build_features; 0 = min(4, cpu_count - 2)
+    chunk_rows: int = 1_000_000    # candidate pairs per feature chunk
+    name_key: bool = True          # v2: filler-free name keys + IDF token overlap
+    filler_min_rate: float = 0.0005  # filler words: min share of S2/S3 names ...
+    filler_min_ratio: float = 2.0    # ... and min ratio to their share of S1 names
 
 
 @dataclass
@@ -99,30 +107,51 @@ class ScorerConfig:
     num_boost_round: int = 3000
     early_stopping: int = 100
     n_threads: int = 0
-    oof_folds: int = 3            # >1: also write out-of-fold scores for train-side pairs
-    model_from_run: str | None = None  # apply that run's model instead of training
-    train_query_frac: float = 0.3   # share of featurised train-side queries used for training
-    es_query_frac: float = 0.2      # share of val-side queries used for early stopping
-    extra_train: list[str] = field(default_factory=list)  # runs whose labelled features_train
-                                                          # pairs are added to training only
-    extra_train_frac: float = 1.0   # query-level share of extra_train pairs used
-    unseen_extra_train: list[str] = field(default_factory=list)  # runs added to a 2nd model for
-                                                                 # countries absent from train
-    unseen_base_frac: float = 0.5   # share of the main model's real pairs in the unseen model
-    drop_features: list[str] = field(default_factory=lambda: ["s_n_cands", "s_n_top1"])
-                                    # not used by the model: per-S1 record counts shift between
-                                    # val and test (test has ~60% more records per S1)
+    train_query_frac: float = 0.14  # share of featurised train-side queries used for training
+    es_query_frac: float = 0.05     # share of val-side queries used for early stopping
+    drop_features: list[str] = field(default_factory=list)  # ablations: names or "prefix*"
 
 
 @dataclass
-class RescoreConfig:
-    k: int = 3                 # top-k stage-1 candidates per query that get rescored
-    conf: float = 0.5          # stage-1 p for a query to count as a confident cluster member
-    folds: int = 2             # cross-fitting folds on val (by the query's best S1)
-    rounds: int = 1            # rescore rounds; round r+1 rebuilds clusters from round-r p
-    stage1_feats: list[str] = field(default_factory=list)  # stage-1 features joined in;
-                                                           # [] = the default short list
-    model_from_run: str | None = None  # apply that run's rescore model to val (France proxy)
+class RerankConfig:
+    min_p1: float = 0.001           # drop pairs below this stage-1 p before stage 2
+    folds: int = 4                  # cross-fitting folds on the val side
+    fold_by: str = "s1"             # "s1" (groups by the record's top S1) | "region" (check)
+    domain_norm: bool = True        # size-dependent features / their per-country-split scale
+    hold_frac: float = 0.4          # v2.4: share of each country's S1 in extra held-out train regions
+                                    # (ber features-hold; stage 1 trains without them)
+    train_sides: list[str] = field(default_factory=lambda: ["val", "hold"])  # stage-2 training pairs:
+                                    # val and/or hold; a side not trained on is scored by the fold mean
+    train_complete: bool = True     # v2.5: train only on pairs whose S1 group is complete (S1 in a val
+                                    # or hold region); the others are still scored
+    norm_complete: bool = True      # domain_norm: S1-group counts take their training scale from
+                                    # complete-group pairs only (as every test group is complete)
+    extra_scores: str | None = "crossenc"  # "crossenc" (that stage's scores) or a dir with val/hold/test_<country>.parquet
+                                    # (q_id, s1_id, ce) in stage 2's row order: an external pair score
+                                    # (cross-encoder logit) + its query / S1-group context as features
+    learning_rate: float = 0.05
+    num_leaves: int = 63
+    min_data_in_leaf: int = 200
+    lambda_l2: float = 1.0
+    feature_fraction: float = 0.9
+    num_boost_round: int = 2000
+    early_stopping: int = 50
+    raw_features: list[str] = field(default_factory=lambda: ["all"])  # or a feature list
+
+
+@dataclass
+class CrossencConfig:
+    """``ber crossenc``: a transformer cross-encoder whose pair score
+    feeds stage 2 (``rerank.extra_scores: crossenc``)."""
+    base_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Apache-2.0, 22 M parameters
+    max_len: int = 64               # tokens per pair (record text + S1 text)
+    batch_size: int = 256
+    learning_rate: float = 5e-5
+    weight_decay: float = 0.01
+    warmup: float = 0.05            # share of the steps with a linear warm-up
+    epochs: int = 2
+    infer_batch: int = 2048         # halved automatically on CUDA out-of-memory
+    chunk: int = 1_000_000          # pairs tokenised at a time
 
 
 @dataclass
@@ -132,38 +161,18 @@ class DecideConfig:
     min_p: float | None = None      # expected_f: drop p below this; None = best on val sweep
     empty_prior: float = 1.0        # expected_f: multiplier on P(no true match)
     tie_duplicates: bool = True     # exact duplicate S2/S3 records share one owner
-    scores_stage: str = "scorer"    # "scorer", "rescore" (M8) or "llm-import" (blended LLM scores)
-    eval_s1: str | None = None      # TSV (entity_id) restricting val scoring to these S1
+    prior_shift: str = "anchor"     # "none" | "anchor" (per name-change kind, from the hn_rel mixture)
+    anchor_min_ratio: float = 2.0   # anchor: correct a kind only if its de-biased odds ratio is beyond this
+    anchor_min_pairs: int = 2000    # anchor: ... and it has at least this many same-street pairs
+    anchor_max_ratio: float = 6.0   # anchor: cap on the applied odds ratio
+    scores_stage: str = "rerank"    # "scorer" (stage 1 only) or "rerank" (stage 2)
     sweep: list[float] = field(default_factory=lambda: [0.02, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3,
                                                         0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8])
 
 
 @dataclass
-class LlmConfig:
-    route_low: float = 0.05       # queries whose best scorer p is in [low, high] go to the LLM
-    route_high: float = 0.95
-    n_candidates: int = 5         # candidates shown per prompt (top by scorer p)
-    easy_frac: float = 0.1        # train prompts: share of non-routed queries also included
-    model_name: str = "Qwen/Qwen3-1.7B"   # Apache-2.0, <= 8B
-    scores_dir: str = "artifacts/llm_scores"  # where Kaggle's llm_scores_<split>.parquet go
-    blend_weight: float | None = None     # None = best on val
-    blend_sweep: list[float] = field(default_factory=lambda: [0.0, 0.25, 0.5, 0.6, 0.7, 0.8,
-                                                              0.9, 1.0])
-
-
-@dataclass
-class FranceConfig:
-    n_entities: int = 20_000        # test S1 France records to synthesise S2/S3 for
-    distractor_rate: float = 0.35   # per S1 and source: chance of one lookalike distractor
-    background_run: str | None = "main"  # run whose test scores pick unmatched background records
-    background_max_p: float = 0.01  # background: best candidate p below this
-    background_frac: float = 0.45   # background records per synthetic query
-    exclude: str | None = None      # TSV (entity_id) of S1 never to synthesise (e.g. proxy eval S1)
-
-
-@dataclass
 class SubmitConfig:
-    write_candidates: bool = True  # also write output/candidate_pairs.tsv (~3 GB; required in the zip)
+    write_candidates: bool = True   # output/candidate_pairs.tsv = input pairs of the final model
 
 
 @dataclass
@@ -178,10 +187,9 @@ class Config:
     candidates: CandidatesConfig = field(default_factory=CandidatesConfig)
     features: FeaturesConfig = field(default_factory=FeaturesConfig)
     scorer: ScorerConfig = field(default_factory=ScorerConfig)
-    rescore: RescoreConfig = field(default_factory=RescoreConfig)
+    rerank: RerankConfig = field(default_factory=RerankConfig)
+    crossenc: CrossencConfig = field(default_factory=CrossencConfig)
     decide: DecideConfig = field(default_factory=DecideConfig)
-    llm: LlmConfig = field(default_factory=LlmConfig)
-    france: FranceConfig = field(default_factory=FranceConfig)
     submit: SubmitConfig = field(default_factory=SubmitConfig)
 
     # ------------------------------------------------------ derived paths
@@ -196,7 +204,17 @@ class Config:
     @property
     def run_test(self) -> bool:
         """Whether stages should also process the test split."""
-        return self.data.slice is None and self.data.with_test
+        return (self.data.slice is None and self.data.with_test
+                and self.data.phase in ("all", "test"))
+
+    @property
+    def run_train(self) -> bool:
+        """Whether stages should process the train split (train + val sides).
+        False only for ``data.phase=test``: the test pass reuses the model,
+        region neighbourhoods and decision parameters of an earlier train pass."""
+        if self.data.phase not in PHASES:
+            raise ConfigError(f"unknown data.phase {self.data.phase!r}; valid: {PHASES}")
+        return self.data.phase in ("all", "train")
 
     @property
     def data_dir(self) -> Path:
@@ -215,9 +233,11 @@ class Config:
         return asdict(self)
 
     def hash(self) -> str:
-        """Stable short hash of the full config (excluding run_id)."""
+        """Stable short hash of the full config (excluding run_id and data.phase,
+        which only choose which part of a stage runs)."""
         d = self.to_dict()
         d.pop("run_id")
+        d["data"].pop("phase")
         blob = json.dumps(d, sort_keys=True, default=str).encode()
         return hashlib.sha256(blob).hexdigest()[:12]
 

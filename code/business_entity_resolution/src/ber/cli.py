@@ -1,8 +1,7 @@
 """Command line entry point: ``ber <stage> [--config ...] [--set k=v] [--run ID]``.
 
 Each pipeline stage is one sub-command, which reads the previous stage's
-artifacts from ``artifacts/<run>/`` and writes its own. Stages that haven't
-been implemented yet are listed with the task that will add them.
+artifacts from ``artifacts/<run>/`` and writes its own.
 """
 
 from __future__ import annotations
@@ -25,7 +24,6 @@ log = get_logger("cli")
 class Command:
     func: Callable[[Config, argparse.Namespace], None]
     help: str
-    task: str | None = None  # plan task that implements it; None = implemented
 
 
 def cmd_config(cfg: Config, args: argparse.Namespace) -> None:
@@ -61,14 +59,24 @@ def cmd_features(cfg: Config, args: argparse.Namespace) -> None:
     run_features(cfg)
 
 
+def cmd_features_hold(cfg: Config, args: argparse.Namespace) -> None:
+    from .features.stage import run_features_hold
+    run_features_hold(cfg)
+
+
 def cmd_scorer(cfg: Config, args: argparse.Namespace) -> None:
     from .scorer.gbm import run_scorer
     run_scorer(cfg)
 
 
-def cmd_rescore(cfg: Config, args: argparse.Namespace) -> None:
-    from .cluster.stage import run_rescore
-    run_rescore(cfg)
+def cmd_crossenc(cfg: Config, args: argparse.Namespace) -> None:
+    from .crossenc.stage import run_crossenc
+    run_crossenc(cfg)
+
+
+def cmd_rerank(cfg: Config, args: argparse.Namespace) -> None:
+    from .rerank.stage import run_rerank
+    run_rerank(cfg)
 
 
 def cmd_decide(cfg: Config, args: argparse.Namespace) -> None:
@@ -86,27 +94,6 @@ def cmd_explain(cfg: Config, args: argparse.Namespace) -> None:
     explain(cfg, args.entity_id)
 
 
-def cmd_llm_export(cfg: Config, args: argparse.Namespace) -> None:
-    from .llm.export import run_llm_export
-    run_llm_export(cfg)
-
-
-def cmd_llm_import(cfg: Config, args: argparse.Namespace) -> None:
-    from .llm.import_scores import run_llm_import
-    run_llm_import(cfg)
-
-
-def cmd_synth_france(cfg: Config, args: argparse.Namespace) -> None:
-    from .france.synth import run_synth_france
-    run_synth_france(cfg)
-
-
-def _planned(task: str) -> Callable[[Config, argparse.Namespace], None]:
-    def run(cfg: Config, args: argparse.Namespace) -> None:
-        raise SystemExit(f"not implemented yet (planned in {task}; see plan.md)")
-    return run
-
-
 COMMANDS: dict[str, Command] = {
     "config": Command(cmd_config, "print the resolved config"),
     "noop": Command(cmd_noop, "no-op stage (tests the artifact/manifest machinery)"),
@@ -114,12 +101,12 @@ COMMANDS: dict[str, Command] = {
     "normalize": Command(cmd_normalize, "stage 0: normalise train + test records"),
     "candidates": Command(cmd_candidates, "stage 1: TF-IDF top-k candidates + recall"),
     "features": Command(cmd_features, "stage 2: pair + context features"),
+    "features-hold": Command(cmd_features_hold,
+                             "features of the held-out train regions (rerank.hold_frac)"),
     "scorer": Command(cmd_scorer, "stage 2: train/apply LightGBM scorer"),
-    "llm-export": Command(cmd_llm_export, "stage 3: route uncertain queries, export prompts"),
-    "llm-import": Command(cmd_llm_import, "stage 3: import Kaggle LLM scores, blend on val"),
-    "rescore": Command(cmd_rescore, "M8: second-stage scorer with cluster context (val cross-fit)"),
+    "crossenc": Command(cmd_crossenc, "transformer cross-encoder: fine-tune, score stage-2 pairs"),
+    "rerank": Command(cmd_rerank, "stage 2b: re-rank with S1/query group context (cross-fitted)"),
     "decide": Command(cmd_decide, "stage 4: one-owner assignment + expected-F0.5, val F0.5"),
-    "synth-france": Command(cmd_synth_france, "synthetic labelled French data (validation proxy)"),
     "submit": Command(cmd_submit, "write output/*.tsv for test and run the validator"),
     "explain": Command(cmd_explain, "trace one entity through every stage"),
 }
@@ -128,15 +115,13 @@ COMMANDS: dict[str, Command] = {
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="ber", description="Business entity resolution pipeline.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="stages marked (T..) are planned; see plan.md")
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="command", required=True, metavar="<stage>")
     for name, c in COMMANDS.items():
-        label = c.help if c.task is None else f"{c.help} ({c.task})"
-        sp = sub.add_parser(name, help=label, description=label)
+        sp = sub.add_parser(name, help=c.help, description=c.help)
         sp.add_argument("--config", "-c", action="append", default=None,
                         help="YAML config file(s), merged in order "
-                             "(default: configs/default.yaml)")
+                             "(default: ber/configs/default.yaml)")
         sp.add_argument("--set", "-s", action="append", default=[], metavar="KEY=VALUE",
                         help="override a config value, e.g. --set candidates.k_name=20")
         sp.add_argument("--run", "-r", default=None, help="run id (artifacts/<run>/)")

@@ -19,6 +19,7 @@ Outputs ``candidates_<split>.parquet``; for train, also a recall report.
 
 from __future__ import annotations
 
+import json
 import os
 
 import numpy as np
@@ -27,7 +28,7 @@ import pandas as pd
 from ..artifacts import StageRun
 from ..config import Config
 from ..log import timed
-from .tfidf import fit_index, pair_cosine, ranks_within_query, topk
+from .tfidf import fit_index, gpu_available, pair_cosine, ranks_within_query, topk
 
 INDEXES = ("name", "addr", "combo")
 RECORD_COLS = ["entity_id", "source", "country", "name_core", "addr_bag", "region",
@@ -82,11 +83,27 @@ def _groups(s1: pd.DataFrame, q: pd.DataFrame, by_region: bool,
         yield np.arange(len(s1)), orphans
 
 
-def _search_group(mats, s_pos, q_pos, no_addr, n_s1, cfg: Config, threads: int):
+def resolve_device(cfg: Config) -> str:
+    """candidates.device: "cpu", "gpu", or "auto" (GPU when CuPy and a CUDA device
+    are available)."""
+    d = cfg.candidates.device
+    if d == "auto":
+        return "gpu" if gpu_available() else "cpu"
+    if d == "gpu" and not gpu_available():
+        raise RuntimeError("candidates.device=gpu but CuPy / a CUDA device is not available")
+    return d
+
+
+def _search_group(mats, s_pos, q_pos, no_addr, n_s1, cfg: Config, threads: int,
+                  device: str = "cpu"):
     """Top-k union for one block: returns (keys, {index: (keys, ranks)})."""
     cc = cfg.candidates
     k = {"name": cc.k_name, "addr": cc.k_addr, "combo": cc.k_combo}
     rank_of = {}
+    # the GPU wins on large blocks only (dense per-query work grows with the block's
+    # S1 count; the CPU kernel's with overlapping postings); small blocks stay on CPU
+    if device == "gpu" and len(s_pos) < cc.gpu_min_s1:
+        device = "cpu"
     for ix in INDEXES:
         Xs, Xq = mats[ix]
         parts_k, parts_r = [], []
@@ -99,7 +116,8 @@ def _search_group(mats, s_pos, q_pos, no_addr, n_s1, cfg: Config, threads: int):
         for qp, kk in runs:
             if len(qp) == 0:
                 continue
-            qi, sj, _ = topk(Xq[qp], Xs[s_pos], kk, cc.chunk_size, threads, cc.min_sim)
+            qi, sj, _ = topk(Xq[qp], Xs[s_pos], kk, cc.chunk_size, threads, cc.min_sim,
+                             device, cc.gpu_mem_gb)
             parts_k.append(qp[qi].astype(np.int64) * n_s1 + s_pos[sj])
             parts_r.append(ranks_within_query(qi))
         rank_of[ix] = (np.concatenate(parts_k) if parts_k else np.array([], dtype=np.int64),
@@ -117,21 +135,29 @@ def generate_country(s1: pd.DataFrame, q: pd.DataFrame, cfg: Config, log,
     k = {"name": cc.k_name, "addr": cc.k_addr, "combo": cc.k_combo}
     no_addr = (q.addr_bag == "").to_numpy()
     threads = cc.n_threads or max(1, (os.cpu_count() or 4) - 2)
+    device = resolve_device(cfg)
+    log.info("  top-k search on %s", device)
     n_s1 = len(s1)
-    mats = {}
+    fitted = {}
     for ix in INDEXES:
         vec, Xs = fit_index(_texts(s1, ix), cc.ngram, cc.max_df)
-        mats[ix] = (Xs, vec.transform(_texts(q, ix)).tocsr())
-        log.info("  index %-5s: %d S1 x %d n-grams, query nnz/row %.1f", ix, Xs.shape[0],
-                 Xs.shape[1], mats[ix][1].nnz / max(q.shape[0], 1))
+        fitted[ix] = (vec, Xs)
+        log.info("  index %-5s: %d S1 x %d n-grams", ix, Xs.shape[0], Xs.shape[1])
     q_ids = pd.Categorical(q.entity_id)
     s_ids = pd.Categorical(s1.entity_id)
     for s_pos, q_pos in _groups(s1, q, cc.block_by_region, neighbors or {}):
         if len(s_pos) == 0 or len(q_pos) == 0:
             continue
-        keys, rank_of = _search_group(mats, s_pos, q_pos, no_addr, n_s1, cfg, threads)
+        # query matrices are built per block (memory: one block's queries at a time);
+        # positions below are local to the block
+        qb = q.iloc[q_pos]
+        mats = {ix: (Xs, vec.transform(_texts(qb, ix)).tocsr())
+                for ix, (vec, Xs) in fitted.items()}
+        local = np.arange(len(q_pos))
+        keys, rank_of = _search_group(mats, s_pos, local, no_addr[q_pos], n_s1, cfg, threads,
+                                      device)
         qi, sj = keys // n_s1, keys % n_s1
-        out = pd.DataFrame({"q_id": q_ids[qi], "s1_id": s_ids[sj]})
+        out = pd.DataFrame({"q_id": q_ids[q_pos[qi]], "s1_id": s_ids[sj]})
         for ix in INDEXES:
             Xs, Xq = mats[ix]
             out[f"cos_{ix}"] = pair_cosine(Xq, Xs, qi, sj)
@@ -144,6 +170,7 @@ def generate_country(s1: pd.DataFrame, q: pd.DataFrame, cfg: Config, log,
                 out[f"rank_{ix}"] = np.where(hit, rr[order][pos], kmax).astype(np.int16)
             else:
                 out[f"rank_{ix}"] = np.int16(kmax)
+        del mats, qb
         yield out
 
 
@@ -153,18 +180,27 @@ def generate_country(s1: pd.DataFrame, q: pd.DataFrame, cfg: Config, log,
 class RecallReport:
     """Accumulates recall statistics part by part (parts partition the queries)."""
 
-    def __init__(self, cfg: Config, recs: pd.DataFrame):
+    def __init__(self, cfg: Config):
         self.cfg = cfg
-        q = recs[recs.source != 1]
-        s1_ids = set(recs.entity_id[recs.source == 1])
-        self.true = q[(q.owner != "") & q.owner.isin(s1_ids)][
-            ["entity_id", "owner", "country", "source", "name_indic", "side"]]
-        self.side = recs.set_index("entity_id").side
-        self.n_queries = len(q)
+        self.true_parts: list[pd.DataFrame] = []
+        self.true: pd.DataFrame | None = None
+        self.side: pd.Series | None = None
+        self.n_queries = 0
         self.found: list[pd.DataFrame] = []
         self.per_query: list[np.ndarray] = []
         self.n_pairs = 0
         self.val_q = self.val_q_leak = self.val_c = self.val_c_leak = 0
+
+    def set_country(self, recs: pd.DataFrame) -> None:
+        """Records of the next country (true pairs never cross countries, so the
+        report is built one country at a time)."""
+        q = recs[recs.source != 1]
+        s1_ids = set(recs.entity_id[recs.source == 1])
+        self.true = q[(q.owner != "") & q.owner.isin(s1_ids)][
+            ["entity_id", "owner", "country", "source", "name_indic", "side"]]
+        self.true_parts.append(self.true)
+        self.side = recs.set_index("entity_id").side
+        self.n_queries += len(q)
 
     def add(self, part: pd.DataFrame) -> None:
         p = part[["q_id", "s1_id", "rank_name", "rank_addr", "rank_combo"]].astype(
@@ -186,6 +222,7 @@ class RecallReport:
     def write(self, st: StageRun) -> None:
         cc = self.cfg.candidates
         k = {"name": cc.k_name, "addr": cc.k_addr, "combo": cc.k_combo}
+        self.true = pd.concat(self.true_parts, ignore_index=True)
         f = pd.concat(self.found, ignore_index=True) if self.found else self.true.iloc[:0]
         hit = self.true.merge(f[["entity_id", "rank_name", "rank_addr", "rank_combo"]],
                               on="entity_id", how="left")
@@ -224,35 +261,49 @@ class RecallReport:
 
 
 def run_candidates(cfg: Config) -> None:
+    """One country at a time (records are read with a parquet filter), so only
+    that country's records and TF-IDF matrices are in memory."""
     with StageRun(cfg, "candidates") as st:
-        splits = ["train"] + (["test"] if cfg.run_test else [])
+        splits = (["train"] if cfg.run_train else []) + (["test"] if cfg.run_test else [])
         neighbors: dict[str, dict[str, list[str]]] = {}
+        if not cfg.run_train:  # test-only pass: neighbourhoods learned by the train pass
+            with open(st.path("region_neighbors.json"), encoding="utf-8") as f:
+                neighbors = json.load(f)
         for split in splits:
             cols = RECORD_COLS + (TRAIN_COLS if split == "train" else [])
-            recs = pd.read_parquet(st.input_path("normalize", f"records_{split}"), columns=cols)
-            if split == "train":  # learned on train-side pairs, reused for test
-                side_train = recs[(recs.source == 1) | (recs.side == "train")]
-                neighbors = region_neighbors(side_train, cfg.candidates.region_min_share)
-                st.write_json(neighbors, "region_neighbors")
-                st.metric("region_neighbors_merged", {c: {r: v for r, v in nb.items() if len(v) > 1}
-                                                      for c, nb in neighbors.items()})
-                report = RecallReport(cfg, recs)
+            path = st.input_path("normalize", f"records_{split}")
+            countries = sorted(pd.read_parquet(path, columns=["country"]).country.unique())
+            report = RecallReport(cfg) if split == "train" else None
             out_dir = st.path(f"candidates_{split}")
             out_dir.mkdir(parents=True, exist_ok=True)
             for old in out_dir.glob("*.parquet"):
                 old.unlink()
             n_parts = n_rows = 0
-            for country in sorted(recs.country.unique()):
-                c = recs[recs.country == country]
+            parts_by_country: dict[str, list[str]] = {}
+            for country in countries:
+                c = pd.read_parquet(path, columns=cols, filters=[("country", "==", country)])
+                if split == "train":  # learned on train-side pairs, reused for test
+                    side_train = c[(c.source == 1) | (c.side == "train")]
+                    neighbors.update(region_neighbors(side_train, cfg.candidates.region_min_share))
+                    del side_train
+                    report.set_country(c)
                 s1, q = c[c.source == 1], c[c.source != 1]
+                del c
                 with timed(st.log, f"{split} {country}: {len(q):,} queries x {len(s1):,} S1"):
                     for part in generate_country(s1, q, cfg, st.log, neighbors.get(country)):
-                        part.to_parquet(out_dir / f"part-{n_parts:05d}.parquet", index=False)
+                        name = f"part-{n_parts:05d}.parquet"
+                        part.to_parquet(out_dir / name, index=False)
+                        parts_by_country.setdefault(country, []).append(name)
                         n_parts += 1
                         n_rows += len(part)
-                        if split == "train":
+                        if report is not None:
                             report.add(part)
+                del s1, q
             st.register(f"candidates_{split}", out_dir, rows=n_rows, parts=n_parts)
+            st.write_json(parts_by_country, f"parts_{split}")
             if split == "train":
+                st.write_json(neighbors, "region_neighbors")
+                st.metric("region_neighbors_merged", {c: {r: v for r, v in nb.items() if len(v) > 1}
+                                                      for c, nb in neighbors.items()})
                 with timed(st.log, "recall report"):
                     report.write(st)
