@@ -3,7 +3,7 @@
     <team>_submission.zip
     ├── output/matching_results.tsv, output/candidate_pairs.tsv
     ├── code/business_entity_resolution/   (src/, README.md, requirements.txt)
-    └── Documentation_template.md
+    └── Documentation_template.md       (copied from docs/methodology.md)
 
 Run from the project root (the directory with dataset/ and output/):
 
@@ -42,7 +42,7 @@ def main() -> None:
                 if p.suffix in SKIP_SUFFIXES or f in SKIP_FILES:
                     continue
                 z.write(p, "code/business_entity_resolution/" + p.relative_to(CODE).as_posix())
-        z.write(root / "Documentation_template.md", "Documentation_template.md")
+        z.write(root / "docs" / "methodology.md", "Documentation_template.md")
     os.replace(tmp, out)
     with zipfile.ZipFile(out) as z:
         bad = z.testzip()

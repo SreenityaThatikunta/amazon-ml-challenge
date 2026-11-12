@@ -86,7 +86,7 @@ What makes it hard:
 | Validation with every state unseen by the model scoring it | 0.98988 |
 | Public leaderboard | **0.98316** |
 
-Pair precision on validation is 0.99898 and pair recall is 0.97408. For ablations, error analysis and the reasoning behind each design decision, see `Documentation_template.md` at the root of the submission package.
+Pair precision on validation is 0.99898 and pair recall is 0.97408. For ablations, error analysis and the reasoning behind each design decision, see the [methodology write-up](../../docs/methodology.md).
 
 ### How we got here
 
@@ -98,14 +98,14 @@ Pair precision on validation is 0.99898 and pair recall is 0.97408. For ablation
 | v2.4–v2.6 | re-ranker trained on held-out states with complete S1 groups; French prior correction | 0.98918 | 0.982344 |
 | **v2.7** | **+ MiniLM cross-encoder margins as re-ranker evidence** | **0.99078** | **0.98316** |
 
-We also tried several other ideas in separate branches. They're written up with their numbers in `Documentation_template.md`, Appendix C:
+We also tried several other ideas in separate branches. They're written up with their numbers in the [methodology write-up](../../docs/methodology.md), Appendix C, and each one is preserved on its own `experiment/*` branch:
 - Rudraksha's inverted-index baseline;
 - a separate model for unseen countries, trained on synthetic French data;
 - test-shaped validation, and rehearsing France by leaving one country out;
 - pseudo-labelling;
 - an LLM that picks among the top candidates (designed, but never trained).
 
-The code for the ideas we dropped isn't in this package.
+The code for the ideas we dropped isn't on `main`; see the experiment branches.
 
 ## Architecture
 
@@ -180,7 +180,7 @@ A few notes:
 - Run the stages one at a time, since several of them need 8–10 GB of RAM.
 - The cross-encoder behind the submitted file was trained with the scripts in [`src/tools/crossenc_prototype/`](src/tools/crossenc_prototype/README.md). They follow the same procedure as the `crossenc` stage.
 - GPU training isn't bit-for-bit deterministic, so a re-run gives a very close file, but not an identical one.
-- Runtime and memory per stage, how to run the training and test sides separately, and the main settings are all in `Documentation_template.md`, Appendix D.
+- Runtime and memory per stage, how to run the training and test sides separately, and the main settings are all in the [methodology write-up](../../docs/methodology.md), Appendix D.
 
 ## Repository structure
 

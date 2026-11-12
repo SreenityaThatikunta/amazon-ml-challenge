@@ -433,26 +433,26 @@ We removed the code for these from the package to keep it lean. Their results ar
 
 ### C. How We Got Here: Experiments Across All Branches
 
-We tried a lot of things in parallel git branches. The submitted pipeline lives on `explore/cross-encoder`, and everything below fed into it one way or another.
+We tried a lot of things in parallel git branches. The submitted pipeline lives on `main` (its full development history is on `experiment/v2.7-cross-encoder`), and everything below fed into it one way or another.
 
 **Timeline**
 
 | Version | Branch | Key idea | Val F0.5 | Public LB | Outcome |
 |---|---|---|---:|---:|---|
-| Rudraksha's baseline | `Rudy_commit_1` | A separate polars pipeline: an inverted index over IDF-weighted keys (name tokens and token pairs, prefixes, address bigrams, house number + token), a 2-stage LightGBM, and a random 3 % entity split | n/a | 0.961 | superseded |
-| v1 | `main` | Region-blocked TF-IDF → ~70 features → LightGBM → one owner → expected F0.5 | 0.98211 | 0.975 | superseded |
-| main v2 | `main` | + lookalike features, cluster-context rescoring, and a separate unseen-country model trained on synthetic French data | 0.98906 | **0.972** | dropped (LB went down) |
-| v2.1 | `improve/v2` | New normalisation and feature set, plus a stage-2 re-ranker on all 102 features | 0.98895 | 0.977 | superseded |
-| v2.2 | `improve/v2` | Stage-2 density rescaling | 0.98897 | 0.980 | superseded |
-| v3 | `v3` | v2.2 + main's lookalike features, 100 name candidates for address-less records, all-pairs Indic dictionary for test | 0.98954 | 0.9805 | superseded |
-| v2.4 | `improve/v2` | Stage 2 on validation + 20 % held-out regions; France anchor correction | 0.98911 | 0.980973 | superseded |
-| v2.5 | `improve/v2` | 40 % held-out regions by owner; complete groups only | 0.98923 | 0.981708 | superseded |
-| v2.6 | `improve/v2` | Rescaling taken from complete groups | 0.98918 | 0.982344 | our best without the transformer |
-| **v2.7** | **`explore/cross-encoder`** | **+ MiniLM cross-encoder margins as stage-2 evidence** | **0.99078** | **0.98316** | **submitted** |
-| v2.7 re-run | `explore/cross-encoder` | Same method, fine-tuned again inside the pipeline | 0.99060 | 0.982681 | not chosen (worse on validation, z ≈ 3.9) |
-| LLM selector | `main` (T5.x) | A Qwen3-1.7B LoRA that picks among the top-5 candidates | n/a | n/a | designed but never trained (no Kaggle access), then dropped for cheaper gains |
+| Rudraksha's baseline | `archive/initial-prototype` | A separate polars pipeline: an inverted index over IDF-weighted keys (name tokens and token pairs, prefixes, address bigrams, house number + token), a 2-stage LightGBM, and a random 3 % entity split | n/a | 0.961 | superseded |
+| v1 | `experiment/v1-lightgbm-baseline` | Region-blocked TF-IDF → ~70 features → LightGBM → one owner → expected F0.5 | 0.98211 | 0.975 | superseded |
+| main v2 | `experiment/v1-lightgbm-baseline` | + lookalike features, cluster-context rescoring, and a separate unseen-country model trained on synthetic French data | 0.98906 | **0.972** | dropped (LB went down) |
+| v2.1 | `experiment/v2-group-reranker` | New normalisation and feature set, plus a stage-2 re-ranker on all 102 features | 0.98895 | 0.977 | superseded |
+| v2.2 | `experiment/v2-group-reranker` | Stage-2 density rescaling | 0.98897 | 0.980 | superseded |
+| v3 | `experiment/v3-test-shaped-validation` | v2.2 + main's lookalike features, 100 name candidates for address-less records, all-pairs Indic dictionary for test | 0.98954 | 0.9805 | superseded |
+| v2.4 | `experiment/v2-group-reranker` | Stage 2 on validation + 20 % held-out regions; France anchor correction | 0.98911 | 0.980973 | superseded |
+| v2.5 | `experiment/v2-group-reranker` | 40 % held-out regions by owner; complete groups only | 0.98923 | 0.981708 | superseded |
+| v2.6 | `experiment/v2-group-reranker` | Rescaling taken from complete groups | 0.98918 | 0.982344 | our best without the transformer |
+| **v2.7** | **`experiment/v2.7-cross-encoder`** | **+ MiniLM cross-encoder margins as stage-2 evidence** | **0.99078** | **0.98316** | **submitted** |
+| v2.7 re-run | `experiment/v2.7-cross-encoder` | Same method, fine-tuned again inside the pipeline | 0.99060 | 0.982681 | not chosen (worse on validation, z ≈ 3.9) |
+| LLM selector | `experiment/v1-lightgbm-baseline` (T5.x) | A Qwen3-1.7B LoRA that picks among the top-5 candidates | n/a | n/a | designed but never trained (no Kaggle access), then dropped for cheaper gains |
 
-**`main`: the v1 pipeline and our first experiments (E1–E18)**
+**`experiment/v1-lightgbm-baseline`: the v1 pipeline and our first experiments (E1–E18)**
 
 *Building v1:*
 - Normalisation raised core-name equality on true pairs by 4–8 points, and address-token Jaccard by 11–35 points.
@@ -479,9 +479,9 @@ We tried a lot of things in parallel git branches. The submitted pipeline lives 
 - **E18:** main v2 scored **0.972 on the LB, despite +0.007 on validation**.
   - Test S1 attract about 60 % more candidate records than validation S1, so our per-S1 count features shifted (`s_n_cands` 364 → 576).
   - The synthetic-France model had made France too strict.
-  - This was the lesson that shaped everything on `improve/v2`.
+  - This was the lesson that shaped everything on `experiment/v2-group-reranker`.
 
-**`improve/v2`: v2.1 to v2.6, our main line**
+**`experiment/v2-group-reranker`: v2.1 to v2.6, our main line**
 
 - **The v2 foundations** were filler-free name keys, new house-number features, the brand flag, address IDF and a stage-2 re-ranker. Stage 1 alone scored 0.98337, and adding stage 2 took it to 0.98748 (p2 AUC 0.99917 vs p1 0.99620).
 - **Looking at the shift:**
@@ -510,7 +510,7 @@ We tried a lot of things in parallel git branches. The submitted pipeline lives 
   - US calibration: π = 0.756 against a mean p2 of 0.762.
   - A memory rework cut peak memory from 7.8 to 3.5 GB with bit-identical outputs.
 
-**`v3`: test-shaped validation and France rehearsals (E19–E32)**
+**`experiment/v3-test-shaped-validation`: test-shaped validation and France rehearsals (E19–E32)**
 
 *Building v3:*
 - **E19:** merging v2.2 with main's features, plus 100 name candidates for records with no address, gave 0.99061 on dev.
@@ -530,9 +530,9 @@ We tried a lot of things in parallel git branches. The submitted pipeline lives 
   - One round of pseudo-labels (99.8 % correct) gave **no gain**.
   - Calibration held up (predicted 0.660 vs actual 0.665).
 - **E31:** a copy-slot test estimated that roughly half of French generic-word swaps are real copies, so the v3 model's hesitation there (p2 ≈ 0.75) looked about right, and the v3 line made no France-specific change. This estimate does not agree with the anchor on our final line, which puts its generic-swap kind at π ≈ 0.81 (section 4.5). The two label-free estimates define the pairs differently (same exact address vs same street) and rest on different assumptions, and there are no French labels to settle it. We kept the anchor because it passed its simulation checks (no false alarms, and 96–99 % of the loss recovered under a wrong prior).
-- **E32:** we stopped this line, deleted its artifacts and archived the v3 submission file. Work carried on in `improve/v2` and `explore/cross-encoder`.
+- **E32:** we stopped this line, deleted its artifacts and archived the v3 submission file. Work carried on in `experiment/v2-group-reranker` and `experiment/v2.7-cross-encoder`.
 
-**`explore/cross-encoder`: v2.7, the final version**
+**`experiment/v2.7-cross-encoder`: v2.7, the final version**
 
 - We fine-tuned MiniLM on 982 k out-of-sample pairs. On its own it reached a validation AUC of 0.975, so we ruled it out as the main matcher.
 - Stacking its score with p2 in a logistic regression helped a little (log loss 0.0357 → 0.0353).

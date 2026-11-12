@@ -10,8 +10,6 @@ output/
 eda/.cache/
 eda/reports/
 
-# --- Local docs ---
-docs/
 
 # --- Models / LLM (Kaggle downloads, LoRA checkpoints) ---
 models/
